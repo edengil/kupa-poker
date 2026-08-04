@@ -6,6 +6,7 @@
    ============================================================================ */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { store } from "../lib/store";
+import { buildReport } from "../lib/report";
 
 const DB_KEY = "poker:db";
 const CONFIG_KEY = "poker:config";
@@ -2040,24 +2041,60 @@ function PlayersTab({
   onPlayer
 }) {
   const A = AL(db);
-  const totals = useMemo(() => allTimeTotals(db), [db]);
+  const nowD = new Date();
+  const [scope, setScope] = useState("all"); // all | year | month
+  const [y, setY] = useState(nowD.getFullYear());
+  const [mo, setMo] = useState(nowD.getMonth() + 1);
+
+  const years = useMemo(() => {
+    const set = new Set([...db.sessions.map(x => x.y), ...db.yearly.map(x => x.y)]);
+    return [...set].sort((a, b) => b - a);
+  }, [db]);
+
+  const totals = useMemo(() => {
+    if (scope === "year") return yearTotals(db, y).totals;
+    if (scope === "month") return monthTotals(db, y, mo);
+    return allTimeTotals(db);
+  }, [db, scope, y, mo]);
+
+  // ספירת הערבים חייבת להיות באותו חתך כמו הסכומים, אחרת הממוצע לא מייצג
   const counts = useMemo(() => {
+    const inScope = db.sessions.filter(x => scope === "all" ? true : scope === "year" ? x.y === y : x.y === y && x.mo === mo);
     const c = {};
-    for (const s of db.sessions) {
+    for (const x of inScope) {
       const seen = new Set();
-      for (const e of s.entries) {
-        const n = canon(e.name, A);
-        if (!seen.has(n)) {
-          c[n] = (c[n] || 0) + 1;
-          seen.add(n);
+      for (const e of x.entries) {
+        const nm = canon(e.name, A);
+        if (!seen.has(nm)) {
+          c[nm] = (c[nm] || 0) + 1;
+          seen.add(nm);
         }
       }
     }
     return c;
-  }, [db]);
-  if (!totals.length) return /*#__PURE__*/React.createElement(Empty, {
-    text: "\u05D0\u05D9\u05DF \u05E9\u05D7\u05E7\u05E0\u05D9\u05DD \u05E2\u05D3\u05D9\u05D9\u05DF."
+  }, [db, scope, y, mo]);
+
+  const sub = scope === "all" ? "2025 לפי המאזן השנתי הרשמי · שאר השנים לפי הערבים" : scope === "year" ? `כל הערבים של ${y}` : `${MONTHS[mo - 1]} ${y}`;
+  const pill = active => ({
+    cursor: "pointer",
+    borderRadius: 999,
+    padding: "6px 14px",
+    fontFamily: "inherit",
+    fontSize: 13,
+    fontWeight: 600,
+    background: active ? C.brass : C.card,
+    color: active ? C.feltDeep : C.dim,
+    border: `1px solid ${active ? C.brass : C.line}`
   });
+  const sel = {
+    background: C.card,
+    color: C.cream,
+    border: `1px solid ${C.line}`,
+    borderRadius: 999,
+    padding: "6px 10px",
+    fontFamily: "inherit",
+    fontSize: 13
+  };
   return /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 4
@@ -2068,69 +2105,113 @@ function PlayersTab({
       fontWeight: 700,
       margin: "6px 2px 4px"
     }
-  }, "\u05E9\u05D7\u05E7\u05E0\u05D9\u05DD \u2014 \u05DB\u05DC \u05D4\u05D6\u05DE\u05DF"), /*#__PURE__*/React.createElement("p", {
+  }, "שחקנים"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      flexWrap: "wrap",
+      alignItems: "center",
+      margin: "10px 2px 6px"
+    }
+  }, ["all", "year", "month"].map(k => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setScope(k),
+    style: pill(scope === k)
+  }, k === "all" ? "הכל" : k === "year" ? "שנה" : "חודש")), scope !== "all" && /*#__PURE__*/React.createElement("select", {
+    value: y,
+    onChange: e => setY(+e.target.value),
+    style: sel
+  }, years.map(yy => /*#__PURE__*/React.createElement("option", {
+    key: yy,
+    value: yy
+  }, yy))), scope === "month" && /*#__PURE__*/React.createElement("select", {
+    value: mo,
+    onChange: e => setMo(+e.target.value),
+    style: sel
+  }, MONTHS.map((m, i) => /*#__PURE__*/React.createElement("option", {
+    key: m,
+    value: i + 1
+  }, m)))), /*#__PURE__*/React.createElement("p", {
     style: {
       color: C.dim,
       fontSize: 12,
       margin: "0 2px 12px"
     }
-  }, "2025 \u05DC\u05E4\u05D9 \u05D4\u05DE\u05D0\u05D6\u05DF \u05D4\u05E9\u05E0\u05EA\u05D9 \u05D4\u05E8\u05E9\u05DE\u05D9 \xB7 \u05E9\u05D0\u05E8 \u05D4\u05E9\u05E0\u05D9\u05DD \u05DC\u05E4\u05D9 \u05D4\u05E2\u05E8\u05D1\u05D9\u05DD"), /*#__PURE__*/React.createElement("div", {
+  }, sub), !totals.length ? /*#__PURE__*/React.createElement(Empty, {
+    text: "אין ערבים בתקופה הזאת."
+  }) : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       gap: 8
     }
-  }, totals.map((t, i) => /*#__PURE__*/React.createElement("button", {
-    key: t.name,
-    onClick: () => onPlayer(t.name),
-    style: {
-      textAlign: "right",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      background: C.card,
-      border: `1px solid ${i === 0 ? C.brass : C.line}`,
-      borderRadius: 12,
-      padding: "12px 14px"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: "0 0 20px",
-      color: C.dim,
-      fontSize: 13,
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, i + 1), /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: 1,
-      fontSize: 14.5,
-      fontWeight: 600,
-      color: C.cream,
-      display: "flex",
-      alignItems: "center",
-      gap: 5
-    }
-  }, i === 0 && /*#__PURE__*/React.createElement(Crown, {
-    size: 15,
-    color: C.brass
-  }), t.name), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
+  }, totals.map((t, i) => {
+    const c = counts[t.name] || 0;
+    const avg = c ? r2(t.amount / c) : null;
+    return /*#__PURE__*/React.createElement("button", {
+      key: t.name,
+      onClick: () => onPlayer(t.name),
+      style: {
+        textAlign: "right",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: C.card,
+        border: `1px solid ${i === 0 ? C.brass : C.line}`,
+        borderRadius: 12,
+        padding: "11px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: "0 0 20px",
+        color: C.dim,
+        fontSize: 13,
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: 14.5,
+        fontWeight: 600,
+        color: C.cream,
+        display: "flex",
+        alignItems: "center",
+        gap: 5
+      }
+    }, i === 0 && /*#__PURE__*/React.createElement(Crown, {
+      size: 15,
+      color: C.brass
+    }), t.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: 1,
+        fontSize: 11,
+        color: C.dim,
+        lineHeight: 1.35
+      }
+    }, /*#__PURE__*/React.createElement("span", null, c, " ערבים"), avg !== null && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: avg >= 0 ? C.win : C.loss,
+        fontVariantNumeric: "tabular-nums",
+        opacity: 0.85
+      }
+    }, fmt(avg), " לערב")), /*#__PURE__*/React.createElement("b", {
+      style: {
+        fontSize: 16,
+        color: t.amount >= 0 ? C.win : C.loss,
+        fontVariantNumeric: "tabular-nums",
+        minWidth: 62,
+        textAlign: "left"
+      }
+    }, fmt(t.amount)), /*#__PURE__*/React.createElement(ChevronLeft, {
+      size: 16,
       color: C.dim
-    }
-  }, counts[t.name] || 0, " \u05E2\u05E8\u05D1\u05D9\u05DD"), /*#__PURE__*/React.createElement("b", {
-    style: {
-      fontSize: 16,
-      color: t.amount >= 0 ? C.win : C.loss,
-      fontVariantNumeric: "tabular-nums",
-      minWidth: 60,
-      textAlign: "left"
-    }
-  }, fmt(t.amount)), /*#__PURE__*/React.createElement(ChevronLeft, {
-    size: 16,
-    color: C.dim
-  })))));
+    }));
+  })));
 }
 
 /* --------------------------- profile ------------------------ */
@@ -2431,7 +2512,7 @@ function LiveTab({
     return () => clearInterval(id);
   }, [startedAt, players.length]);
   const now = new Date();
-  const dLbl = `${now.getDate()}.${now.getMonth() + 1}`;
+  const dLbl = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
   const addPlayer = nm => {
     nm = nm.trim();
     if (!nm || players.some(p => p.name === nm)) return;
@@ -2483,13 +2564,14 @@ function LiveTab({
   const entriesLeft = entriesPrepared === null ? null : r2(entriesPrepared - entriesUsed);
 
   // דוח ביט מתעדכן — בפורמט הקבוצה
-  const bitReport = useMemo(() => {
-    const lines = players.filter(p => +p.buyin > 0).map(p => `${p.name} ${+p.buyin} ביט`);
-    let s = `${dLbl} \n` + lines.join("\n");
-    if (entriesPrepared !== null) s += `\n\n(${entriesPrepared} כניסות מתוכם ${entriesLeft} בחוץ)`;
-    if (startedAt) s += `\n\n🕐 התחלנו ${hhmm(startedAt)} · ${durWords(nowTs - startedAt)} במשחק`;
-    return s.trim();
-  }, [players, entriesPrepared, entriesLeft, dLbl, startedAt, nowTs]);
+  // אותו מפרמט בדיוק שהבוט בוואטסאפ משתמש בו — כדי ששני הטקסטים לא יתפצלו
+  const bitReport = useMemo(() => buildReport({
+    players,
+    entriesCount,
+    startedAt,
+    now: nowTs,
+    cps
+  }), [players, entriesCount, startedAt, nowTs, cps]);
   function saveNight() {
     const entries = nets.filter(n => n.net !== null && n.net !== 0).map(n => ({
       name: n.name,
@@ -3061,8 +3143,18 @@ const RoundBtn = ({
 }, children);
 
 /* ------------------------- שולחן פוקר ----------------------- */
+/* סדר מושבים קבוע. עדן תמיד למטה, והשאר נשמרים באותו מקום יחסי מערב לערב.
+   לשינוי — מספיק לערוך את השורה הזאת. מי שלא ברשימה מקבל מושב פנוי בסוף. */
+const SEAT_ORDER = ["עדן", "אופיר", "קובי", "דוד בני", "אורן", "דן"];
+function seatSort(players) {
+  const idx = nm => {
+    const i = SEAT_ORDER.findIndex(x => nm === x || nm.startsWith(x));
+    return i === -1 ? 999 : i;
+  };
+  return [...players].sort((a, b) => idx(a.name) - idx(b.name));
+}
 function PokerTable({
-  players,
+  players: rawPlayers,
   cps,
   addAmt,
   pot,
@@ -3071,6 +3163,7 @@ function PokerTable({
   startedAt,
   elapsed
 }) {
+  const players = seatSort(rawPlayers);
   const n = players.length;
   // גובה גדל עם מספר השחקנים כדי שהמושבים לא יתנגשו
   const H = n <= 4 ? 250 : n <= 6 ? 280 : n <= 8 ? 310 : 340;
@@ -3151,7 +3244,7 @@ function PokerTable({
       color: C.dim
     }
   }, "\u05DE\u05BE", hhmm(startedAt)))), players.map((p, i) => {
-    const ang = -Math.PI / 2 + i * 2 * Math.PI / Math.max(n, 1); // מתחיל למעלה, בכיוון השעון
+    const ang = Math.PI / 2 + i * 2 * Math.PI / Math.max(n, 1); // מתחיל למטה — שם יושב עדן
     const x = cx + rx * Math.cos(ang),
       y = cy + ry * Math.sin(ang);
     const chips = (+p.buyin || 0) * cps;
@@ -4000,3 +4093,4 @@ const BarChart3 = mkIcon(/*#__PURE__*/React.createElement(React.Fragment, null, 
 })));
 
 export default App;
+export { PokerTable };
