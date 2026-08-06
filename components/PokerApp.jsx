@@ -2075,31 +2075,70 @@ function RecordsTab({ db }) {
       return { iso: s.iso, d: s.d, mo: s.mo, y: s.y, totals: t };
     });
 
-    let bestNight = null, worstNight = null;
+    let bestNight = null, worstNight = null, stormyNight = null;
     const nightsCount = {};
     const history = {}; // name -> [amount, amount...] כרונולוגי
+    const monthAgg = {}; // "name|y-mo" -> סכום החודש לשחקן
 
     for (const n of perNight) {
+      let moved = 0;
       for (const [nm, amount] of Object.entries(n.totals)) {
         nightsCount[nm] = (nightsCount[nm] || 0) + 1;
         (history[nm] = history[nm] || []).push(amount);
+        if (amount > 0) moved = r2(moved + amount);
         if (!bestNight || amount > bestNight.amount) bestNight = { name: nm, amount, d: n.d, mo: n.mo, y: n.y };
         if (!worstNight || amount < worstNight.amount) worstNight = { name: nm, amount, d: n.d, mo: n.mo, y: n.y };
+        const mk = `${nm}|${n.y}-${n.mo}`;
+        monthAgg[mk] = r2((monthAgg[mk] || 0) + amount);
       }
+      // "הערב הסוער" — כמה כסף החליף ידיים (סכום הזכיות של אותו ערב)
+      if (!stormyNight || moved > stormyNight.moved) stormyNight = { moved, d: n.d, mo: n.mo, y: n.y };
     }
 
-    // רצפים: הכי ארוך אי פעם, והרצף החי כרגע (נספר מהערב האחרון של השחקן אחורה)
-    let bestStreak = null, liveStreak = null;
+    /* רצפים וסטטיסטיקות אישיות — הכל מ-history הכרונולוגי של כל שחקן:
+       רצף ניצחונות (הארוך + החי), רצף הפסדים, אחוז ניצחונות, ממוצע לערב,
+       והקאמבק הגדול (ערב חיובי מיד אחרי ערב שלילי). */
+    let bestStreak = null, liveStreak = null, lossStreak = null;
+    let winRate = null, bestAvg = null, comeback = null;
+    const MIN_NIGHTS = 5;
     for (const [nm, arr] of Object.entries(history)) {
-      let cur = 0, max = 0;
+      let cur = 0, max = 0, lcur = 0, lmax = 0;
       for (const v of arr) {
         cur = v > 0 ? cur + 1 : 0;
         if (cur > max) max = cur;
+        lcur = v < 0 ? lcur + 1 : 0;
+        if (lcur > lmax) lmax = lcur;
       }
       let tail = 0;
       for (let i = arr.length - 1; i >= 0 && arr[i] > 0; i--) tail++;
       if (max >= 2 && (!bestStreak || max > bestStreak.count)) bestStreak = { name: nm, count: max };
       if (tail >= 2 && (!liveStreak || tail > liveStreak.count)) liveStreak = { name: nm, count: tail };
+      if (lmax >= 3 && (!lossStreak || lmax > lossStreak.count)) lossStreak = { name: nm, count: lmax };
+
+      for (let i = 1; i < arr.length; i++) {
+        if (arr[i - 1] < 0 && arr[i] > 0) {
+          const jump = r2(arr[i] - arr[i - 1]);
+          if (!comeback || jump > comeback.jump) comeback = { name: nm, jump, from: arr[i - 1], to: arr[i] };
+        }
+      }
+
+      if (arr.length >= MIN_NIGHTS) {
+        const wins = arr.filter(v => v > 0).length;
+        const rate = Math.round(wins / arr.length * 100);
+        if (!winRate || rate > winRate.rate) winRate = { name: nm, rate, nights: arr.length };
+        const avg = r2(arr.reduce((s, v) => s + v, 0) / arr.length);
+        if (avg > 0 && (!bestAvg || avg > bestAvg.avg)) bestAvg = { name: nm, avg, nights: arr.length };
+      }
+    }
+
+    // החודש הטוב אי פעם — שחקן + חודש עם הנטו הגבוה ביותר
+    let bestMonth = null;
+    for (const [key, amount] of Object.entries(monthAgg)) {
+      if (!bestMonth || amount > bestMonth.amount) {
+        const [nm, ym] = key.split("|");
+        const [yy, mm] = ym.split("-");
+        bestMonth = { name: nm, amount, y: +yy, mo: +mm };
+      }
     }
 
     // מלכי התקופה: החודש האחרון שיש בו ערבים, והשנה הנוכחית
@@ -2109,7 +2148,8 @@ function RecordsTab({ db }) {
     const most = Object.entries(nightsCount).sort((a, b) => b[1] - a[1])[0];
 
     return {
-      bestNight, worstNight, bestStreak, liveStreak,
+      bestNight, worstNight, bestStreak, liveStreak, lossStreak,
+      winRate, bestAvg, comeback, stormyNight, bestMonth,
       monthKing: monthT[0] || null, monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
       yearKing: yearT[0] || null, yearLabel: `${last.y}`,
       most: most ? { name: most[0], count: most[1] } : null,
@@ -2169,6 +2209,11 @@ function RecordsTab({ db }) {
           <Card icon="🥶" title="הערב הקשה בהיסטוריה" holder={recs.worstNight.name}
             value={fmt(recs.worstNight.amount)} tone={C.loss} sub={dt(recs.worstNight)} />
         )}
+        {recs.bestMonth && (
+          <Card icon="📅" title="החודש הטוב אי פעם" holder={recs.bestMonth.name}
+            value={fmt(recs.bestMonth.amount)} tone={C.win}
+            sub={`${MONTHS[recs.bestMonth.mo - 1]} ${recs.bestMonth.y}`} />
+        )}
         {recs.liveStreak && (
           <Card icon="⚡" title="רצף ניצחונות פעיל" holder={recs.liveStreak.name}
             value={`${recs.liveStreak.count} ערבים`} />
@@ -2176,6 +2221,29 @@ function RecordsTab({ db }) {
         {recs.bestStreak && (
           <Card icon="🎖️" title="רצף הניצחונות הארוך אי פעם" holder={recs.bestStreak.name}
             value={`${recs.bestStreak.count} ערבים`} />
+        )}
+        {recs.lossStreak && (
+          <Card icon="🌧️" title="הרצף הקשה אי פעם" holder={recs.lossStreak.name}
+            value={`${recs.lossStreak.count} ערבים`} tone={C.loss} />
+        )}
+        {recs.comeback && (
+          <Card icon="🎢" title="הקאמבק הגדול" holder={recs.comeback.name}
+            value={fmt(recs.comeback.jump)} tone={C.win}
+            sub={`מ־${fmt(recs.comeback.from)} ל־${fmt(recs.comeback.to)} בערב אחד`} />
+        )}
+        {recs.winRate && (
+          <Card icon="🎲" title="אחוז הניצחונות הגבוה ביותר" holder={recs.winRate.name}
+            value={`${recs.winRate.rate}%`} tone={C.win}
+            sub={`מתוך ${recs.winRate.nights} ערבים (מינימום 5)`} />
+        )}
+        {recs.bestAvg && (
+          <Card icon="📈" title="הממוצע הטוב ביותר לערב" holder={recs.bestAvg.name}
+            value={fmt(recs.bestAvg.avg)} tone={C.win}
+            sub={`על פני ${recs.bestAvg.nights} ערבים (מינימום 5)`} />
+        )}
+        {recs.stormyNight && recs.stormyNight.moved > 0 && (
+          <Card icon="💸" title="הערב הסוער — הכי הרבה כסף החליף ידיים" holder={dt(recs.stormyNight)}
+            value={fmt(recs.stormyNight.moved)} />
         )}
         {recs.most && (
           <Card icon="🎯" title="המתמיד — הכי הרבה ערבים" holder={recs.most.name}
