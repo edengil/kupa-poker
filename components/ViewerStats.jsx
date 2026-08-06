@@ -25,6 +25,7 @@ const C = {
 const TAB_LABEL = {
   table: "טבלה",
   players: "שחקנים",
+  records: "שיאים",
   live: "לייב",
   input: "הזנה",
   sessions: "ערבים",
@@ -69,6 +70,34 @@ const visitMs = (row) => {
   return Math.max(0, new Date(row.left_at) - new Date(row.at));
 };
 
+/* משך קצר — לזמן על כל טאב, שם דקות עגולות לא מספיקות */
+function fmtShort(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} שנ׳`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} דק׳`;
+  return `${Math.floor(m / 60)} שע׳ ${m % 60} דק׳`;
+}
+
+/* כמה זמן בכל טאב: כל רשומת טאב חיה עד הרשומה הבאה, והאחרונה עד היציאה.
+   רצף באותו טאב מתמזג לקטע אחד. */
+function tabSpans(row) {
+  const list = (row.tabs || []).filter((t) => t && t.tab);
+  const end = row.left_at ? new Date(row.left_at) : null;
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const stop = i + 1 < list.length ? new Date(list[i + 1].at) : end;
+    const ms = stop ? Math.max(0, stop - new Date(list[i].at)) : 0;
+    const last = out[out.length - 1];
+    if (last && last.tab === list[i].tab) last.ms += ms;
+    else out.push({ tab: list[i].tab, ms });
+  }
+  return out;
+}
+
+/* המכשיר נשמר על רשומת הטאב הראשונה של הביקור */
+const deviceOf = (row) => row.tabs?.[0]?.d || null;
+
 export default function ViewerStats({ supabase, online = [], groupId }) {
   const [rows, setRows] = useState(null); // null = טוען
   const [openKey, setOpenKey] = useState(null);
@@ -105,14 +134,23 @@ export default function ViewerStats({ supabase, online = [], groupId }) {
           email: row.email,
           visits: [],
           totalMs: 0,
+          closedVisits: 0,
           tabCounts: {},
+          tabMs: {},
+          devices: new Set(),
         };
         byPerson.set(key, p);
       }
       p.visits.push(row);
       p.totalMs += visitMs(row);
+      if (row.left_at) p.closedVisits += 1;
+      const dev = deviceOf(row);
+      if (dev) p.devices.add(dev);
       for (const t of row.tabs || []) {
         p.tabCounts[t.tab] = (p.tabCounts[t.tab] || 0) + 1;
+      }
+      for (const s of tabSpans(row)) {
+        p.tabMs[s.tab] = (p.tabMs[s.tab] || 0) + s.ms;
       }
     }
     // הפעילים לאחרונה למעלה
@@ -166,11 +204,20 @@ export default function ViewerStats({ supabase, online = [], groupId }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {people.map((p) => {
             const open = openKey === p.key;
-            const topTabs = Object.entries(p.tabCounts)
+            // בעיקר לפי זמן אמיתי בכל טאב; אם אין מדידות זמן — לפי ספירת מעברים
+            const byMs = Object.entries(p.tabMs)
+              .filter(([, ms]) => ms > 0)
               .sort((a, b) => b[1] - a[1])
-              .slice(0, 3)
-              .map(([t]) => TAB_LABEL[t] || t)
-              .join(" · ");
+              .slice(0, 3);
+            const topTabs = byMs.length
+              ? byMs.map(([t, ms]) => `${TAB_LABEL[t] || t} ${fmtShort(ms)}`).join(" · ")
+              : Object.entries(p.tabCounts)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 3)
+                  .map(([t]) => TAB_LABEL[t] || t)
+                  .join(" · ");
+            const avgMs = p.closedVisits ? p.totalMs / p.closedVisits : null;
+            const devices = [...p.devices].join(" · ");
             return (
               <div
                 key={p.key}
@@ -207,8 +254,14 @@ export default function ViewerStats({ supabase, online = [], groupId }) {
                     </div>
                     <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>
                       {p.visits.length} כניסות · סה״כ {fmtDur(p.totalMs)}
-                      {topTabs ? ` · בעיקר ${topTabs}` : ""}
+                      {avgMs != null ? ` · ממוצע ${fmtDur(avgMs)}` : ""}
+                      {devices ? ` · ${devices}` : ""}
                     </div>
+                    {topTabs && (
+                      <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>
+                        בעיקר: {topTabs}
+                      </div>
+                    )}
                   </div>
                   <span style={{ fontSize: 11.5, color: C.dim, flex: "0 0 auto" }}>
                     {ago(p.visits[0].at)}
@@ -218,10 +271,10 @@ export default function ViewerStats({ supabase, online = [], groupId }) {
                 {open && (
                   <div style={{ borderTop: `1px solid ${C.line}`, padding: "4px 14px 11px" }}>
                     {p.visits.slice(0, 20).map((v, i) => {
-                      const seq = (v.tabs || [])
-                        .map((t) => TAB_LABEL[t.tab] || t.tab)
-                        .filter((t, j, arr) => j === 0 || t !== arr[j - 1])
+                      const seq = tabSpans(v)
+                        .map((s) => `${TAB_LABEL[s.tab] || s.tab}${s.ms > 0 ? ` ${fmtShort(s.ms)}` : ""}`)
                         .join(" ← ");
+                      const dev = deviceOf(v);
                       return (
                         <div
                           key={i}
@@ -238,9 +291,10 @@ export default function ViewerStats({ supabase, online = [], groupId }) {
                             </span>
                             <span style={{ color: C.dim }}>{fmtDur(v.left_at ? visitMs(v) : null)}</span>
                           </div>
-                          {seq && (
+                          {(seq || dev) && (
                             <div style={{ color: C.dim, marginTop: 3, fontSize: 11.5 }}>
-                              צפה ב: {seq}
+                              {dev ? `${dev}${seq ? " · " : ""}` : ""}
+                              {seq ? `צפה ב: ${seq}` : ""}
                             </div>
                           )}
                         </div>

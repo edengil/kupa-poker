@@ -2817,6 +2817,16 @@ const Stat = ({
 }, value));
 
 /* ----------------------------- live ------------------------- */
+/* כתובות המארחים הקבועים — לחיצה ממלאת את שדה ההערה בתכנון ערב,
+   כדי לא להקליד את אותה כתובת מחדש בכל פעם. */
+const HOSTS = [
+  { label: "אצלי", text: "אצל עדן · לויתן 4, נתניה · קומה 23, דירה 2303 · קוד בניין #4770#" },
+  { label: "אופיר סנה", text: "אצל אופיר סנה · לויתן 4, נתניה · קומה 15, דירה 1503 · קוד בניין #4770#" },
+  { label: "דור ועדן לירז", text: "אצל דור ועדן לירז · תותחנים 16, כפר יונה" },
+  { label: "שגיא גיל", text: "אצל שגיא גיל · יהדות הדממה 11, הרצליה" },
+  { label: "איציק", text: "אצל איציק · יוסף בורג 10, נתניה · קומה 2, דירה 6 · קוד בניין #7580" },
+];
+
 /* תכנון הערב הבא. נשמר בתוך ה-DB (db.plan) ולכן זורם לצופים דרך אותו
    snapshot — הם רואים את התאריך ועונים מגיע/לא בטבלת ה-RSVP. */
 function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
@@ -2900,6 +2910,23 @@ function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               onChange={(e) => setIso(e.target.value)} style={{ ...field, flex: 1.4 }} />
             <input type="time" value={time}
               onChange={(e) => setTime(e.target.value)} style={{ ...field, flex: 1 }} />
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {HOSTS.map((h) => (
+              <button
+                key={h.label}
+                onClick={() => setNote(h.text)}
+                style={{
+                  padding: "5px 11px", borderRadius: 999,
+                  border: `1px solid ${note === h.text ? C.brass : C.line}`,
+                  background: note === h.text ? `${C.brass}22` : "transparent",
+                  color: note === h.text ? C.brass : C.dim,
+                  fontFamily: "inherit", fontSize: 12, cursor: "pointer",
+                }}
+              >
+                📍 {h.label}
+              </button>
+            ))}
           </div>
           <input
             value={note}
