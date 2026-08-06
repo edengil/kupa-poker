@@ -151,6 +151,20 @@ export default function OwnerApp() {
     }
   }, [supabase]);
 
+  /* נשבר שיא בערב שנשמר → הבוט מכריז בקבוצה. נכשל בשקט — ההכרזה
+     היא בונוס, ושמירת הערב חשובה ממנה. */
+  const notifyRecords = useCallback(async (lines) => {
+    try {
+      await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: `🤖 שיא חדש! 🏆\n\n${lines.join("\n")}` }),
+      });
+    } catch (e) {
+      console.warn("record announce failed:", e.message);
+    }
+  }, []);
+
   const signIn = useCallback(async () => {
     const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
     await supabase.auth.signInWithOAuth({
@@ -179,6 +193,7 @@ export default function OwnerApp() {
           <ViewerStats supabase={supabase} slug={group.slug} groupId={group.id} />
         }
         onGameStart={notifyStart}
+        onRecords={notifyRecords}
         renderRsvps={(planIso) => (
           <RsvpList supabase={supabase} groupId={group.id} planIso={planIso} />
         )}
