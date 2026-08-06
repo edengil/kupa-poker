@@ -6,6 +6,7 @@ import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore } from "../lib/store";
 import { createBroadcaster } from "../lib/realtime";
 import Viewers from "./Viewers";
+import ViewerStats from "./ViewerStats";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -152,7 +153,11 @@ export default function OwnerApp() {
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 13px" }}>
         <Viewers supabase={supabase} slug={group.slug} groupId={group.id} />
       </div>
-      <PokerApp />
+      <PokerApp
+        statsPanel={
+          <ViewerStats supabase={supabase} slug={group.slug} groupId={group.id} />
+        }
+      />
     </>
   );
 }

@@ -122,15 +122,22 @@ create table if not exists public.group_views (
   user_id   uuid references auth.users (id) on delete set null,
   email     text,
   name      text,
-  at        timestamptz not null default now()
+  at        timestamptz not null default now(),
+  left_at   timestamptz,                      -- "נראה לאחרונה" — מתעדכן כל דקה וביציאה
+  tabs      jsonb not null default '[]'::jsonb -- [{tab, at}] — במה הצופה הסתכל ומתי
 );
+
+-- שדרוג להתקנות קיימות (בטוח להריץ שוב)
+alter table public.group_views add column if not exists left_at timestamptz;
+alter table public.group_views add column if not exists tabs jsonb not null default '[]'::jsonb;
 
 create index if not exists group_views_recent_idx on public.group_views (group_id, at desc);
 
 alter table public.group_views enable row level security;
 
-drop policy if exists "owner reads views"     on public.group_views;
-drop policy if exists "viewer logs own view"  on public.group_views;
+drop policy if exists "owner reads views"      on public.group_views;
+drop policy if exists "viewer logs own view"   on public.group_views;
+drop policy if exists "viewer updates own view" on public.group_views;
 
 -- הבעלים רואה את היומן של הקבוצה שלו בלבד
 create policy "owner reads views"
@@ -145,7 +152,13 @@ create policy "viewer logs own view"
   on public.group_views for insert
   with check (auth.uid() = user_id);
 
-grant select, insert on table public.group_views to authenticated;
+-- הצופה מעדכן רק את השורות של עצמו: זמן יציאה ורשימת הטאבים שנצפו
+create policy "viewer updates own view"
+  on public.group_views for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update on table public.group_views to authenticated;
 grant usage, select on sequence public.group_views_id_seq to authenticated;
 grant all privileges on table public.group_views to service_role;
 

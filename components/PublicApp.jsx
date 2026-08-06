@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
-import { subscribeToGroup, fetchSnapshot, joinPresence, logView } from "../lib/realtime";
+import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -29,6 +29,7 @@ export default function PublicApp({ slug }) {
   const [generation, setGeneration] = useState(0);
   const dataRef = useRef(null);
   const loggedRef = useRef(false);
+  const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
 
   /* ---------------------- טעינה אחרי התחברות ---------------------- */
   const load = useCallback(async () => {
@@ -55,10 +56,13 @@ export default function PublicApp({ slug }) {
         return;
       }
       const snap = await load();
-      // רישום ביומן פעם אחת לטעינה, ולא בכל רענון של הנתונים
+      // רישום ביומן פעם אחת לטעינה, ולא בכל רענון של הנתונים.
+      // השורה שנפתחת כאן ממשיכה להתעדכן כל הביקור: טאבים וזמן יציאה.
       if (snap && !loggedRef.current) {
         loggedRef.current = true;
-        logView(supabase, snap.id, user);
+        const viewId = await logView(supabase, snap.id, user);
+        if (alive) visitRef.current = trackVisit(supabase, viewId);
+        else visitRef.current?.stop?.();
       }
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -67,6 +71,8 @@ export default function PublicApp({ slug }) {
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
+      visitRef.current?.stop?.();
+      visitRef.current = null;
     };
   }, [supabase, load]);
 
@@ -186,7 +192,11 @@ export default function PublicApp({ slug }) {
         </div>
       )}
 
-      <PokerApp key={generation} readOnly />
+      <PokerApp
+        key={generation}
+        readOnly
+        onTabChange={(tab) => visitRef.current?.onTab?.(tab)}
+      />
     </>
   );
 }

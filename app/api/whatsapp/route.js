@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, pingViewers } from "@/lib/supabaseAdmin";
 import {
-  parseCommands, applyCommands, extractMessage, isOwner,
+  parseCommands, applyCommands, extractMessage, isAllowed,
   sendToGroup, listGroups, BOT_MARK,
 } from "@/lib/whatsapp";
 
@@ -75,7 +75,7 @@ export async function POST(request) {
   const supabase = getAdminSupabase();
   const { data: row, error } = await supabase
     .from("groups")
-    .select("id, slug, live")
+    .select("id, slug, live, config")
     .eq("slug", process.env.KUPA_GROUP_SLUG)
     .single();
 
@@ -83,6 +83,10 @@ export async function POST(request) {
     console.error("group lookup failed:", error?.message);
     return ok({ skipped: "no group" });
   }
+
+  /* המתג מהאפליקציה: כשהבוט כבוי הוא פשוט לא מגיב לכלום. החיבור ל-Whapi
+     נשאר חי — רק ההתנהגות מושתקת, ולכן אין צורך בסריקת QR מחדש. */
+  if (!row.config?.botOn) return ok({ skipped: "bot off" });
 
   const live = row.live || null;
   const gameActive = (live?.players?.length || 0) > 0;

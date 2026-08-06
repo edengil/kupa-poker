@@ -16,7 +16,8 @@ const LIVE_KEY = "poker:live"; // משחק פעיל — נשמר אוטומטי�
 /* --------- קונפיגורציה: cache במשתנה מודול, נטען פעם אחת, listeners --------- */
 const DEFAULT_CONFIG = {
   chipsPerShekel: 2,
-  defaultBuyin: 50
+  defaultBuyin: 50,
+  botOn: false // הבוט בוואטסאפ מגיב רק כשהדגל דלוק; נדלק אוטומטית עם פתיחת משחק
 };
 let _configCache = {
   ...DEFAULT_CONFIG
@@ -1077,10 +1078,15 @@ async function waShare(text) {
 const waSend = waOpen;
 
 /* ============================ APP ============================ */
-function App({ readOnly = false }) {
+function App({ readOnly = false, onTabChange, statsPanel = null }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState("table");
+  const [tab, setTabState] = useState("table");
+  // מעבר טאב מדווח החוצה — ככה יומן הצפיות יודע במה כל צופה הסתכל
+  const setTab = id => {
+    setTabState(id);
+    if (typeof onTabChange === "function") onTabChange(id);
+  };
   const canWrite = !readOnly;
   const [profile, setProfile] = useState(null);
   useEffect(() => {
@@ -1162,8 +1168,9 @@ function App({ readOnly = false }) {
     }
   }) : tab === "table" ? /*#__PURE__*/React.createElement(TableTab, {
     db: db,
-    years: years
-  }) : /*#__PURE__*/React.createElement(PlayersTab, {
+    years: years,
+    readOnly: readOnly
+  }) : tab === "stats" && statsPanel ? statsPanel : /*#__PURE__*/React.createElement(PlayersTab, {
     db: db,
     onPlayer: setProfile
   })), profile && /*#__PURE__*/React.createElement(ProfileSheet, {
@@ -1174,7 +1181,8 @@ function App({ readOnly = false }) {
     tab: tab,
     setTab: setTab,
     n: db.sessions.length,
-    readOnly: readOnly
+    readOnly: readOnly,
+    hasStats: !!statsPanel
   }));
 }
 
@@ -1409,10 +1417,11 @@ function TabBar({
   tab,
   setTab,
   n,
-  readOnly = false
+  readOnly = false,
+  hasStats = false
 }) {
   const WRITE_TABS = ["live", "input", "sessions"];
-  const items = [["table", "טבלה", BarChart3], ["players", "שחקנים", Users], ["live", "לייב", PlayCircle], ["input", "הזנה", ClipboardPaste], ["sessions", "ערבים", CalendarDays]].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));
+  const items = [["table", "טבלה", BarChart3], ["players", "שחקנים", Users], ["live", "לייב", PlayCircle], ["input", "הזנה", ClipboardPaste], ["sessions", "ערבים", CalendarDays], ...(hasStats ? [["stats", "צפיות", Eye]] : [])].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));
   return /*#__PURE__*/React.createElement("nav", {
     style: {
       position: "fixed",
@@ -1827,9 +1836,11 @@ function SessionsTab({
 /* ---------------------------- table ------------------------- */
 function TableTab({
   db,
-  years
+  years,
+  readOnly = false
 }) {
-  const [scope, setScope] = useState("year");
+  // צופה מהלינק מתחיל בחודש הנוכחי; המנהל מתחיל בתמונה השנתית
+  const [scope, setScope] = useState(readOnly ? "month" : "year");
   const [y, setY] = useState(years[0] || new Date().getFullYear());
   const [mo, setMo] = useState(() => {
     const s = [...db.sessions].sort((a, b) => b.iso.localeCompare(a.iso))[0];
@@ -1914,7 +1925,8 @@ function TableTab({
     text: "\u05D0\u05D9\u05DF \u05E0\u05EA\u05D5\u05E0\u05D9\u05DD \u05DC\u05EA\u05E7\u05D5\u05E4\u05D4 \u05D4\u05D6\u05D5."
   }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ledger, {
     totals: totals,
-    official: official
+    official: official,
+    readOnly: readOnly
   }), /*#__PURE__*/React.createElement("p", {
     style: {
       color: official ? C.brass : C.dim,
@@ -1932,7 +1944,8 @@ function TableTab({
 /* ---------------------------- ledger ------------------------ */
 function Ledger({
   totals,
-  official
+  official,
+  readOnly = false
 }) {
   const winners = totals.filter(t => t.amount > 0),
     losers = totals.filter(t => t.amount < 0),
@@ -2009,7 +2022,10 @@ function Ledger({
   })), zeros.map(t => /*#__PURE__*/React.createElement(Row, {
     key: t.name,
     t: t
-  })), /*#__PURE__*/React.createElement("div", {
+  })),
+  // בדיקת הסגירה (והפער, אם יש) — עניין פנימי של המנהל. צופים מהלינק
+  // רואים רק את הסה"כ הרשמי כשקיים כזה.
+  (official || !readOnly) && /*#__PURE__*/React.createElement("div", {
     style: {
       borderTop: `1px solid ${C.line}`,
       marginTop: 8,
@@ -2422,6 +2438,61 @@ const Stat = ({
 }, value));
 
 /* ----------------------------- live ------------------------- */
+/* מתג הבוט בקבוצת הוואטסאפ. החיבור ל-Whapi נשאר תמיד חי — המתג רק קובע אם
+   ה-webhook מגיב לפקודות. נדלק לבד כשנפתח משחק, נכבה לבד כשהערב נסגר. */
+function BotToggle({ on, onChange }) {
+  return (
+    <div
+      style={{
+        background: C.card,
+        border: `1px solid ${on ? C.win + "77" : C.line}`,
+        borderRadius: 12,
+        padding: "10px 12px",
+        marginBottom: 12,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 9,
+          height: 9,
+          borderRadius: "50%",
+          background: on ? C.win : C.dim,
+          boxShadow: on ? `0 0 0 3px ${C.win}22` : "none",
+          flex: "0 0 auto",
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: C.cream }}>
+          בוט הוואטסאפ {on ? "פעיל" : "כבוי"}
+        </div>
+        <div style={{ fontSize: 11.5, color: C.dim }}>
+          {on ? "מגיב לפקודות בקבוצה. נכבה לבד בסוף הערב." : "נדלק לבד כשנפתח משחק, או ידנית כאן."}
+        </div>
+      </div>
+      <button
+        onClick={() => onChange(!on)}
+        style={{
+          border: "none",
+          cursor: "pointer",
+          borderRadius: 999,
+          padding: "7px 16px",
+          fontFamily: "inherit",
+          fontSize: 13,
+          fontWeight: 700,
+          background: on ? C.feltDeep : C.brass,
+          color: on ? C.cream : C.feltDeep,
+        }}
+      >
+        {on ? "כבה" : "הדלק"}
+      </button>
+    </div>
+  );
+}
+
 function LiveTab({
   db,
   commit
@@ -2518,7 +2589,11 @@ function LiveTab({
     nm = nm.trim();
     if (!nm || players.some(p => p.name === nm)) return;
     setPlayers(p => {
-      if (p.length === 0 && !startedAt) setStartedAt(Date.now());
+      if (p.length === 0 && !startedAt) {
+        setStartedAt(Date.now());
+        // משחק נפתח — הבוט בקבוצה נדלק לבד
+        if (!getConfig().botOn) setConfig({ botOn: true });
+      }
       return [...p, {
         name: nm,
         buyin: addAmt,
@@ -2621,12 +2696,19 @@ function LiveTab({
     setEntriesCount("");
     setStartedAt(null);
     setOutCount("");
+    // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
+    if (getConfig().botOn) setConfig({ botOn: false });
   }
   return /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 4
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(BotToggle, {
+    on: !!cfg.botOn,
+    onChange: v => setConfig({
+      botOn: v
+    })
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
       border: `1px solid ${C.line}`,
@@ -4089,6 +4171,13 @@ const TrendingUp = mkIcon(/*#__PURE__*/React.createElement(React.Fragment, null,
 const X = mkIcon(/*#__PURE__*/React.createElement("path", {
   d: "M18 6 6 18M6 6l12 12"
 }));
+const Eye = mkIcon(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+  d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "12",
+  cy: "12",
+  r: "3"
+})));
 const Award = mkIcon(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
   cx: "12",
   cy: "8",

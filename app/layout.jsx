@@ -1,6 +1,20 @@
 export const metadata = {
   title: "קופה — פוקר",
   description: "מעקב אחרי ערבי הפוקר של הקבוצה",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  // "הוסף למסך הבית" באייפון: פותח כאפליקציה, בלי סרגלי הדפדפן
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "קופה — פוקר",
+  },
 };
 
 export const viewport = {
