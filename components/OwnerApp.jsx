@@ -7,7 +7,7 @@ import { configureStore, makeSupabaseStore, flushStore } from "../lib/store";
 import { createBroadcaster } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
-import { RsvpList } from "./Rsvp";
+import { RsvpList, planLabel } from "./Rsvp";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -165,6 +165,31 @@ export default function OwnerApp() {
     }
   }, []);
 
+  /* נקבע ערב חדש (או עודכן) → הזמנה לקבוצה עם הלינק, שהחברים יאשרו הגעה. */
+  const notifyPlan = useCallback(async (plan, { isUpdate } = {}) => {
+    try {
+      const slug = groupRef.current?.slug;
+      if (!slug) return;
+      const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      const head = isUpdate ? "עדכון לערב הפוקר! ♠" : "ערב פוקר מתוכנן! ♠";
+      const text = [
+        `🤖 ${head}`,
+        planLabel(plan),
+        ...(plan.note ? [plan.note] : []),
+        "",
+        "מגיעים? מאשרים הגעה כאן:",
+        `${base}/g/${slug}`,
+      ].join("\n");
+      await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+    } catch (e) {
+      console.warn("plan announce failed:", e.message);
+    }
+  }, []);
+
   const signIn = useCallback(async () => {
     const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
     await supabase.auth.signInWithOAuth({
@@ -194,6 +219,7 @@ export default function OwnerApp() {
         }
         onGameStart={notifyStart}
         onRecords={notifyRecords}
+        onPlanShared={notifyPlan}
         renderRsvps={(planIso) => (
           <RsvpList supabase={supabase} groupId={group.id} planIso={planIso} />
         )}

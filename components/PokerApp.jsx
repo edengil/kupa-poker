@@ -1079,7 +1079,7 @@ async function waShare(text) {
 const waSend = waOpen;
 
 /* ============================ APP ============================ */
-function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, renderRsvps, onRecords }) {
+function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, renderRsvps, onRecords, onPlanShared }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
   const [tab, setTabState] = useState("table");
@@ -1162,7 +1162,8 @@ function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, re
     commit: commit,
     onGameStart: onGameStart,
     renderRsvps: renderRsvps,
-    onRecords: onRecords
+    onRecords: onRecords,
+    onPlanShared: onPlanShared
   }) : tab === "sessions" ? /*#__PURE__*/React.createElement(SessionsTab, {
     db: db,
     commit: commit,
@@ -2818,7 +2819,7 @@ const Stat = ({
 /* ----------------------------- live ------------------------- */
 /* תכנון הערב הבא. נשמר בתוך ה-DB (db.plan) ולכן זורם לצופים דרך אותו
    snapshot — הם רואים את התאריך ועונים מגיע/לא בטבלת ה-RSVP. */
-function PlanCard({ db, commit, renderRsvps }) {
+function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const todayIso = new Date().toISOString().slice(0, 10);
   const plan = db.plan && db.plan.iso >= todayIso ? db.plan : null;
   const [editing, setEditing] = useState(false);
@@ -2834,8 +2835,11 @@ function PlanCard({ db, commit, renderRsvps }) {
   };
   const save = () => {
     if (!iso) return;
-    commit({ ...db, plan: { iso, time, note: note.trim(), createdAt: Date.now() } });
+    const next = { iso, time, note: note.trim(), createdAt: Date.now() };
+    commit({ ...db, plan: next });
     setEditing(false);
+    // ההזמנה יוצאת לקבוצת הוואטסאפ עם הלינק — שהחברים יאשרו הגעה
+    if (typeof onPlanShared === "function") onPlanShared(next, { isUpdate: !!plan });
   };
   const clear = () => {
     commit({ ...db, plan: null });
@@ -3012,7 +3016,8 @@ function LiveTab({
   commit,
   onGameStart,
   renderRsvps,
-  onRecords
+  onRecords,
+  onPlanShared
 }) {
   const A = AL(db);
   const known = useMemo(() => {
@@ -3238,7 +3243,8 @@ function LiveTab({
   }), players.length === 0 && /*#__PURE__*/React.createElement(PlanCard, {
     db: db,
     commit: commit,
-    renderRsvps: renderRsvps
+    renderRsvps: renderRsvps,
+    onPlanShared: onPlanShared
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
