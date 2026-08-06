@@ -6,7 +6,8 @@
    ============================================================================ */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { store } from "../lib/store";
-import { buildReport } from "../lib/report";
+import { buildReport, buildSettlement } from "../lib/report";
+import { settle, isCashOnly, transferVerb } from "../lib/settlement";
 
 const DB_KEY = "poker:db";
 const CONFIG_KEY = "poker:config";
@@ -2600,13 +2601,21 @@ function LiveTab({
       roster
     });
     store.set(LIVE_KEY, "");
+    // החלוקה מחושבת כאן ונשמרת לתצוגה מקדימה. היא לא נשלחת לשום מקום
+    // עד שתאשר אותה במסך השיתוף.
+    const split = buildSettlement(settle(players, cps), {
+      now: endedAt,
+      isCashOnly,
+      transferVerb
+    });
     setShare({
       entries,
       d,
       mo,
       final: true,
       startedAt: startedAt || null,
-      endedAt
+      endedAt,
+      settlement: split
     });
     setPlayers([]);
     setEntriesCount("");
@@ -3049,6 +3058,7 @@ function LiveTab({
   }, "\u05D1\u05D8\u05DC \u05DE\u05E9\u05D7\u05E7"))), share && /*#__PURE__*/React.createElement(ShareSheet, {
     title: share.final ? `סיכום פוקר ${share.d}.${share.mo}` : `עדכון ביט ${dLbl}`,
     text: share.raw !== undefined ? share.raw : toWhatsApp(share.entries, share, null, A),
+    settlement: share.settlement,
     onClose: () => setShare(null)
   }), prompt && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3323,16 +3333,74 @@ function toWhatsApp(entries, dateObj, title, aliases, alreadyCanon) {
 function ShareSheet({
   title,
   text,
+  settlement,
   onClose
 }) {
   const [copied, setCopied] = useState(false);
+  const [view, setView] = useState("summary");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState("");
+  const body = view === "split" && settlement ? settlement : text;
+
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(body);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {}
   };
+
+  // שליחה ישירה לקבוצה דרך הבוט. השרת מאמת שזה אתה לפני שהוא מפרסם.
+  const send = async () => {
+    setSending(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: body })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "השליחה נכשלה");
+      setSent(true);
+      setTimeout(() => setSent(false), 4000);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const tab = active => ({
+    flex: 1,
+    padding: "8px 10px",
+    borderRadius: 999,
+    border: "none",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    fontSize: 13.5,
+    fontWeight: 600,
+    background: active ? C.brass : "transparent",
+    color: active ? C.feltDeep : C.dim
+  });
+  const ghost = {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    border: `1px solid ${C.line}`,
+    fontSize: 14.5,
+    fontWeight: 600,
+    cursor: "pointer",
+    background: "transparent",
+    color: C.cream,
+    fontFamily: "inherit",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  };
+
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClose,
     style: {
@@ -3364,17 +3432,33 @@ function ShareSheet({
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("b", {
-    style: {
-      fontSize: 16
-    }
+    style: { fontSize: 16 }
   }, title), /*#__PURE__*/React.createElement(IconBtn, {
     onClick: onClose
-  }, /*#__PURE__*/React.createElement(X, {
-    size: 17
-  }))), /*#__PURE__*/React.createElement("textarea", {
+  }, /*#__PURE__*/React.createElement(X, { size: 17 }))),
+
+  settlement && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      background: C.card,
+      border: `1px solid ${C.line}`,
+      borderRadius: 999,
+      padding: 4,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setView("summary"),
+    style: tab(view === "summary")
+  }, "סיכום"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setView("split"),
+    style: tab(view === "split")
+  }, "חלוקה")),
+
+  /*#__PURE__*/React.createElement("textarea", {
     readOnly: true,
-    value: text,
-    rows: Math.min(16, text.split("\n").length + 1),
+    value: body,
+    rows: Math.min(16, body.split("\n").length + 1),
     onFocus: e => e.target.select(),
     style: {
       width: "100%",
@@ -3389,8 +3473,15 @@ function ShareSheet({
       fontFamily: "inherit",
       resize: "none"
     }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => waOpen(text),
+  }),
+
+  err && /*#__PURE__*/React.createElement("p", {
+    style: { color: C.loss, fontSize: 12.5, margin: "8px 2px 0" }
+  }, err, " — אפשר לשלוח ידנית למטה."),
+
+  /*#__PURE__*/React.createElement("button", {
+    onClick: send,
+    disabled: sending,
     style: {
       width: "100%",
       marginTop: 12,
@@ -3399,63 +3490,27 @@ function ShareSheet({
       border: "none",
       fontSize: 15,
       fontWeight: 700,
-      cursor: "pointer",
-      background: "#25D366",
+      cursor: sending ? "default" : "pointer",
+      opacity: sending ? 0.6 : 1,
+      background: sent ? C.win : "#25D366",
       color: "#06301B",
+      fontFamily: "inherit",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       gap: 8
     }
-  }, /*#__PURE__*/React.createElement(Send, {
-    size: 18
-  }), "\u05E4\u05EA\u05D7 \u05D1\u05D5\u05D5\u05D0\u05D8\u05E1\u05D0\u05E4"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginTop: 8
-    }
+  }, sent ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(CheckCircle2, { size: 18 }), "נשלח לקבוצה") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Send, { size: 18 }), sending ? "שולח…" : "שלח לקבוצה"),
+
+  ), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 8, marginTop: 8 }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: copy,
-    style: {
-      flex: 1,
-      padding: 12,
-      borderRadius: 12,
-      border: `1px solid ${C.line}`,
-      fontSize: 14.5,
-      fontWeight: 600,
-      cursor: "pointer",
-      background: "transparent",
-      color: copied ? C.win : C.cream,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, copied ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(CheckCircle2, {
-    size: 18
-  }), "\u05D4\u05D5\u05E2\u05EA\u05E7") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Copy, {
-    size: 18
-  }), "\u05D4\u05E2\u05EA\u05E7")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => waShare(text),
-    style: {
-      flex: 1,
-      padding: 12,
-      borderRadius: 12,
-      border: `1px solid ${C.line}`,
-      fontSize: 14.5,
-      fontWeight: 600,
-      cursor: "pointer",
-      background: "transparent",
-      color: C.cream,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(Share2, {
-    size: 18
-  }), "\u05E9\u05D9\u05EA\u05D5\u05E3"))));
+    style: { ...ghost, color: copied ? C.win : C.cream }
+  }, copied ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(CheckCircle2, { size: 18 }), "הועתק") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Copy, { size: 18 }), "העתק")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => waOpen(body),
+    style: ghost
+  }, /*#__PURE__*/React.createElement(Share2, { size: 18 }), "פתח בוואטסאפ"))));
 }
 
 /* --------------------------- aliases ------------------------ */

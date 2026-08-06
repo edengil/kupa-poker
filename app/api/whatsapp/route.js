@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, pingViewers } from "@/lib/supabaseAdmin";
 import {
-  parseCommand, applyCommand, extractMessage, isOwner,
+  parseCommands, applyCommands, extractMessage, isOwner,
   sendToGroup, listGroups, BOT_MARK,
 } from "@/lib/whatsapp";
 
@@ -69,7 +69,8 @@ export async function POST(request) {
   const groupId = process.env.WHAPI_GROUP_ID;
   if (groupId && msg.chatId !== groupId) return ok({ skipped: "other chat" });
 
-  if (!isOwner(msg, process.env.WHATSAPP_OWNER)) return ok({ skipped: "not owner" });
+  if (!isAllowed(msg, process.env.WHATSAPP_OWNER, process.env.WHATSAPP_ALLOWED))
+    return ok({ skipped: "not allowed" });
 
   const supabase = getAdminSupabase();
   const { data: row, error } = await supabase
@@ -84,12 +85,16 @@ export async function POST(request) {
   }
 
   const live = row.live || null;
-  const cmd = parseCommand(msg.text, live?.addAmt || 50);
-  if (!cmd) return ok({ skipped: "not a command" });
+  const gameActive = (live?.players?.length || 0) > 0;
+  const cmds = parseCommands(msg.text, live?.addAmt || 50, gameActive);
+  if (!cmds.length) return ok({ skipped: "not a command" });
 
-  const { live: nextLive, reply } = applyCommand(live, cmd);
+  // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה
+  const { live: nextLive, reply } = applyCommands(live, cmds, msg.id);
+  if (!reply) return ok({ skipped: "nothing to do" });
 
-  if (cmd.kind !== "status") {
+  const changed = nextLive !== live;
+  if (changed) {
     const { error: writeError } = await supabase
       .from("groups")
       .update({ live: nextLive })
@@ -110,5 +115,5 @@ export async function POST(request) {
     console.error(e.message); // הנתונים כבר נשמרו — התשובה היא בונוס
   }
 
-  return ok({ handled: cmd.kind });
+  return ok({ handled: cmds.length });
 }

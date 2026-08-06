@@ -79,6 +79,12 @@ grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on table public.groups to authenticated;
 revoke all on table public.groups from anon;
 
+-- service_role הוא התפקיד שהמפתח הסודי מתחזה אליו, וה-webhook של הוואטסאפ
+-- עובד דרכו. הוא אמנם עוקף RLS, אבל עדיין חייב הרשאה ברמת הטבלה — ובלי
+-- ההגדרה האוטומטית של Supabase אף אחד לא נותן לו אותה.
+grant usage on schema public to service_role;
+grant all privileges on table public.groups to service_role;
+
 -- ---------------------------------------------------------------------------
 -- קריאה ציבורית לקריאה-בלבד.
 -- security definer עוקף RLS, אבל מחזיר רק את העמודות הבטוחות ורק לפי slug.
@@ -89,13 +95,13 @@ revoke all on table public.groups from anon;
 drop function if exists public.public_group(text);
 
 create function public.public_group(p_slug text)
-returns table (name text, data jsonb, live jsonb, updated_at timestamptz)
+returns table (id uuid, name text, data jsonb, live jsonb, updated_at timestamptz)
 language sql
 security definer
 stable
 set search_path = public
 as $$
-  select g.name, g.data, g.live, g.updated_at
+  select g.id, g.name, g.data, g.live, g.updated_at
   from public.groups g
   where g.slug = p_slug
   limit 1;
@@ -103,3 +109,49 @@ $$;
 
 revoke all on function public.public_group(text) from public;
 grant execute on function public.public_group(text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- יומן צפיות.
+--
+-- כל כניסה של צופה נרשמת כאן: מי, מתי, ומאיזה חשבון. זה מה שמאפשר לראות
+-- אחר כך מי פתח את הלינק ומתי — כולל מי שנכנס באמצע היום סתם להציץ.
+-- ---------------------------------------------------------------------------
+create table if not exists public.group_views (
+  id        bigserial primary key,
+  group_id  uuid not null references public.groups (id) on delete cascade,
+  user_id   uuid references auth.users (id) on delete set null,
+  email     text,
+  name      text,
+  at        timestamptz not null default now()
+);
+
+create index if not exists group_views_recent_idx on public.group_views (group_id, at desc);
+
+alter table public.group_views enable row level security;
+
+drop policy if exists "owner reads views"     on public.group_views;
+drop policy if exists "viewer logs own view"  on public.group_views;
+
+-- הבעלים רואה את היומן של הקבוצה שלו בלבד
+create policy "owner reads views"
+  on public.group_views for select
+  using (exists (
+    select 1 from public.groups g
+    where g.id = group_id and g.owner_id = auth.uid()
+  ));
+
+-- כל מחובר רושם את הכניסה של עצמו, ולא של אף אחד אחר
+create policy "viewer logs own view"
+  on public.group_views for insert
+  with check (auth.uid() = user_id);
+
+grant select, insert on table public.group_views to authenticated;
+grant usage, select on sequence public.group_views_id_seq to authenticated;
+grant all privileges on table public.group_views to service_role;
+
+-- ---------------------------------------------------------------------------
+-- הצפייה דורשת עכשיו התחברות. ה-slug נשאר מפתח הגישה, אבל בנוסף אליו
+-- צריך חשבון Google — אחרת אין דרך לדעת מי צופה.
+-- ---------------------------------------------------------------------------
+revoke execute on function public.public_group(text) from anon;
+grant execute on function public.public_group(text) to authenticated;

@@ -5,6 +5,7 @@ import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore } from "../lib/store";
 import { createBroadcaster } from "../lib/realtime";
+import Viewers from "./Viewers";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -148,6 +149,9 @@ export default function OwnerApp() {
   return (
     <>
       <ShareBar slug={group.slug} onSignOut={signOut} />
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 13px" }}>
+        <Viewers supabase={supabase} slug={group.slug} groupId={group.id} />
+      </div>
       <PokerApp />
     </>
   );
