@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, pingViewers } from "@/lib/supabaseAdmin";
+import { notifyGameStart } from "@/lib/push";
 import {
   parseCommands, applyCommands, extractMessage, isAllowed,
   sendToGroup, listGroups, BOT_MARK,
@@ -22,6 +23,15 @@ function guard(request) {
   const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
   const given = new URL(request.url).searchParams.get("secret");
   return Boolean(secret) && given === secret;
+}
+
+/* "בוט הדלק" / "בוט כבה" / "בוט" (מצב). מזוהה לפני כל שאר הפקודות. */
+function parseBotControl(text) {
+  const line = (text || "").trim();
+  if (/^(?:בוט|רובוט)\s+(?:הדלק|הפעל|קום)$|^(?:הדלק|הפעל)\s+(?:את\s+ה?)?בוט$/.test(line)) return "on";
+  if (/^(?:בוט|רובוט)\s+(?:כבה|עצור|שתוק)$|^(?:כבה|עצור)\s+(?:את\s+ה?)?בוט$/.test(line)) return "off";
+  if (/^(?:בוט|רובוט)\s*\??$/.test(line)) return "state";
+  return null;
 }
 
 /* אבחון בלי לדלוף את הסוד עצמו: אומר רק אם המשתנה קיים בכלל ומה אורכו.
@@ -84,6 +94,36 @@ export async function POST(request) {
     return ok({ skipped: "no group" });
   }
 
+  /* שליטה בבוט מתוך הקבוצה — רק הבעלים, לא רשימת המורשים. הפקודות האלה
+     נבדקות לפני מתג ה-botOn, אחרת אי אפשר היה להדליק בוט כבוי. */
+  const botCmd = parseBotControl(msg.text);
+  if (botCmd) {
+    if (!isAllowed(msg, process.env.WHATSAPP_OWNER, "")) return ok({ skipped: "not owner" });
+    let reply;
+    if (botCmd === "state") {
+      reply = `${BOT_MARK} הבוט כרגע ${row.config?.botOn ? "פעיל ✅" : "כבוי 💤"}`;
+    } else {
+      const botOn = botCmd === "on";
+      const { error: cfgError } = await supabase
+        .from("groups")
+        .update({ config: { ...(row.config || {}), botOn } })
+        .eq("id", row.id);
+      if (cfgError) {
+        console.error("bot toggle failed:", cfgError.message);
+        return ok({ skipped: "toggle failed" });
+      }
+      reply = botOn
+        ? `${BOT_MARK} הבוט פעיל — שולחים פקודות ואני על זה.`
+        : `${BOT_MARK} הבוט כבוי. "בוט הדלק" יחזיר אותי.`;
+    }
+    try {
+      await sendToGroup(reply, { token: process.env.WHAPI_TOKEN, groupId: msg.chatId });
+    } catch (e) {
+      console.error(e.message);
+    }
+    return ok({ botControl: botCmd });
+  }
+
   /* המתג מהאפליקציה: כשהבוט כבוי הוא פשוט לא מגיב לכלום. החיבור ל-Whapi
      נשאר חי — רק ההתנהגות מושתקת, ולכן אין צורך בסריקת QR מחדש. */
   if (!row.config?.botOn) return ok({ skipped: "bot off" });
@@ -108,6 +148,15 @@ export async function POST(request) {
       return ok({ skipped: "write failed" });
     }
     await pingViewers(row.slug);
+
+    // המשחק נפתח דרך הוואטסאפ (שחקן ראשון בשולחן) — מודיעים לצופים
+    if (!gameActive && (nextLive?.players?.length || 0) > 0) {
+      try {
+        await notifyGameStart(row, row.slug);
+      } catch (e) {
+        console.warn("game-start push failed:", e.message);
+      }
+    }
   }
 
   try {

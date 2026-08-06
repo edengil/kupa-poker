@@ -8,6 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { store } from "../lib/store";
 import { buildReport, buildSettlement } from "../lib/report";
 import { settle, isCashOnly, transferVerb } from "../lib/settlement";
+import { planLabel } from "./Rsvp";
 
 const DB_KEY = "poker:db";
 const CONFIG_KEY = "poker:config";
@@ -1078,7 +1079,7 @@ async function waShare(text) {
 const waSend = waOpen;
 
 /* ============================ APP ============================ */
-function App({ readOnly = false, onTabChange, statsPanel = null }) {
+function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, renderRsvps }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
   const [tab, setTabState] = useState("table");
@@ -1158,7 +1159,9 @@ function App({ readOnly = false, onTabChange, statsPanel = null }) {
     years: years
   }) : tab === "live" ? /*#__PURE__*/React.createElement(LiveTab, {
     db: db,
-    commit: commit
+    commit: commit,
+    onGameStart: onGameStart,
+    renderRsvps: renderRsvps
   }) : tab === "sessions" ? /*#__PURE__*/React.createElement(SessionsTab, {
     db: db,
     commit: commit,
@@ -1170,7 +1173,9 @@ function App({ readOnly = false, onTabChange, statsPanel = null }) {
     db: db,
     years: years,
     readOnly: readOnly
-  }) : tab === "stats" && statsPanel ? statsPanel : /*#__PURE__*/React.createElement(PlayersTab, {
+  }) : tab === "stats" && statsPanel ? statsPanel : tab === "records" ? /*#__PURE__*/React.createElement(RecordsTab, {
+    db: db
+  }) : /*#__PURE__*/React.createElement(PlayersTab, {
     db: db,
     onPlayer: setProfile
   })), profile && /*#__PURE__*/React.createElement(ProfileSheet, {
@@ -1421,7 +1426,7 @@ function TabBar({
   hasStats = false
 }) {
   const WRITE_TABS = ["live", "input", "sessions"];
-  const items = [["table", "טבלה", BarChart3], ["players", "שחקנים", Users], ["live", "לייב", PlayCircle], ["input", "הזנה", ClipboardPaste], ["sessions", "ערבים", CalendarDays], ...(hasStats ? [["stats", "צפיות", Eye]] : [])].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));
+  const items = [["table", "טבלה", BarChart3], ["players", "שחקנים", Users], ["records", "שיאים", Trophy], ["live", "לייב", PlayCircle], ["input", "הזנה", ClipboardPaste], ["sessions", "ערבים", CalendarDays], ...(hasStats ? [["stats", "צפיות", Eye]] : [])].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));
   return /*#__PURE__*/React.createElement("nav", {
     style: {
       position: "fixed",
@@ -2052,6 +2057,135 @@ const GroupLabel = ({
   }
 }, children);
 
+/* --------------------------- records ------------------------ */
+/* מסך השיאים. הכל מחושב מהערבים עצמם (db.sessions), בלי טבלאות עזר. */
+function RecordsTab({ db }) {
+  const A = AL(db);
+  const recs = useMemo(() => {
+    const sessions = [...db.sessions].sort((a, b) => a.iso.localeCompare(b.iso));
+    if (!sessions.length) return null;
+
+    // סכום לילה לכל שחקן, לכל ערב
+    const perNight = sessions.map(s => {
+      const t = {};
+      for (const e of s.entries) {
+        const nm = canon(e.name, A);
+        t[nm] = r2((t[nm] || 0) + e.amount);
+      }
+      return { iso: s.iso, d: s.d, mo: s.mo, y: s.y, totals: t };
+    });
+
+    let bestNight = null, worstNight = null;
+    const nightsCount = {};
+    const history = {}; // name -> [amount, amount...] כרונולוגי
+
+    for (const n of perNight) {
+      for (const [nm, amount] of Object.entries(n.totals)) {
+        nightsCount[nm] = (nightsCount[nm] || 0) + 1;
+        (history[nm] = history[nm] || []).push(amount);
+        if (!bestNight || amount > bestNight.amount) bestNight = { name: nm, amount, d: n.d, mo: n.mo, y: n.y };
+        if (!worstNight || amount < worstNight.amount) worstNight = { name: nm, amount, d: n.d, mo: n.mo, y: n.y };
+      }
+    }
+
+    // רצפים: הכי ארוך אי פעם, והרצף החי כרגע (נספר מהערב האחרון של השחקן אחורה)
+    let bestStreak = null, liveStreak = null;
+    for (const [nm, arr] of Object.entries(history)) {
+      let cur = 0, max = 0;
+      for (const v of arr) {
+        cur = v > 0 ? cur + 1 : 0;
+        if (cur > max) max = cur;
+      }
+      let tail = 0;
+      for (let i = arr.length - 1; i >= 0 && arr[i] > 0; i--) tail++;
+      if (max >= 2 && (!bestStreak || max > bestStreak.count)) bestStreak = { name: nm, count: max };
+      if (tail >= 2 && (!liveStreak || tail > liveStreak.count)) liveStreak = { name: nm, count: tail };
+    }
+
+    // מלכי התקופה: החודש האחרון שיש בו ערבים, והשנה הנוכחית
+    const last = sessions[sessions.length - 1];
+    const monthT = monthTotals(db, last.y, last.mo);
+    const yearT = yearTotals(db, last.y).totals;
+    const most = Object.entries(nightsCount).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      bestNight, worstNight, bestStreak, liveStreak,
+      monthKing: monthT[0] || null, monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
+      yearKing: yearT[0] || null, yearLabel: `${last.y}`,
+      most: most ? { name: most[0], count: most[1] } : null,
+      totalNights: sessions.length,
+    };
+  }, [db]);
+
+  if (!recs) return <Empty text="עוד אין ערבים — אין שיאים." />;
+
+  const Card = ({ icon, title, holder, value, tone, sub }) => (
+    <div style={{
+      background: C.card,
+      border: `1px solid ${C.line}`,
+      borderRadius: 14,
+      padding: "13px 14px",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+    }}>
+      <span style={{ fontSize: 26, flex: "0 0 auto" }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: C.dim }}>{title}</div>
+        <div style={{ fontSize: 15.5, fontWeight: 700, color: C.cream }}>{holder}</div>
+        {sub && <div style={{ fontSize: 11.5, color: C.dim }}>{sub}</div>}
+      </div>
+      <b style={{
+        fontSize: 16,
+        color: tone || C.brass,
+        fontVariantNumeric: "tabular-nums",
+        flex: "0 0 auto",
+      }}>{value}</b>
+    </div>
+  );
+
+  const dt = (r) => `${r.d}.${r.mo}.${String(r.y).slice(2)}`;
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <h2 style={{ fontSize: 17, fontWeight: 700, margin: "6px 2px 4px" }}>שיאים</h2>
+      <p style={{ color: C.dim, fontSize: 12, margin: "0 2px 12px" }}>
+        מ־{recs.totalNights} ערבים מתועדים
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {recs.monthKing && (
+          <Card icon="👑" title={`מלך ${recs.monthLabel}`} holder={recs.monthKing.name}
+            value={fmt(recs.monthKing.amount)} tone={C.win} />
+        )}
+        {recs.yearKing && (
+          <Card icon="🏆" title={`מוביל ${recs.yearLabel}`} holder={recs.yearKing.name}
+            value={fmt(recs.yearKing.amount)} tone={C.win} />
+        )}
+        {recs.bestNight && (
+          <Card icon="🔥" title="ערב השיא בהיסטוריה" holder={recs.bestNight.name}
+            value={fmt(recs.bestNight.amount)} tone={C.win} sub={dt(recs.bestNight)} />
+        )}
+        {recs.worstNight && recs.worstNight.amount < 0 && (
+          <Card icon="🥶" title="הערב הקשה בהיסטוריה" holder={recs.worstNight.name}
+            value={fmt(recs.worstNight.amount)} tone={C.loss} sub={dt(recs.worstNight)} />
+        )}
+        {recs.liveStreak && (
+          <Card icon="⚡" title="רצף ניצחונות פעיל" holder={recs.liveStreak.name}
+            value={`${recs.liveStreak.count} ערבים`} />
+        )}
+        {recs.bestStreak && (
+          <Card icon="🎖️" title="רצף הניצחונות הארוך אי פעם" holder={recs.bestStreak.name}
+            value={`${recs.bestStreak.count} ערבים`} />
+        )}
+        {recs.most && (
+          <Card icon="🎯" title="המתמיד — הכי הרבה ערבים" holder={recs.most.name}
+            value={`${recs.most.count}`} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------- players ------------------------ */
 function PlayersTab({
   db,
@@ -2438,6 +2572,142 @@ const Stat = ({
 }, value));
 
 /* ----------------------------- live ------------------------- */
+/* תכנון הערב הבא. נשמר בתוך ה-DB (db.plan) ולכן זורם לצופים דרך אותו
+   snapshot — הם רואים את התאריך ועונים מגיע/לא בטבלת ה-RSVP. */
+function PlanCard({ db, commit, renderRsvps }) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const plan = db.plan && db.plan.iso >= todayIso ? db.plan : null;
+  const [editing, setEditing] = useState(false);
+  const [iso, setIso] = useState("");
+  const [time, setTime] = useState("21:00");
+  const [note, setNote] = useState("");
+
+  const startEdit = () => {
+    setIso(plan?.iso || todayIso);
+    setTime(plan?.time || "21:00");
+    setNote(plan?.note || "");
+    setEditing(true);
+  };
+  const save = () => {
+    if (!iso) return;
+    commit({ ...db, plan: { iso, time, note: note.trim(), createdAt: Date.now() } });
+    setEditing(false);
+  };
+  const clear = () => {
+    commit({ ...db, plan: null });
+    setEditing(false);
+  };
+
+  const field = {
+    background: C.feltDeep,
+    border: `1px solid ${C.line}`,
+    borderRadius: 9,
+    color: C.cream,
+    fontFamily: "inherit",
+    fontSize: 13.5,
+    padding: "9px 10px",
+    colorScheme: "dark",
+  };
+
+  if (!plan && !editing) {
+    return (
+      <button
+        onClick={startEdit}
+        style={{
+          width: "100%",
+          padding: "11px 12px",
+          borderRadius: 12,
+          border: `1px dashed ${C.line}`,
+          background: "transparent",
+          color: C.dim,
+          fontFamily: "inherit",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          marginBottom: 12,
+        }}
+      >
+        📅 תכנן את הערב הבא — החברים יאשרו הגעה מהלינק
+      </button>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        background: C.card,
+        border: `1px solid ${C.brass}66`,
+        borderRadius: 12,
+        padding: "11px 12px",
+        marginBottom: 12,
+      }}
+    >
+      {editing ? (
+        <>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: C.brass, marginBottom: 8 }}>
+            📅 תכנון הערב הבא
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <input type="date" value={iso} min={todayIso}
+              onChange={(e) => setIso(e.target.value)} style={{ ...field, flex: 1.4 }} />
+            <input type="time" value={time}
+              onChange={(e) => setTime(e.target.value)} style={{ ...field, flex: 1 }} />
+          </div>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="הערה (איפה, מה להביא…) — לא חובה"
+            style={{ ...field, width: "100%", boxSizing: "border-box", marginBottom: 10 }}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={save} style={{
+              flex: 1, padding: "10px 12px", borderRadius: 10, border: "none",
+              background: C.brass, color: C.feltDeep, fontFamily: "inherit",
+              fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+            }}>
+              שמור
+            </button>
+            <button onClick={() => setEditing(false)} style={{
+              padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.line}`,
+              background: "transparent", color: C.dim, fontFamily: "inherit",
+              fontSize: 13, cursor: "pointer",
+            }}>
+              ביטול
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: plan.note ? 2 : 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: C.brass }}>♠ הערב הבא</div>
+              <div style={{ fontSize: 13.5, color: C.cream }}>{planLabel(plan)}</div>
+            </div>
+            <button onClick={startEdit} style={{
+              padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.line}`,
+              background: "transparent", color: C.cream, fontFamily: "inherit",
+              fontSize: 12, cursor: "pointer",
+            }}>
+              עריכה
+            </button>
+            <button onClick={clear} style={{
+              padding: "6px 12px", borderRadius: 8, border: "none",
+              background: "transparent", color: C.dim, fontFamily: "inherit",
+              fontSize: 12, cursor: "pointer",
+            }}>
+              בטל
+            </button>
+          </div>
+          {plan.note && (
+            <div style={{ fontSize: 12.5, color: C.dim, marginBottom: 8 }}>{plan.note}</div>
+          )}
+          {typeof renderRsvps === "function" && renderRsvps(plan.iso)}
+        </>
+      )}
+    </div>
+  );
+}
+
 /* מתג הבוט בקבוצת הוואטסאפ. החיבור ל-Whapi נשאר תמיד חי — המתג רק קובע אם
    ה-webhook מגיב לפקודות. נדלק לבד כשנפתח משחק, נכבה לבד כשהערב נסגר. */
 function BotToggle({ on, onChange }) {
@@ -2495,7 +2765,9 @@ function BotToggle({ on, onChange }) {
 
 function LiveTab({
   db,
-  commit
+  commit,
+  onGameStart,
+  renderRsvps
 }) {
   const A = AL(db);
   const known = useMemo(() => {
@@ -2591,8 +2863,9 @@ function LiveTab({
     setPlayers(p => {
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
-        // משחק נפתח — הבוט בקבוצה נדלק לבד
+        // משחק נפתח — הבוט בקבוצה נדלק לבד, והצופים מקבלים התראה
         if (!getConfig().botOn) setConfig({ botOn: true });
+        if (typeof onGameStart === "function") onGameStart();
       }
       return [...p, {
         name: nm,
@@ -2708,6 +2981,10 @@ function LiveTab({
     onChange: v => setConfig({
       botOn: v
     })
+  }), players.length === 0 && /*#__PURE__*/React.createElement(PlanCard, {
+    db: db,
+    commit: commit,
+    renderRsvps: renderRsvps
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
@@ -4177,6 +4454,13 @@ const Eye = mkIcon(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__P
   cx: "12",
   cy: "12",
   r: "3"
+})));
+const Trophy = mkIcon(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("path", {
+  d: "M6 9a6 6 0 0 0 12 0V3H6z"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M6 5H3a3 3 0 0 0 3 4M18 5h3a3 3 0 0 1-3 4"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 15v3M8 21h8M10 18h4"
 })));
 const Award = mkIcon(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("circle", {
   cx: "12",

@@ -5,6 +5,8 @@ import PokerApp, { PokerTable } from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
+import { getPushSupport, getPushSubscription, subscribePush, unsubscribePush } from "../lib/pushClient";
+import { RsvpCard } from "./Rsvp";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -23,7 +25,9 @@ const POLL_MS = 12000;
 export default function PublicApp({ slug }) {
   const supabase = getSupabase();
   const [phase, setPhase] = useState("loading"); // loading | signedOut | ready | missing
+  const [groupId, setGroupId] = useState(null);
   const [live, setLive] = useState(null);
+  const [plan, setPlan] = useState(null);
   const [fresh, setFresh] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [generation, setGeneration] = useState(0);
@@ -40,7 +44,9 @@ export default function PublicApp({ slug }) {
     }
     configureStore(makeReadOnlyStore(snap));
     dataRef.current = JSON.stringify(snap.data ?? null);
+    setGroupId(snap.id);
     setLive(snap.live ?? null);
+    setPlan(snap.data?.plan ?? null);
     setPhase("ready");
     return snap;
   }, [supabase, slug]);
@@ -103,6 +109,7 @@ export default function PublicApp({ slug }) {
     const next = await fetchSnapshot(supabase, slug);
     if (!next) return;
     setLive(next.live ?? null);
+    setPlan(next.data?.plan ?? null);
     const serialized = JSON.stringify(next.data ?? null);
     if (serialized !== dataRef.current) {
       dataRef.current = serialized;
@@ -178,6 +185,13 @@ export default function PublicApp({ slug }) {
         </div>
       </div>
 
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "10px 13px 0" }}>
+        <NotifyBell supabase={supabase} groupId={groupId} />
+        {plan?.iso >= new Date().toISOString().slice(0, 10) && !running && (
+          <RsvpCard supabase={supabase} groupId={groupId} plan={plan} />
+        )}
+      </div>
+
       {running && (
         <div style={{ maxWidth: 640, margin: "0 auto", padding: "13px 13px 0" }}>
           <h2 style={{ margin: "0 2px 9px", fontSize: 15, fontWeight: 700, color: C.brass }}>
@@ -198,6 +212,91 @@ export default function PublicApp({ slug }) {
         onTabChange={(tab) => visitRef.current?.onTab?.(tab)}
       />
     </>
+  );
+}
+
+/* ========================= התראות "המשחק התחיל" ========================= */
+function NotifyBell({ supabase, groupId }) {
+  const [state, setState] = useState("checking");
+  // checking | off | on | busy | denied | needs-install | unsupported
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const support = getPushSupport();
+      if (support !== "supported") {
+        if (alive) setState(support === "needs-install" ? "needs-install" : "unsupported");
+        return;
+      }
+      const sub = await getPushSubscription();
+      if (alive) setState(sub ? "on" : "off");
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (state === "checking" || state === "unsupported" || !groupId) return null;
+
+  if (state === "needs-install") {
+    return (
+      <p style={{ margin: 0, fontSize: 12, color: C.dim, textAlign: "center", lineHeight: 1.6 }}>
+        רוצה התראה כשמתחיל משחק? הוסף את האתר למסך הבית
+        (שיתוף ← הוסף למסך הבית) ואז הפעל התראות מכאן.
+      </p>
+    );
+  }
+
+  const toggle = async () => {
+    if (state === "busy") return;
+    const was = state;
+    setState("busy");
+    if (was === "on") {
+      await unsubscribePush(supabase);
+      setState("off");
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user;
+    if (!user) {
+      setState("off");
+      return;
+    }
+    const result = await subscribePush(supabase, groupId, user);
+    setState(result === "subscribed" ? "on" : result === "denied" ? "denied" : "off");
+  };
+
+  if (state === "denied") {
+    return (
+      <p style={{ margin: 0, fontSize: 12, color: C.dim, textAlign: "center" }}>
+        ההתראות חסומות בדפדפן — אפשר לאפשר אותן בהגדרות האתר.
+      </p>
+    );
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={state === "busy"}
+      style={{
+        width: "100%",
+        padding: "9px 12px",
+        borderRadius: 11,
+        border: `1px solid ${state === "on" ? C.win : C.line}`,
+        background: "transparent",
+        color: state === "on" ? C.win : C.dim,
+        fontFamily: "inherit",
+        fontSize: 12.5,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      {state === "busy"
+        ? "רגע…"
+        : state === "on"
+        ? "🔔 תקבל התראה כשמתחיל משחק · לחץ לביטול"
+        : "🔕 עדכן אותי כשמתחיל משחק"}
+    </button>
   );
 }
 

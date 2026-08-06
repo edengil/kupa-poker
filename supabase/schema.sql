@@ -168,3 +168,74 @@ grant all privileges on table public.group_views to service_role;
 -- ---------------------------------------------------------------------------
 revoke execute on function public.public_group(text) from anon;
 grant execute on function public.public_group(text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- מנויי התראות פוש.
+--
+-- כל צופה שביקש "עדכן אותי כשמתחיל משחק" נשמר כאן עם פרטי המנוי של הדפדפן
+-- שלו. השליחה עצמה נעשית בצד השרת עם המפתח הסודי, ולכן service_role מקבל הכל.
+-- ---------------------------------------------------------------------------
+create table if not exists public.push_subscriptions (
+  id         bigserial primary key,
+  group_id   uuid not null references public.groups (id) on delete cascade,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  name       text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists push_subs_group_idx on public.push_subscriptions (group_id);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "viewer manages own subscription" on public.push_subscriptions;
+
+create policy "viewer manages own subscription"
+  on public.push_subscriptions for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on table public.push_subscriptions to authenticated;
+grant usage, select on sequence public.push_subscriptions_id_seq to authenticated;
+grant all privileges on table public.push_subscriptions to service_role;
+
+-- ---------------------------------------------------------------------------
+-- אישורי הגעה לערב מתוכנן.
+--
+-- המנהל קובע תאריך באפליקציה (נשמר בתוך data.plan), והצופים עונים כאן.
+-- שורה אחת לאדם בקבוצה; plan_iso מציין לאיזה ערב התשובה שייכת, כך שתכנון
+-- חדש מאפס אוטומטית את התשובות הישנות.
+-- ---------------------------------------------------------------------------
+create table if not exists public.game_rsvps (
+  group_id   uuid not null references public.groups (id) on delete cascade,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  plan_iso   text not null,
+  status     text not null check (status in ('yes', 'no', 'maybe')),
+  name       text,
+  email      text,
+  updated_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+
+alter table public.game_rsvps enable row level security;
+
+drop policy if exists "rsvp read"  on public.game_rsvps;
+drop policy if exists "rsvp write" on public.game_rsvps;
+
+-- כל מי שמחובר ומחזיק את מזהה הקבוצה (שמגיע רק מהלינק) רואה מי מגיע —
+-- זו בדיוק המטרה: שהחברים יראו אחד את השני
+create policy "rsvp read"
+  on public.game_rsvps for select
+  to authenticated
+  using (true);
+
+create policy "rsvp write"
+  on public.game_rsvps for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on table public.game_rsvps to authenticated;
+grant all privileges on table public.game_rsvps to service_role;

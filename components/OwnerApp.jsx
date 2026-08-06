@@ -7,6 +7,7 @@ import { configureStore, makeSupabaseStore, flushStore } from "../lib/store";
 import { createBroadcaster } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
+import { RsvpList } from "./Rsvp";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -31,6 +32,7 @@ export default function OwnerApp() {
   const [group, setGroup] = useState(null);
   const [message, setMessage] = useState("");
   const broadcasterRef = useRef(null);
+  const groupRef = useRef(null); // גישה יציבה לקבוצה מתוך callbacks
 
   /* ------------------------------ סשן ------------------------------ */
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function OwnerApp() {
         makeSupabaseStore(supabase, row.id, { onFlush: () => broadcaster.ping() })
       );
       if (alive) {
+        groupRef.current = row;
         setGroup(row);
         setPhase("ready");
       }
@@ -130,6 +133,24 @@ export default function OwnerApp() {
     };
   }, []);
 
+  /* פתיחת משחק בלייב → התראת פוש לצופים שנרשמו. השרת מאמת שזה אתה
+     ודואג שלא תישלח יותר מהתראה אחת לערב. */
+  const notifyStart = useCallback(async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const slug = groupRef.current?.slug;
+      if (!token || !slug) return;
+      await fetch("/api/notify-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ slug }),
+      });
+    } catch (e) {
+      console.warn("notify-start failed:", e.message);
+    }
+  }, [supabase]);
+
   const signIn = useCallback(async () => {
     const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
     await supabase.auth.signInWithOAuth({
@@ -157,6 +178,10 @@ export default function OwnerApp() {
         statsPanel={
           <ViewerStats supabase={supabase} slug={group.slug} groupId={group.id} />
         }
+        onGameStart={notifyStart}
+        renderRsvps={(planIso) => (
+          <RsvpList supabase={supabase} groupId={group.id} planIso={planIso} />
+        )}
       />
     </>
   );
