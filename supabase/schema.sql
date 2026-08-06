@@ -136,6 +136,7 @@ create index if not exists group_views_recent_idx on public.group_views (group_i
 alter table public.group_views enable row level security;
 
 drop policy if exists "owner reads views"      on public.group_views;
+drop policy if exists "viewer reads own views"  on public.group_views;
 drop policy if exists "viewer logs own view"   on public.group_views;
 drop policy if exists "viewer updates own view" on public.group_views;
 
@@ -146,6 +147,12 @@ create policy "owner reads views"
     select 1 from public.groups g
     where g.id = group_id and g.owner_id = auth.uid()
   ));
+
+-- הצופה חייב לראות את השורה של עצמו: הרישום מחזיר את מזהה השורה
+-- (insert ... returning), וב-RLS זה נכשל בלי הרשאת select על השורה.
+create policy "viewer reads own views"
+  on public.group_views for select
+  using (auth.uid() = user_id);
 
 -- כל מחובר רושם את הכניסה של עצמו, ולא של אף אחד אחר
 create policy "viewer logs own view"
