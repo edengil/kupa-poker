@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore } from "../lib/store";
-import { createBroadcaster } from "../lib/realtime";
+import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import { RsvpList, planLabel } from "./Rsvp";
@@ -31,6 +31,7 @@ export default function OwnerApp() {
   const [phase, setPhase] = useState("loading"); // loading | signedOut | ready | error
   const [group, setGroup] = useState(null);
   const [message, setMessage] = useState("");
+  const [online, setOnline] = useState([]); // מי צופה עכשיו — נוכחות חיה
   const broadcasterRef = useRef(null);
   const groupRef = useRef(null); // גישה יציבה לקבוצה מתוך callbacks
 
@@ -120,6 +121,14 @@ export default function OwnerApp() {
     },
     []
   );
+
+  /* נוכחות חיה — מנוי אחד לכל הדף. גם פאנל "מי צופה" וגם טאב "צפיות"
+     מקבלים את אותה רשימה כ-prop. שני מנויים לאותו ערוץ היו מפילים את
+     ספריית ה-realtime ("cannot add presence callbacks after subscribe"). */
+  useEffect(() => {
+    if (phase !== "ready" || !group?.slug) return;
+    return watchPresence(supabase, group.slug, setOnline);
+  }, [supabase, phase, group?.slug]);
 
   /* ------------------ שמירה אחרונה לפני יציאה מהדף ------------------ */
   useEffect(() => {
@@ -211,11 +220,11 @@ export default function OwnerApp() {
     <>
       <ShareBar slug={group.slug} onSignOut={signOut} />
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 13px" }}>
-        <Viewers supabase={supabase} slug={group.slug} groupId={group.id} />
+        <Viewers supabase={supabase} online={online} groupId={group.id} />
       </div>
       <PokerApp
         statsPanel={
-          <ViewerStats supabase={supabase} slug={group.slug} groupId={group.id} />
+          <ViewerStats supabase={supabase} online={online} groupId={group.id} />
         }
         onGameStart={notifyStart}
         onRecords={notifyRecords}

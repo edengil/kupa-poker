@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { watchPresence } from "../lib/realtime";
 
 /* ============================================================================
    טאב "צפיות" — למנהל בלבד.
 
    מציג מי פתח את הלינק, כמה פעמים, כמה זמן נשאר ובמה הסתכל. הנתונים מגיעים
    מיומן group_views: כל ביקור הוא שורה עם זמן כניסה, זמן "נראה לאחרונה"
-   ורצף הטאבים שנצפו. הנוכחות החיה מגיעה מערוץ ה-presence הקיים.
+   ורצף הטאבים שנצפו. הנוכחות החיה מגיעה מ-OwnerApp כ-prop — מנוי אחד לכל
+   הדף; מנוי שני לאותו ערוץ מפיל את ספריית ה-realtime.
    ============================================================================ */
 
 const C = {
@@ -69,15 +69,9 @@ const visitMs = (row) => {
   return Math.max(0, new Date(row.left_at) - new Date(row.at));
 };
 
-export default function ViewerStats({ supabase, slug, groupId }) {
+export default function ViewerStats({ supabase, online = [], groupId }) {
   const [rows, setRows] = useState(null); // null = טוען
-  const [online, setOnline] = useState([]);
   const [openKey, setOpenKey] = useState(null);
-
-  useEffect(() => {
-    if (!slug) return;
-    return watchPresence(supabase, slug, setOnline);
-  }, [supabase, slug]);
 
   useEffect(() => {
     if (!groupId) return;

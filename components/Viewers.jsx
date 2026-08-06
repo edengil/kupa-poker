@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { watchPresence } from "../lib/realtime";
 
 /* ============================================================================
    מי צופה בקבוצה.
 
-   שני מקורות שונים: נוכחות בזמן אמת (מי פתוח עכשיו) ויומן הכניסות
-   (מי נכנס מתי, גם אם סגר מזמן). הפאנל סגור כברירת מחדל כדי לא לגנוב
-   מקום מהטבלה עצמה.
+   שני מקורות שונים: נוכחות בזמן אמת (מגיעה מ-OwnerApp כ-prop — מנוי אחד
+   לכל הדף) ויומן הכניסות (מי נכנס מתי, גם אם סגר מזמן). הפאנל סגור
+   כברירת מחדל כדי לא לגנוב מקום מהטבלה עצמה.
    ============================================================================ */
 
 const C = {
@@ -35,15 +34,9 @@ const short = (v) => {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
-export default function Viewers({ supabase, slug, groupId }) {
-  const [online, setOnline] = useState([]);
+export default function Viewers({ supabase, online = [], groupId }) {
   const [log, setLog] = useState([]);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!slug) return;
-    return watchPresence(supabase, slug, setOnline);
-  }, [supabase, slug]);
 
   // היומן נטען רק כשפותחים, ואין טעם למשוך אותו ברקע כל הזמן
   useEffect(() => {
