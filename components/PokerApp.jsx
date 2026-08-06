@@ -2075,33 +2075,42 @@ function RecordsTab({ db }) {
       return { iso: s.iso, d: s.d, mo: s.mo, y: s.y, totals: t };
     });
 
-    let bestNight = null, worstNight = null, stormyNight = null;
-    const nightsCount = {};
+    let stormyNight = null;
+    const nightList = []; // כל תוצאה של כל שחקן בכל ערב — למציאת שיא + סגן
     const history = {}; // name -> [amount, amount...] כרונולוגי
     const monthAgg = {}; // "name|y-mo" -> סכום החודש לשחקן
+    const attend = {}; // name -> {cur, max} — נוכחות בערבים רצופים
 
     for (const n of perNight) {
       let moved = 0;
+      const present = new Set(Object.keys(n.totals));
       for (const [nm, amount] of Object.entries(n.totals)) {
-        nightsCount[nm] = (nightsCount[nm] || 0) + 1;
         (history[nm] = history[nm] || []).push(amount);
+        nightList.push({ name: nm, amount, d: n.d, mo: n.mo, y: n.y });
         if (amount > 0) moved = r2(moved + amount);
-        if (!bestNight || amount > bestNight.amount) bestNight = { name: nm, amount, d: n.d, mo: n.mo, y: n.y };
-        if (!worstNight || amount < worstNight.amount) worstNight = { name: nm, amount, d: n.d, mo: n.mo, y: n.y };
         const mk = `${nm}|${n.y}-${n.mo}`;
         monthAgg[mk] = r2((monthAgg[mk] || 0) + amount);
+        const at = attend[nm] = attend[nm] || { cur: 0, max: 0 };
+        at.cur += 1;
+        if (at.cur > at.max) at.max = at.cur;
       }
+      for (const nm of Object.keys(attend)) if (!present.has(nm)) attend[nm].cur = 0;
       // "הערב הסוער" — כמה כסף החליף ידיים (סכום הזכיות של אותו ערב)
       if (!stormyNight || moved > stormyNight.moved) stormyNight = { moved, d: n.d, mo: n.mo, y: n.y };
     }
 
-    /* רצפים וסטטיסטיקות אישיות — הכל מ-history הכרונולוגי של כל שחקן:
-       רצף ניצחונות (הארוך + החי), רצף הפסדים, אחוז ניצחונות, ממוצע לערב,
-       והקאמבק הגדול (ערב חיובי מיד אחרי ערב שלילי). */
-    let bestStreak = null, liveStreak = null, lossStreak = null;
-    let winRate = null, bestAvg = null, comeback = null;
+    // ערבי השיא — הטוב והקשה, כל אחד עם הסגן שלו
+    nightList.sort((a, b) => b.amount - a.amount);
+    const bestNight = nightList[0] || null;
+    const bestNight2 = nightList[1] || null;
+    const worstNight = nightList[nightList.length - 1] || null;
+    const worstNight2 = nightList[nightList.length - 2] || null;
+
+    /* סטטיסטיקה פר שחקן — הכל מ-history הכרונולוגי: רצפים, אחוז ניצחונות,
+       ממוצע, תנודתיות (סטיית תקן) והקאמבק. מחושב פעם אחת ואז ממוינים
+       לכל שיא בנפרד, כך שקל לשלוף גם את הסגן. */
     const MIN_NIGHTS = 5;
-    for (const [nm, arr] of Object.entries(history)) {
+    const stats = Object.entries(history).map(([nm, arr]) => {
       let cur = 0, max = 0, lcur = 0, lmax = 0;
       for (const v of arr) {
         cur = v > 0 ? cur + 1 : 0;
@@ -2111,25 +2120,44 @@ function RecordsTab({ db }) {
       }
       let tail = 0;
       for (let i = arr.length - 1; i >= 0 && arr[i] > 0; i--) tail++;
-      if (max >= 2 && (!bestStreak || max > bestStreak.count)) bestStreak = { name: nm, count: max };
-      if (tail >= 2 && (!liveStreak || tail > liveStreak.count)) liveStreak = { name: nm, count: tail };
-      if (lmax >= 3 && (!lossStreak || lmax > lossStreak.count)) lossStreak = { name: nm, count: lmax };
-
+      let comeback = null;
       for (let i = 1; i < arr.length; i++) {
         if (arr[i - 1] < 0 && arr[i] > 0) {
           const jump = r2(arr[i] - arr[i - 1]);
-          if (!comeback || jump > comeback.jump) comeback = { name: nm, jump, from: arr[i - 1], to: arr[i] };
+          if (!comeback || jump > comeback.jump) comeback = { jump, from: arr[i - 1], to: arr[i] };
         }
       }
+      const wins = arr.filter(v => v > 0).length;
+      const sum = r2(arr.reduce((s, v) => s + v, 0));
+      const avg = r2(sum / arr.length);
+      const sd = Math.round(Math.sqrt(arr.reduce((s, v) => s + (v - avg) ** 2, 0) / arr.length));
+      return {
+        name: nm, nights: arr.length, wins, sum, avg, sd,
+        rate: Math.round(wins / arr.length * 100),
+        maxStreak: max, tail, lossMax: lmax, comeback,
+        attendMax: attend[nm]?.max || 0,
+      };
+    });
 
-      if (arr.length >= MIN_NIGHTS) {
-        const wins = arr.filter(v => v > 0).length;
-        const rate = Math.round(wins / arr.length * 100);
-        if (!winRate || rate > winRate.rate) winRate = { name: nm, rate, nights: arr.length };
-        const avg = r2(arr.reduce((s, v) => s + v, 0) / arr.length);
-        if (avg > 0 && (!bestAvg || avg > bestAvg.avg)) bestAvg = { name: nm, avg, nights: arr.length };
-      }
-    }
+    // שניים הראשונים לפי מדד — [שיאן, סגן]
+    const top2 = (key, filter = () => true) => {
+      const s = stats.filter(filter).sort((a, b) => key(b) - key(a));
+      return [s[0] || null, s[1] || null];
+    };
+
+    const [bestStreak, bestStreak2] = top2(s => s.maxStreak, s => s.maxStreak >= 2);
+    const [liveStreak] = top2(s => s.tail, s => s.tail >= 2);
+    const [lossStreak] = top2(s => s.lossMax, s => s.lossMax >= 3);
+    const [winRate, winRate2] = top2(s => s.rate, s => s.nights >= MIN_NIGHTS);
+    const [bestAvg, bestAvg2] = top2(s => s.avg, s => s.nights >= MIN_NIGHTS && s.avg > 0);
+    const [mostWins, mostWins2] = top2(s => s.wins);
+    const [most, most2] = top2(s => s.nights);
+    const [attendTop, attendTop2] = top2(s => s.attendMax, s => s.attendMax >= 3);
+    const [roller] = top2(s => s.sd, s => s.nights >= MIN_NIGHTS);
+    const comeback = stats.reduce(
+      (m, s) => s.comeback && (!m || s.comeback.jump > m.jump) ? { name: s.name, ...s.comeback } : m,
+      null
+    );
 
     // החודש הטוב אי פעם — שחקן + חודש עם הנטו הגבוה ביותר
     let bestMonth = null;
@@ -2141,25 +2169,51 @@ function RecordsTab({ db }) {
       }
     }
 
-    // מלכי התקופה: החודש האחרון שיש בו ערבים, והשנה הנוכחית
+    // מלך המלכים — מי סיים הכי הרבה חודשים במקום הראשון
+    const bestOfMonth = {};
+    for (const [key, amount] of Object.entries(monthAgg)) {
+      const [nm, ym] = key.split("|");
+      if (!bestOfMonth[ym] || amount > bestOfMonth[ym].amount) bestOfMonth[ym] = { name: nm, amount };
+    }
+    const crownCount = {};
+    for (const b of Object.values(bestOfMonth)) crownCount[b.name] = (crownCount[b.name] || 0) + 1;
+    const crowns = Object.entries(crownCount).sort((a, b) => b[1] - a[1]);
+
+    // השנה הטובה אי פעם — לפי המאזן הרשמי כשקיים
+    const yearsSet = new Set([...sessions.map(s => s.y), ...db.yearly.map(x => x.y)]);
+    let bestYear = null;
+    for (const y of yearsSet) {
+      for (const t of yearTotals(db, y).totals) {
+        if (!bestYear || t.amount > bestYear.amount) bestYear = { name: t.name, amount: t.amount, y };
+      }
+    }
+
+    // מלכי התקופה: החודש האחרון שיש בו ערבים, השנה, וכל הזמנים
     const last = sessions[sessions.length - 1];
     const monthT = monthTotals(db, last.y, last.mo);
     const yearT = yearTotals(db, last.y).totals;
-    const most = Object.entries(nightsCount).sort((a, b) => b[1] - a[1])[0];
+    const allT = allTimeTotals(db);
 
     return {
-      bestNight, worstNight, bestStreak, liveStreak, lossStreak,
-      winRate, bestAvg, comeback, stormyNight, bestMonth,
-      monthKing: monthT[0] || null, monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
-      yearKing: yearT[0] || null, yearLabel: `${last.y}`,
-      most: most ? { name: most[0], count: most[1] } : null,
+      bestNight, bestNight2, worstNight, worstNight2,
+      bestStreak, bestStreak2, liveStreak, lossStreak,
+      winRate, winRate2, bestAvg, bestAvg2, mostWins, mostWins2,
+      comeback, stormyNight, bestMonth, bestYear, roller,
+      attendTop, attendTop2,
+      crownKing: crowns[0] ? { name: crowns[0][0], count: crowns[0][1] } : null,
+      crownKing2: crowns[1] ? { name: crowns[1][0], count: crowns[1][1] } : null,
+      monthKing: monthT[0] || null, monthKing2: monthT[1] || null,
+      monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
+      yearKing: yearT[0] || null, yearKing2: yearT[1] || null, yearLabel: `${last.y}`,
+      allKing: allT[0] || null, allKing2: allT[1] || null,
+      most, most2,
       totalNights: sessions.length,
     };
   }, [db]);
 
   if (!recs) return <Empty text="עוד אין ערבים — אין שיאים." />;
 
-  const Card = ({ icon, title, holder, value, tone, sub }) => (
+  const Card = ({ icon, title, holder, value, tone, sub, runner }) => (
     <div style={{
       background: C.card,
       border: `1px solid ${C.line}`,
@@ -2174,6 +2228,9 @@ function RecordsTab({ db }) {
         <div style={{ fontSize: 12, color: C.dim }}>{title}</div>
         <div style={{ fontSize: 15.5, fontWeight: 700, color: C.cream }}>{holder}</div>
         {sub && <div style={{ fontSize: 11.5, color: C.dim }}>{sub}</div>}
+        {runner && (
+          <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>🥈 {runner}</div>
+        )}
       </div>
       <b style={{
         fontSize: 16,
@@ -2195,36 +2252,56 @@ function RecordsTab({ db }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {recs.monthKing && (
           <Card icon="👑" title={`מלך ${recs.monthLabel}`} holder={recs.monthKing.name}
-            value={fmt(recs.monthKing.amount)} tone={C.win} />
+            value={fmt(recs.monthKing.amount)} tone={C.win}
+            runner={recs.monthKing2 && `${recs.monthKing2.name} · ${fmt(recs.monthKing2.amount)}`} />
         )}
         {recs.yearKing && (
           <Card icon="🏆" title={`מוביל ${recs.yearLabel}`} holder={recs.yearKing.name}
-            value={fmt(recs.yearKing.amount)} tone={C.win} />
+            value={fmt(recs.yearKing.amount)} tone={C.win}
+            runner={recs.yearKing2 && `${recs.yearKing2.name} · ${fmt(recs.yearKing2.amount)}`} />
+        )}
+        {recs.allKing && (
+          <Card icon="🐐" title="מלך כל הזמנים" holder={recs.allKing.name}
+            value={fmt(recs.allKing.amount)} tone={C.win}
+            runner={recs.allKing2 && `${recs.allKing2.name} · ${fmt(recs.allKing2.amount)}`} />
+        )}
+        {recs.crownKing && (
+          <Card icon="🥇" title="מלך המלכים — הכי הרבה חודשים במקום הראשון" holder={recs.crownKing.name}
+            value={`${recs.crownKing.count} כתרים`}
+            runner={recs.crownKing2 && `${recs.crownKing2.name} · ${recs.crownKing2.count} כתרים`} />
         )}
         {recs.bestNight && (
           <Card icon="🔥" title="ערב השיא בהיסטוריה" holder={recs.bestNight.name}
-            value={fmt(recs.bestNight.amount)} tone={C.win} sub={dt(recs.bestNight)} />
+            value={fmt(recs.bestNight.amount)} tone={C.win} sub={dt(recs.bestNight)}
+            runner={recs.bestNight2 && `${recs.bestNight2.name} · ${fmt(recs.bestNight2.amount)} · ${dt(recs.bestNight2)}`} />
         )}
         {recs.worstNight && recs.worstNight.amount < 0 && (
           <Card icon="🥶" title="הערב הקשה בהיסטוריה" holder={recs.worstNight.name}
-            value={fmt(recs.worstNight.amount)} tone={C.loss} sub={dt(recs.worstNight)} />
+            value={fmt(recs.worstNight.amount)} tone={C.loss} sub={dt(recs.worstNight)}
+            runner={recs.worstNight2 && recs.worstNight2.amount < 0 &&
+              `${recs.worstNight2.name} · ${fmt(recs.worstNight2.amount)} · ${dt(recs.worstNight2)}`} />
         )}
         {recs.bestMonth && (
           <Card icon="📅" title="החודש הטוב אי פעם" holder={recs.bestMonth.name}
             value={fmt(recs.bestMonth.amount)} tone={C.win}
             sub={`${MONTHS[recs.bestMonth.mo - 1]} ${recs.bestMonth.y}`} />
         )}
+        {recs.bestYear && (
+          <Card icon="🗓️" title="השנה הטובה אי פעם" holder={recs.bestYear.name}
+            value={fmt(recs.bestYear.amount)} tone={C.win} sub={`${recs.bestYear.y}`} />
+        )}
         {recs.liveStreak && (
           <Card icon="⚡" title="רצף ניצחונות פעיל" holder={recs.liveStreak.name}
-            value={`${recs.liveStreak.count} ערבים`} />
+            value={`${recs.liveStreak.tail} ערבים`} />
         )}
         {recs.bestStreak && (
           <Card icon="🎖️" title="רצף הניצחונות הארוך אי פעם" holder={recs.bestStreak.name}
-            value={`${recs.bestStreak.count} ערבים`} />
+            value={`${recs.bestStreak.maxStreak} ערבים`}
+            runner={recs.bestStreak2 && `${recs.bestStreak2.name} · ${recs.bestStreak2.maxStreak} ערבים`} />
         )}
         {recs.lossStreak && (
           <Card icon="🌧️" title="הרצף הקשה אי פעם" holder={recs.lossStreak.name}
-            value={`${recs.lossStreak.count} ערבים`} tone={C.loss} />
+            value={`${recs.lossStreak.lossMax} ערבים`} tone={C.loss} />
         )}
         {recs.comeback && (
           <Card icon="🎢" title="הקאמבק הגדול" holder={recs.comeback.name}
@@ -2234,20 +2311,40 @@ function RecordsTab({ db }) {
         {recs.winRate && (
           <Card icon="🎲" title="אחוז הניצחונות הגבוה ביותר" holder={recs.winRate.name}
             value={`${recs.winRate.rate}%`} tone={C.win}
-            sub={`מתוך ${recs.winRate.nights} ערבים (מינימום 5)`} />
+            sub={`מתוך ${recs.winRate.nights} ערבים (מינימום 5)`}
+            runner={recs.winRate2 && `${recs.winRate2.name} · ${recs.winRate2.rate}%`} />
         )}
         {recs.bestAvg && (
           <Card icon="📈" title="הממוצע הטוב ביותר לערב" holder={recs.bestAvg.name}
             value={fmt(recs.bestAvg.avg)} tone={C.win}
-            sub={`על פני ${recs.bestAvg.nights} ערבים (מינימום 5)`} />
+            sub={`על פני ${recs.bestAvg.nights} ערבים (מינימום 5)`}
+            runner={recs.bestAvg2 && `${recs.bestAvg2.name} · ${fmt(recs.bestAvg2.avg)}`} />
+        )}
+        {recs.mostWins && recs.mostWins.wins > 0 && (
+          <Card icon="✅" title="הכי הרבה ערבים חיוביים" holder={recs.mostWins.name}
+            value={`${recs.mostWins.wins} ערבים`} tone={C.win}
+            sub={`מתוך ${recs.mostWins.nights}`}
+            runner={recs.mostWins2 && recs.mostWins2.wins > 0 &&
+              `${recs.mostWins2.name} · ${recs.mostWins2.wins} ערבים`} />
+        )}
+        {recs.roller && recs.roller.sd > 0 && (
+          <Card icon="🌪️" title="רכבת ההרים — הכי תנודתי" holder={recs.roller.name}
+            value={`±${recs.roller.sd}₪`}
+            sub="כמה רחוק הוא מהממוצע של עצמו בערב טיפוסי" />
         )}
         {recs.stormyNight && recs.stormyNight.moved > 0 && (
           <Card icon="💸" title="הערב הסוער — הכי הרבה כסף החליף ידיים" holder={dt(recs.stormyNight)}
             value={fmt(recs.stormyNight.moved)} />
         )}
+        {recs.attendTop && (
+          <Card icon="🪑" title="לא מפספס — הכי הרבה ערבים ברצף" holder={recs.attendTop.name}
+            value={`${recs.attendTop.attendMax} ערבים`}
+            runner={recs.attendTop2 && `${recs.attendTop2.name} · ${recs.attendTop2.attendMax} ערבים`} />
+        )}
         {recs.most && (
           <Card icon="🎯" title="המתמיד — הכי הרבה ערבים" holder={recs.most.name}
-            value={`${recs.most.count}`} />
+            value={`${recs.most.nights}`}
+            runner={recs.most2 && `${recs.most2.name} · ${recs.most2.nights}`} />
         )}
       </div>
     </div>
