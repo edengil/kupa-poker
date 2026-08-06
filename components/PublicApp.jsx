@@ -34,6 +34,7 @@ export default function PublicApp({ slug }) {
   const dataRef = useRef(null);
   const loggedRef = useRef(false);
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
+  const tabRef = useRef("table"); // רענון נתונים לא מחזיר את הצופה לטבלה
 
   /* ---------------------- טעינה אחרי התחברות ---------------------- */
   const load = useCallback(async () => {
@@ -209,7 +210,11 @@ export default function PublicApp({ slug }) {
       <PokerApp
         key={generation}
         readOnly
-        onTabChange={(tab) => visitRef.current?.onTab?.(tab)}
+        initialTab={tabRef.current}
+        onTabChange={(tab) => {
+          tabRef.current = tab;
+          visitRef.current?.onTab?.(tab);
+        }}
       />
     </>
   );

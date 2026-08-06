@@ -1079,10 +1079,12 @@ async function waShare(text) {
 const waSend = waOpen;
 
 /* ============================ APP ============================ */
-function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, renderRsvps, onRecords, onPlanShared }) {
+function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, renderRsvps, onRecords, onPlanShared, initialTab = "table" }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
-  const [tab, setTabState] = useState("table");
+  // initialTab מאפשר לרענון מבחוץ (remount אחרי פינג מהבוט) לא לזרוק
+  // את המשתמש בחזרה לטבלה
+  const [tab, setTabState] = useState(initialTab);
   // מעבר טאב מדווח החוצה — ככה יומן הצפיות יודע במה כל צופה הסתכל
   const setTab = id => {
     setTabState(id);

@@ -32,8 +32,11 @@ export default function OwnerApp() {
   const [group, setGroup] = useState(null);
   const [message, setMessage] = useState("");
   const [online, setOnline] = useState([]); // מי צופה עכשיו — נוכחות חיה
+  const [generation, setGeneration] = useState(0); // remount כשהלייב השתנה מבחוץ
   const broadcasterRef = useRef(null);
   const groupRef = useRef(null); // גישה יציבה לקבוצה מתוך callbacks
+  const lastLiveRef = useRef(undefined); // הלייב האחרון שידוע לדף — להשוואה מול פינגים
+  const tabRef = useRef("table"); // הטאב הפתוח — נשמר בין רענונים
 
   /* ------------------------------ סשן ------------------------------ */
   useEffect(() => {
@@ -94,9 +97,37 @@ export default function OwnerApp() {
         row = created;
       }
 
-      // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם
-      const broadcaster = createBroadcaster(supabase, row.slug);
+      // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם.
+      // ובכיוון ההפוך: פינג שמגיע מבחוץ (פקודה בוואטסאפ) בודק אם הלייב
+      // השתנה ומרענן את המסך מיד — בלי לחכות ליציאה וחזרה מהטאב.
+      const broadcaster = createBroadcaster(supabase, row.slug, async () => {
+        try {
+          const { data, error } = await supabase
+            .from("groups")
+            .select("live")
+            .eq("id", row.id)
+            .single();
+          if (error || !alive) return;
+          const s = JSON.stringify(data?.live ?? null);
+          if (lastLiveRef.current !== s) {
+            lastLiveRef.current = s;
+            setGeneration((g) => g + 1);
+          }
+        } catch {}
+      });
       broadcasterRef.current = broadcaster;
+
+      // נקודת ייחוס ראשונה ללייב — שהפינג הראשון לא ירענן סתם
+      supabase
+        .from("groups")
+        .select("live")
+        .eq("id", row.id)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && lastLiveRef.current === undefined) {
+            lastLiveRef.current = JSON.stringify(data?.live ?? null);
+          }
+        });
 
       // חשוב: מגדירים את שכבת האחסון לפני שהאפליקציה עולה ומנסה לקרוא
       configureStore(
@@ -223,6 +254,11 @@ export default function OwnerApp() {
         <Viewers supabase={supabase} online={online} groupId={group.id} />
       </div>
       <PokerApp
+        key={generation}
+        initialTab={tabRef.current}
+        onTabChange={(t) => {
+          tabRef.current = t;
+        }}
         statsPanel={
           <ViewerStats supabase={supabase} online={online} groupId={group.id} />
         }
