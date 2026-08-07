@@ -1488,6 +1488,7 @@ function InputTab({
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [toast, setToast] = useState(null);
+  const [splitShare, setSplitShare] = useState(null);
   useEffect(() => {
     window.__loadRaw = r => setText(r);
     return () => {
@@ -1498,6 +1499,25 @@ function InputTab({
   const bal = balance(entries);
   const date = kind === "session" ? parseDate(text, year) : null;
   const canSave = entries.length > 0 && (kind !== "session" || !!date);
+  /* חלוקה ידנית מהסיכום המודבק — רשת ביטחון כשהלייב השתבש: מקלידים את
+     המספרים הנכונים והחלוקה מחושבת מהם, בלי תלות במה שהבוט רשם. */
+  function openSplit() {
+    const norm = entries.map(e => ({ name: canon(e.name, AL(db)), amount: e.amount }));
+    // settle עובד על buyin/cashout; נטו נקי ממופה אליהם עם cps=1
+    const pseudo = norm.map(e => ({
+      name: e.name,
+      buyin: e.amount < 0 ? -e.amount : 0,
+      cashout: String(Math.max(0, e.amount))
+    }));
+    const split = buildSettlement(settle(pseudo, 1), {
+      isCashOnly,
+      transferVerb
+    });
+    setSplitShare({
+      text: toWhatsApp(norm, date, null, null, true),
+      split
+    });
+  }
   function save() {
     if (!canSave) return;
     const rec = {
@@ -1645,7 +1665,28 @@ function InputTab({
       background: canSave ? C.brass : C.card,
       color: canSave ? C.feltDeep : C.dim
     }
-  }, "\u05E9\u05DE\u05D5\u05E8 ", kind === "session" ? "ערב" : kind === "month" ? "חודש" : "מאזן שנתי"), toast && /*#__PURE__*/React.createElement("div", {
+  }, "\u05E9\u05DE\u05D5\u05E8 ", kind === "session" ? "ערב" : kind === "month" ? "חודש" : "מאזן שנתי"), kind === "session" && entries.length > 1 && /*#__PURE__*/React.createElement("button", {
+    onClick: openSplit,
+    style: {
+      width: "100%",
+      marginTop: 8,
+      padding: 12,
+      borderRadius: 12,
+      border: `1px solid ${C.brass}`,
+      background: "transparent",
+      color: C.brass,
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: "inherit"
+    }
+  }, "\uD83D\uDCB8 חלוקה — מי מעביר למי"), splitShare && /*#__PURE__*/React.createElement(ShareSheet, {
+    title: "חלוקה",
+    text: splitShare.text,
+    settlement: splitShare.split,
+    initialView: "split",
+    onClose: () => setSplitShare(null)
+  }), toast && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12,
       display: "flex",
@@ -2276,7 +2317,32 @@ function RecordsTab({ db }) {
     const yearT = yearTotals(db, last.y).totals;
     const allT = allTimeTotals(db);
 
+    /* הערב האחרון — תמיד מעניין מה קרה הרגע: מי לקח, מי נתן, כמה עבר
+       ידיים, והאם נשברו שיאים (אותה בדיקה שמפעילה את ההכרזה בוואטסאפ). */
+    const lastN = perNight[perNight.length - 1];
+    const lastRows = Object.entries(lastN.totals).sort((a, b) => b[1] - a[1]);
+    let lastBroken = [];
+    try {
+      lastBroken = brokenRecords({ ...db, sessions: sessions.slice(0, -1) }, last);
+    } catch {}
+    const topRow = lastRows[0] && lastRows[0][1] > 0 ? { name: lastRows[0][0], amount: lastRows[0][1] } : null;
+    const prevOfTop = topRow
+      ? perNight.slice(0, -1).map(n => n.totals[topRow.name]).filter(v => v != null)
+      : [];
+    const lastNight = {
+      label: `${lastN.d}.${lastN.mo}.${String(lastN.y).slice(2)}`,
+      count: lastRows.length,
+      top: topRow,
+      bottom: lastRows.length && lastRows[lastRows.length - 1][1] < 0
+        ? { name: lastRows[lastRows.length - 1][0], amount: lastRows[lastRows.length - 1][1] }
+        : null,
+      moved: r2(lastRows.reduce((s, [, v]) => s + (v > 0 ? v : 0), 0)),
+      personalBest: !!(topRow && prevOfTop.length >= 3 && topRow.amount > Math.max(...prevOfTop)),
+      broken: lastBroken,
+    };
+
     return {
+      lastNight,
       bestNight, bestNight2, worstNight, worstNight2,
       bestStreak, bestStreak2, liveStreak, lossStreak,
       winRate, winRate2, bestAvg, bestAvg2, mostWins, mostWins2,
@@ -2332,6 +2398,42 @@ function RecordsTab({ db }) {
         מ־{recs.totalNights} ערבים מתועדים
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {recs.lastNight && (
+          <>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "2px 2px 0" }}>
+              ♠ מהערב האחרון · {recs.lastNight.label} · {recs.lastNight.count} שחקנים
+            </div>
+            {recs.lastNight.top && (
+              <Card icon="🌟" title="גיבור הערב" holder={recs.lastNight.top.name}
+                value={fmt(recs.lastNight.top.amount)} tone={C.win}
+                sub={recs.lastNight.personalBest ? "🚀 שיא אישי חדש — התוצאה הטובה שלו אי פעם" : undefined} />
+            )}
+            {recs.lastNight.bottom && (
+              <Card icon="🥀" title="הנפילה של הערב" holder={recs.lastNight.bottom.name}
+                value={fmt(recs.lastNight.bottom.amount)} tone={C.loss} />
+            )}
+            {recs.lastNight.moved > 0 && (
+              <Card icon="💸" title="עבר ידיים בערב" holder="סך כל הזכיות"
+                value={fmt(recs.lastNight.moved)} />
+            )}
+            {recs.lastNight.broken.length > 0 && (
+              <div style={{
+                background: C.card, border: `1px solid ${C.brass}66`,
+                borderRadius: 14, padding: "12px 14px",
+              }}>
+                <div style={{ fontSize: 12, color: C.brass, fontWeight: 700, marginBottom: 6 }}>
+                  🏆 שיאים שנשברו בערב הזה
+                </div>
+                {recs.lastNight.broken.map((line, i) => (
+                  <div key={i} style={{ fontSize: 12.5, color: C.cream, lineHeight: 1.7 }}>{line}</div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "8px 2px 0" }}>
+              🏛 כל הזמנים
+            </div>
+          </>
+        )}
         {recs.monthKing && (
           <Card icon="👑" title={`מלך ${recs.monthLabel}`} holder={recs.monthKing.name}
             value={fmt(recs.monthKing.amount)} tone={C.win}
@@ -3984,10 +4086,11 @@ function ShareSheet({
   title,
   text,
   settlement,
-  onClose
+  onClose,
+  initialView = "summary"
 }) {
   const [copied, setCopied] = useState(false);
-  const [view, setView] = useState("summary");
+  const [view, setView] = useState(initialView);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");

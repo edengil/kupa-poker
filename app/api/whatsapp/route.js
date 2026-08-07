@@ -73,8 +73,14 @@ export async function POST(request) {
   }
   if (!msg) return ok({ skipped: "no text" });
 
-  // תשובות של הבוט עצמו — אחרת נוצרת לולאה
-  if (msg.text.trim().startsWith(BOT_MARK)) return ok({ skipped: "bot echo" });
+  /* תשובות של הבוט עצמו — אחרת נוצרת לולאה. הבדיקה מחמירה בכוונה:
+     לא רק תחילת ההודעה אלא כל אזכור של סימן הבוט, וגם ⚠️ בתחילת שורה.
+     ב-6.8.26 תשובה שהתחילה ב-⚠️ (אזהרת שם דו-משמעי) עברה את הפילטר הישן,
+     ושורות הסיכום שבה ("אורן מגיע 525₪") פורסרו כהוספות כסף לכולם. */
+  const incoming = msg.text.trim();
+  if (incoming.includes(BOT_MARK) || incoming.startsWith("⚠️")) {
+    return ok({ skipped: "bot echo" });
+  }
 
   const groupId = process.env.WHAPI_GROUP_ID;
   if (groupId && msg.chatId !== groupId) return ok({ skipped: "other chat" });
