@@ -3,7 +3,7 @@ import { getAdminSupabase, pingViewers } from "@/lib/supabaseAdmin";
 import { notifyGameStart } from "@/lib/push";
 import {
   parseCommands, applyCommands, extractMessage, isAllowed,
-  sendToGroup, listGroups, BOT_MARK,
+  sendToGroup, listGroups, BOT_MARK, setPresenceOffline,
 } from "@/lib/whatsapp";
 
 /* ============================================================================
@@ -80,6 +80,13 @@ export async function POST(request) {
   const incoming = msg.text.trim();
   if (incoming.includes(BOT_MARK) || incoming.startsWith("⚠️")) {
     return ok({ skipped: "bot echo" });
+  }
+
+  /* הודעה שעדן שלח מהטלפון = הוא היה "מחובר", ווואטסאפ יעצור את ההתראות
+     שלו עד שהנוכחות תתאפס. מאפסים אותה מיד אחרי כל שימוש בטלפון —
+     ההמלצה הרשמית של Whapi לבעיית ההתראות במכשירים מקושרים. */
+  if (isAllowed(msg, process.env.WHATSAPP_OWNER, "")) {
+    await setPresenceOffline(process.env.WHAPI_TOKEN);
   }
 
   const groupId = process.env.WHAPI_GROUP_ID;
