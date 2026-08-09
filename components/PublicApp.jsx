@@ -36,19 +36,50 @@ export default function PublicApp({ slug }) {
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
   const tabRef = useRef("table"); // רענון נתונים לא מחזיר את הצופה לטבלה
 
-  /* ---------------------- טעינה אחרי התחברות ---------------------- */
+  /* ---------------------- טעינה אחרי התחברות ----------------------
+     העתק אחרון של התמונה נשמר ב-localStorage: בביקור חוזר הדף עולה מיד
+     ממנו, והרשת רק מיישרת ברקע (בדיוק כמו רענון רגיל). */
   const load = useCallback(async () => {
+    const cacheKey = `poker:cache:pub:${slug}`;
+
+    const apply = (snap) => {
+      configureStore(makeReadOnlyStore(snap));
+      dataRef.current = JSON.stringify(snap.data ?? null);
+      setGroupId(snap.id);
+      setLive(snap.live ?? null);
+      setPlan(snap.data?.plan ?? null);
+      setPhase("ready");
+    };
+
+    let cached = null;
+    try {
+      cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    } catch {}
+    if (cached?.id) apply(cached);
+
     const snap = await fetchSnapshot(supabase, slug);
     if (!snap) {
-      setPhase("missing");
-      return null;
+      if (!cached?.id) setPhase("missing");
+      return cached?.id ? cached : null;
     }
-    configureStore(makeReadOnlyStore(snap));
-    dataRef.current = JSON.stringify(snap.data ?? null);
-    setGroupId(snap.id);
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(snap));
+    } catch {}
+
+    if (!cached?.id) {
+      apply(snap);
+      return snap;
+    }
+
+    // עלינו מהמטמון — מיישרים מול מה שחזר מהרשת
     setLive(snap.live ?? null);
     setPlan(snap.data?.plan ?? null);
-    setPhase("ready");
+    const serialized = JSON.stringify(snap.data ?? null);
+    if (serialized !== dataRef.current) {
+      dataRef.current = serialized;
+      configureStore(makeReadOnlyStore(snap));
+      setGeneration((g) => g + 1);
+    }
     return snap;
   }, [supabase, slug]);
 
@@ -109,6 +140,9 @@ export default function PublicApp({ slug }) {
   const refresh = useCallback(async () => {
     const next = await fetchSnapshot(supabase, slug);
     if (!next) return;
+    try {
+      localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify(next));
+    } catch {}
     setLive(next.live ?? null);
     setPlan(next.data?.plan ?? null);
     const serialized = JSON.stringify(next.data ?? null);

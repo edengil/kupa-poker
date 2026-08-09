@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
-import { configureStore, makeSupabaseStore, flushStore } from "../lib/store";
+import { configureStore, makeSupabaseStore, flushStore, clearLocalCache } from "../lib/store";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
@@ -57,14 +57,82 @@ export default function OwnerApp() {
     };
   }, [supabase]);
 
-  /* -------------------- איתור או יצירה של הקבוצה -------------------- */
+  /* האם הלייב במסד שונה ממה שמוצג? אם כן — רענון (remount של PokerApp).
+     נקרא מפינג של הבוט, מסקר קבוע, ומחזרה לדף. lastLiveRef מתעדכן גם בכל
+     כתיבה מקומית, כדי שהשינויים של עצמנו לא ייחשבו "חיצוniים" ויקפיצו רענון. */
+  const checkLive = useCallback(async () => {
+    const row = groupRef.current;
+    if (!row) return;
+    try {
+      const { data, error } = await supabase
+        .from("groups")
+        .select("live")
+        .eq("id", row.id)
+        .single();
+      if (error) return;
+      const s = JSON.stringify(data?.live ?? null);
+      if (lastLiveRef.current === undefined) {
+        lastLiveRef.current = s; // נקודת ייחוס ראשונה — בלי רענון סרק
+        return;
+      }
+      if (lastLiveRef.current !== s) {
+        lastLiveRef.current = s;
+        setGeneration((g) => g + 1);
+      }
+    } catch {}
+  }, [supabase]);
+
+  /* -------------------- איתור או יצירה של הקבוצה --------------------
+     שורת הקבוצה נשמרת ב-localStorage: בביקור חוזר האפליקציה עולה מיידית
+     מהמטמון, והרשת רק מאמתת ברקע. */
   useEffect(() => {
     let alive = true;
+
+    const boot = (row, broadcaster) => {
+      configureStore(
+        makeSupabaseStore(supabase, row.id, {
+          onFlush: (patch) => {
+            // כתיבה שלנו שנגעה בלייב — מעדכנים את נקודת הייחוס לפני הפינג
+            if (patch && "live" in patch) {
+              lastLiveRef.current = JSON.stringify(patch.live ?? null);
+            }
+            broadcaster.ping();
+          },
+          // המטמון המקומי התגלה כלא עדכני — מרעננים עם הנתונים הטריים
+          onStale: () => setGeneration((g) => g + 1),
+        })
+      );
+      groupRef.current = row;
+      setGroup(row);
+      setPhase("ready");
+    };
+
     (async () => {
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
       if (!user) return;
 
+      const cacheKey = `poker:cache:group:${user.id}`;
+
+      // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם.
+      // ובכיוון ההפוך: פינג שמגיע מבחוץ (פקודה בוואטסאפ) מרענן את המסך מיד.
+      const mkBroadcaster = (slug) => {
+        const b = createBroadcaster(supabase, slug, checkLive);
+        broadcasterRef.current = b;
+        return b;
+      };
+
+      // מסלול מהיר: שורת הקבוצה מהביקור הקודם
+      let cachedRow = null;
+      try {
+        cachedRow = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      } catch {}
+      if (cachedRow?.id && cachedRow?.slug && alive) {
+        boot(cachedRow, mkBroadcaster(cachedRow.slug));
+        checkLive(); // קובע נקודת ייחוס ללייב
+      }
+
+      // אימות מול המסד — גם במסלול המהיר, ליישור המטמון
       const { data: rows, error } = await supabase
         .from("groups")
         .select("id, slug, name")
@@ -73,7 +141,7 @@ export default function OwnerApp() {
         .limit(1);
 
       if (error) {
-        if (alive) {
+        if (alive && !cachedRow) {
           setMessage(error.message);
           setPhase("error");
         }
@@ -88,7 +156,7 @@ export default function OwnerApp() {
           .select("id, slug, name")
           .single();
         if (insertError) {
-          if (alive) {
+          if (alive && !cachedRow) {
             setMessage(insertError.message);
             setPhase("error");
           }
@@ -97,52 +165,22 @@ export default function OwnerApp() {
         row = created;
       }
 
-      // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם.
-      // ובכיוון ההפוך: פינג שמגיע מבחוץ (פקודה בוואטסאפ) בודק אם הלייב
-      // השתנה ומרענן את המסך מיד — בלי לחכות ליציאה וחזרה מהטאב.
-      const broadcaster = createBroadcaster(supabase, row.slug, async () => {
-        try {
-          const { data, error } = await supabase
-            .from("groups")
-            .select("live")
-            .eq("id", row.id)
-            .single();
-          if (error || !alive) return;
-          const s = JSON.stringify(data?.live ?? null);
-          if (lastLiveRef.current !== s) {
-            lastLiveRef.current = s;
-            setGeneration((g) => g + 1);
-          }
-        } catch {}
-      });
-      broadcasterRef.current = broadcaster;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(row));
+      } catch {}
 
-      // נקודת ייחוס ראשונה ללייב — שהפינג הראשון לא ירענן סתם
-      supabase
-        .from("groups")
-        .select("live")
-        .eq("id", row.id)
-        .single()
-        .then(({ data, error }) => {
-          if (!error && lastLiveRef.current === undefined) {
-            lastLiveRef.current = JSON.stringify(data?.live ?? null);
-          }
-        });
+      if (!alive) return;
+      if (cachedRow?.id === row.id && cachedRow?.slug === row.slug) return; // המטמון היה נכון
 
-      // חשוב: מגדירים את שכבת האחסון לפני שהאפליקציה עולה ומנסה לקרוא
-      configureStore(
-        makeSupabaseStore(supabase, row.id, { onFlush: () => broadcaster.ping() })
-      );
-      if (alive) {
-        groupRef.current = row;
-        setGroup(row);
-        setPhase("ready");
-      }
+      // אין מטמון (או שהוא לא תואם) — עולים עם הנתונים מהמסד
+      broadcasterRef.current?.dispose();
+      boot(row, mkBroadcaster(row.slug));
+      checkLive();
     })();
     return () => {
       alive = false;
     };
-  }, [supabase, phase === "signedOut"]);
+  }, [supabase, phase === "signedOut", checkLive]);
 
   // ניקוי הערוץ ביציאה
   useEffect(
@@ -152,6 +190,34 @@ export default function OwnerApp() {
     },
     []
   );
+
+  /* גיבוי לפינגים: WebSocket בטלפון נופל כשהמסך ננעל ולא תמיד מתאושש,
+     ואז עדכונים מהבוט לא מגיעים עד שיוצאים וחוזרים. סקר קל (שאילתת לייב
+     אחת) כל 12 שניות כשהמסך גלוי + בדיקה מיידית בכל חזרה לדף סוגרים את
+     החור — בדיוק כמו אצל הצופים. */
+  useEffect(() => {
+    if (phase !== "ready") return;
+    let timer = null;
+    const stop = () => timer && clearInterval(timer);
+    const start = () => {
+      stop();
+      timer = setInterval(checkLive, 12000);
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        checkLive();
+        start();
+      } else stop();
+    };
+    onVis();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", checkLive);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", checkLive);
+    };
+  }, [phase, checkLive]);
 
   /* נוכחות חיה — מנוי אחד לכל הדף. גם פאנל "מי צופה" וגם טאב "צפיות"
      מקבלים את אותה רשימה כ-prop. שני מנויים לאותו ערוץ היו מפילים את
@@ -240,6 +306,12 @@ export default function OwnerApp() {
 
   const signOut = useCallback(async () => {
     await flushStore();
+    clearLocalCache();
+    try {
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id;
+      if (uid) localStorage.removeItem(`poker:cache:group:${uid}`);
+    } catch {}
     await supabase.auth.signOut();
   }, [supabase]);
 
