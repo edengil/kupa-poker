@@ -83,7 +83,12 @@ export function EGSplash() {
   return (
     <main
       style={{
-        minHeight: "100vh",
+        /* תופס את כל המסך ממש — ככה התוכן תמיד באמצע, גם עם ה-safe area של האייפון */
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         background: "#0A2B21",
         display: "grid",
         placeItems: "center",
