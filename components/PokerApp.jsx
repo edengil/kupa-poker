@@ -9,6 +9,7 @@ import { store } from "../lib/store";
 import { buildReport, buildSettlement } from "../lib/report";
 import { settle, isCashOnly, transferVerb } from "../lib/settlement";
 import { planLabel } from "./Rsvp";
+import { EGMark } from "./Logo";
 
 const DB_KEY = "poker:db";
 const CONFIG_KEY = "poker:config";
@@ -1150,7 +1151,7 @@ function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, re
     style: {
       maxWidth: 640,
       margin: "0 auto",
-      padding: "0 13px 90px"
+      padding: "0 13px calc(90px + env(safe-area-inset-bottom))"
     }
   }, /*#__PURE__*/React.createElement(Header, null), /*#__PURE__*/React.createElement(Banner, {
     db: db,
@@ -1204,21 +1205,9 @@ function Header() {
       gap: 12,
       padding: "20px 4px 12px"
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 40,
-      height: 40,
-      borderRadius: "50%",
-      flexShrink: 0,
-      background: `radial-gradient(circle at 50% 40%, ${C.brass}, ${C.brassSoft})`,
-      border: `2px dashed ${C.feltDeep}`,
-      boxShadow: `0 0 0 2px ${C.brassSoft}, inset 0 0 0 6px ${C.brass}`,
-      display: "grid",
-      placeItems: "center",
-      color: C.feltDeep,
-      fontWeight: 800
-    }
-  }, "\u2660"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(EGMark, {
+    size: 42
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -1440,7 +1429,7 @@ function TabBar({
       background: C.card,
       borderTop: `1px solid ${C.line}`,
       display: "flex",
-      padding: "6px 8px 10px",
+      padding: "6px 8px calc(10px + env(safe-area-inset-bottom))",
       zIndex: 20
     }
   }, /*#__PURE__*/React.createElement("div", {

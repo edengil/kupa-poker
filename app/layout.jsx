@@ -37,6 +37,8 @@ export default function RootLayout({ children }) {
         />
         <style>{`
           html,body{margin:0;padding:0;background:#0A2B21;-webkit-text-size-adjust:100%;}
+          /* באייפון (PWA) התוכן נמתח עד מתחת לשעון — הריווח מחזיר אותו למקום */
+          body{padding-top:env(safe-area-inset-top);}
           body{font-family:'Rubik',system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;}
           *{-webkit-tap-highlight-color:transparent;}
         `}</style>
