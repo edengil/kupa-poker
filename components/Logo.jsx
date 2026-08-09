@@ -58,4 +58,24 @@ export function EGMark({ size = 64, className, style }) {
   );
 }
 
+/* שורת קרדיט — מופיעה במסכי ההתחברות מתחת לכותרת */
+export function EGByline({ style }) {
+  return (
+    <div
+      dir="ltr"
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.24em",
+        textTransform: "uppercase",
+        color: "#D9A441",
+        opacity: 0.9,
+        ...style,
+      }}
+    >
+      By Eden Haim Gil
+    </div>
+  );
+}
+
 export default EGMark;

@@ -7,7 +7,7 @@ import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { getPushSupport, getPushSubscription, subscribePush, unsubscribePush } from "../lib/pushClient";
 import { RsvpCard } from "./Rsvp";
-import { EGMark } from "./Logo";
+import { EGMark, EGByline } from "./Logo";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -348,6 +348,7 @@ function SignIn({ onSignIn }) {
       <div style={{ maxWidth: 340 }}>
         <EGMark size={84} style={{ margin: "0 auto" }} />
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: "16px 0 6px" }}>קופה — פוקר</h1>
+        <EGByline style={{ margin: "0 0 14px" }} />
         <p style={{ color: C.dim, fontSize: 15, lineHeight: 1.7, margin: "0 0 24px" }}>
           כדי לראות את הטבלה צריך להתחבר. זה לוקח שנייה, ואין צורך בהרשמה.
         </p>
