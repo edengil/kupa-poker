@@ -9,7 +9,7 @@ import { store } from "../lib/store";
 import { buildReport, buildSettlement } from "../lib/report";
 import { settle, isCashOnly, transferVerb } from "../lib/settlement";
 import { planLabel } from "./Rsvp";
-import { EGMark } from "./Logo";
+import { EGMark, EGFooter } from "./Logo";
 
 const DB_KEY = "poker:db";
 const CONFIG_KEY = "poker:config";
@@ -1183,7 +1183,7 @@ function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, re
   }) : /*#__PURE__*/React.createElement(PlayersTab, {
     db: db,
     onPlayer: setProfile
-  })), profile && /*#__PURE__*/React.createElement(ProfileSheet, {
+  }), /*#__PURE__*/React.createElement(EGFooter, null)), profile && /*#__PURE__*/React.createElement(ProfileSheet, {
     db: db,
     name: profile,
     onClose: () => setProfile(null)

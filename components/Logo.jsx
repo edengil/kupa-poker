@@ -79,6 +79,33 @@ export function EGByline({ style }) {
   );
 }
 
+/* חתימה בתחתית האתר — מופיעה מתחת לכל התוכן, מעל התפריט התחתון */
+export function EGFooter() {
+  return (
+    <footer
+      dir="ltr"
+      style={{ textAlign: "center", padding: "30px 0 4px", userSelect: "none" }}
+    >
+      <EGMark size={24} style={{ margin: "0 auto 9px", opacity: 0.9 }} />
+      <div
+        style={{
+          fontFamily: "'Outfit','Rubik',system-ui,sans-serif",
+          fontSize: 11.5,
+          fontWeight: 700,
+          letterSpacing: "0.2em",
+          textTransform: "uppercase",
+          color: "#D9A441",
+        }}
+      >
+        Eden Gil&trade;
+      </div>
+      <div style={{ fontSize: 10, color: "#9DBBAC", opacity: 0.8, marginTop: 5 }}>
+        &copy; {new Date().getFullYear()} Eden Haim Gil &middot; All rights reserved
+      </div>
+    </footer>
+  );
+}
+
 /* מסך פתיחה — מוצג בזמן הטעינה במקום "טוען…" */
 export function EGSplash() {
   return (
