@@ -8,6 +8,7 @@ import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import { RsvpList, planLabel } from "./Rsvp";
+import { EGMark } from "./Logo";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -360,8 +361,8 @@ function SignIn({ onSignIn }) {
       }}
     >
       <div style={{ maxWidth: 340 }}>
-        <div style={{ fontSize: 52, lineHeight: 1, color: C.brass }}>♠</div>
-        <h1 style={{ fontSize: 30, fontWeight: 800, margin: "14px 0 6px" }}>קופה — פוקר</h1>
+        <EGMark size={84} style={{ margin: "0 auto" }} />
+        <h1 style={{ fontSize: 30, fontWeight: 800, margin: "16px 0 6px" }}>קופה — פוקר</h1>
         <p style={{ color: C.dim, fontSize: 15, lineHeight: 1.7, margin: "0 0 28px" }}>
           התחבר כדי לנהל את ערבי הקבוצה. אחרי ההתחברות תקבל לינק לשיתוף שהחברים
           יוכלו לפתוח בלי חשבון.
