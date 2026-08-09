@@ -7,7 +7,7 @@ import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { getPushSupport, getPushSubscription, subscribePush, unsubscribePush } from "../lib/pushClient";
 import { RsvpCard } from "./Rsvp";
-import { EGMark, EGByline } from "./Logo";
+import { EGMark, EGByline, EGSplash } from "./Logo";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -197,7 +197,7 @@ export default function PublicApp({ slug }) {
     });
   };
 
-  if (phase === "loading") return <Splash>טוען…</Splash>;
+  if (phase === "loading") return <EGSplash />;
   if (phase === "signedOut") return <SignIn onSignIn={signIn} />;
   if (phase === "missing")
     return <Splash tone="error">הלינק הזה לא מוביל לשום קבוצה.<br />בקש מהמנהל לינק מעודכן.</Splash>;

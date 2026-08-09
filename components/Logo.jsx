@@ -78,4 +78,37 @@ export function EGByline({ style }) {
   );
 }
 
+/* מסך פתיחה — מוצג בזמן הטעינה במקום "טוען…" */
+export function EGSplash() {
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#0A2B21",
+        display: "grid",
+        placeItems: "center",
+        padding: 24,
+      }}
+    >
+      <style>{`@keyframes egPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.82;transform:scale(.97)}}`}</style>
+      <div style={{ textAlign: "center", animation: "egPulse 2.2s ease-in-out infinite" }}>
+        <EGMark size={96} style={{ margin: "0 auto" }} />
+        <div
+          dir="ltr"
+          style={{
+            marginTop: 18,
+            fontSize: 24,
+            fontWeight: 800,
+            letterSpacing: "-0.02em",
+            color: "#EFE7D2",
+          }}
+        >
+          Poker — Kupa
+        </div>
+        <EGByline style={{ marginTop: 10 }} />
+      </div>
+    </main>
+  );
+}
+
 export default EGMark;

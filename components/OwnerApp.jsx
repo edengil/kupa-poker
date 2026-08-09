@@ -8,7 +8,7 @@ import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import { RsvpList, planLabel } from "./Rsvp";
-import { EGMark, EGByline } from "./Logo";
+import { EGMark, EGByline, EGSplash } from "./Logo";
 
 const C = {
   feltDeep: "#0A2B21",
@@ -316,7 +316,7 @@ export default function OwnerApp() {
     await supabase.auth.signOut();
   }, [supabase]);
 
-  if (phase === "loading") return <Splash>טוען…</Splash>;
+  if (phase === "loading") return <EGSplash />;
   if (phase === "error") return <Splash tone="error">{message || "משהו השתבש"}</Splash>;
   if (phase === "signedOut") return <SignIn onSignIn={signIn} />;
 
