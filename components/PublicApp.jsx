@@ -86,6 +86,22 @@ export default function PublicApp({ slug }) {
 
   useEffect(() => {
     let alive = true;
+
+    /* מסלול מהיר: עולים מהמטמון מיד, עוד לפני בדיקת הסשן.
+       getSession בספארי/PWA נתקע לפעמים עד שנוגעים במסך — אסור לחכות לו.
+       אם יתברר שאין סשן, נעבור למסך ההתחברות מיד אחר כך. */
+    try {
+      const cached = JSON.parse(localStorage.getItem(`poker:cache:pub:${slug}`) || "null");
+      if (cached?.id) {
+        configureStore(makeReadOnlyStore(cached));
+        dataRef.current = JSON.stringify(cached.data ?? null);
+        setGroupId(cached.id);
+        setLive(cached.live ?? null);
+        setPlan(cached.data?.plan ?? null);
+        setPhase("ready");
+      }
+    } catch {}
+
     (async () => {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;

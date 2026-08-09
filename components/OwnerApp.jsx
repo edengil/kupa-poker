@@ -108,30 +108,32 @@ export default function OwnerApp() {
       setPhase("ready");
     };
 
+    const cacheKey = "poker:cache:group";
+
+    // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם.
+    // ובכיוון ההפוך: פינג שמגיע מבחוץ (פקודה בוואטסאפ) מרענן את המסך מיד.
+    const mkBroadcaster = (slug) => {
+      const b = createBroadcaster(supabase, slug, checkLive);
+      broadcasterRef.current = b;
+      return b;
+    };
+
+    /* מסלול מהיר: עולים מהמטמון מיד, עוד לפני בדיקת הסשן.
+       getSession בספארי/PWA נתקע לפעמים עד שנוגעים במסך — אסור לחכות לו.
+       אם יתברר שאין סשן, האפקט של הסשן למעלה יעביר למסך התחברות. */
+    let cachedRow = null;
+    try {
+      cachedRow = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    } catch {}
+    if (cachedRow?.id && cachedRow?.slug) {
+      boot(cachedRow, mkBroadcaster(cachedRow.slug));
+      checkLive(); // קובע נקודת ייחוס ללייב
+    }
+
     (async () => {
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
       if (!user) return;
-
-      const cacheKey = `poker:cache:group:${user.id}`;
-
-      // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם.
-      // ובכיוון ההפוך: פינג שמגיע מבחוץ (פקודה בוואטסאפ) מרענן את המסך מיד.
-      const mkBroadcaster = (slug) => {
-        const b = createBroadcaster(supabase, slug, checkLive);
-        broadcasterRef.current = b;
-        return b;
-      };
-
-      // מסלול מהיר: שורת הקבוצה מהביקור הקודם
-      let cachedRow = null;
-      try {
-        cachedRow = JSON.parse(localStorage.getItem(cacheKey) || "null");
-      } catch {}
-      if (cachedRow?.id && cachedRow?.slug && alive) {
-        boot(cachedRow, mkBroadcaster(cachedRow.slug));
-        checkLive(); // קובע נקודת ייחוס ללייב
-      }
 
       // אימות מול המסד — גם במסלול המהיר, ליישור המטמון
       const { data: rows, error } = await supabase
@@ -309,9 +311,7 @@ export default function OwnerApp() {
     await flushStore();
     clearLocalCache();
     try {
-      const { data } = await supabase.auth.getSession();
-      const uid = data.session?.user?.id;
-      if (uid) localStorage.removeItem(`poker:cache:group:${uid}`);
+      localStorage.removeItem("poker:cache:group");
     } catch {}
     await supabase.auth.signOut();
   }, [supabase]);

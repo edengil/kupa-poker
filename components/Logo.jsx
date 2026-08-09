@@ -64,9 +64,10 @@ export function EGByline({ style }) {
     <div
       dir="ltr"
       style={{
+        fontFamily: "'Outfit','Rubik',system-ui,sans-serif",
         fontSize: 11,
         fontWeight: 600,
-        letterSpacing: "0.24em",
+        letterSpacing: "0.22em",
         textTransform: "uppercase",
         color: "#D9A441",
         opacity: 0.9,
@@ -101,14 +102,15 @@ export function EGSplash() {
         <div
           dir="ltr"
           style={{
-            marginTop: 18,
-            fontSize: 24,
+            marginTop: 20,
+            fontFamily: "'Outfit','Rubik',system-ui,sans-serif",
+            fontSize: 27,
             fontWeight: 800,
-            letterSpacing: "-0.02em",
+            letterSpacing: "-0.03em",
             color: "#EFE7D2",
           }}
         >
-          Poker — Kupa
+          Poker <span style={{ color: "#D9A441", fontWeight: 700 }}>—</span> Kupa
         </div>
         <EGByline style={{ marginTop: 10 }} />
       </div>
