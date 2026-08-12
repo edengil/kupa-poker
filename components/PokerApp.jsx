@@ -11,13 +11,15 @@ import { settle, isCashOnly, transferVerb } from "../lib/settlement";
 import { planLabel } from "./Rsvp";
 import { C } from "./poker/colors";
 import { IconBtn, Empty, SegBar, Tag, NavBtn, RoundBtn, GroupLabel, Stat, inputStyle, Select } from "./poker/ui";
+import { Header, TabBar, BalanceMeter, Style } from "./poker/chrome";
+import { fmt, MONTHS } from "./poker/format";
 import {
   Trash2, AlertTriangle, CheckCircle2, CalendarDays, Pencil, Users,
   ChevronDown, ChevronLeft, ChevronRight, Crown, Plus, Minus, Share2, Copy,
   TrendingUp, X, Eye, Trophy, Award, Send, Download, Upload, UserPlus, Coins,
   ClipboardPaste, PlayCircle, BarChart3,
 } from "./poker/icons";
-import { EGMark, EGFooter } from "./Logo";
+import { EGFooter } from "./Logo";
 
 const DB_KEY = "poker:db";
 const CONFIG_KEY = "poker:config";
@@ -889,7 +891,6 @@ const SEED_YEARLY = {
     amount: -2198
   }]
 };
-const MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 
 /* ------------------------- parsing ------------------------- */
 const KW = new RegExp("^\\s*(.+?)\\s*(מגיע(?:ה|ים)?|מרווח(?:ת|ים)?|מקבל(?:ת)?|זכאי(?:ת)?|חייב(?:ת|ים|ות)?)\\s*(\\d+)");
@@ -940,7 +941,6 @@ const balance = e => {
   };
 };
 const canon = (n, a) => a[n] || n;
-const fmt = n => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toLocaleString("en-US");
 const hhmm = ts => {
   const d = new Date(ts);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -1191,37 +1191,6 @@ function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, re
   }));
 }
 
-/* --------------------------- header ------------------------- */
-function Header() {
-  return /*#__PURE__*/React.createElement("header", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      padding: "20px 4px 12px"
-    }
-  }, /*#__PURE__*/React.createElement(EGMark, {
-    size: 42
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("h1", {
-    style: {
-      margin: 0,
-      fontSize: 23,
-      fontWeight: 800,
-      letterSpacing: "-.5px"
-    }
-  }, "\u05E7\u05D5\u05E4\u05D4 \u2014 \u05E4\u05D5\u05E7\u05E8"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: 0,
-      fontSize: 12,
-      color: C.dim
-    }
-  }, "\u05DE\u05D0\u05D6\u05DF \u05D7\u05D9 \xB7 \u05E9\u05D9\u05EA\u05D5\u05E3 \u05D1\u05D5\u05D5\u05D0\u05D8\u05E1\u05D0\u05E4")));
-}
-
 /* --------------------------- banner ------------------------- */
 function Banner({
   db,
@@ -1385,61 +1354,6 @@ function Banner({
   }, /*#__PURE__*/React.createElement(Award, {
     size: 12
   }), "\u05DE\u05D0\u05D6\u05DF \u05E9\u05E0\u05EA\u05D9 \u05E8\u05E9\u05DE\u05D9"));
-}
-/* --------------------------- tab bar ------------------------ */
-function TabBar({
-  tab,
-  setTab,
-  n,
-  readOnly = false,
-  hasStats = false
-}) {
-  const WRITE_TABS = ["live", "input", "sessions"];
-  const items = [["table", "טבלה", BarChart3], ["players", "שחקנים", Users], ["records", "שיאים", Trophy], ["live", "לייב", PlayCircle], ["input", "הזנה", ClipboardPaste], ["sessions", "ערבים", CalendarDays], ...(hasStats ? [["stats", "צפיות", Eye]] : [])].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));
-  return /*#__PURE__*/React.createElement("nav", {
-    style: {
-      position: "fixed",
-      bottom: 0,
-      left: 0,
-      right: 0,
-      background: C.card,
-      borderTop: `1px solid ${C.line}`,
-      display: "flex",
-      padding: "6px 8px calc(10px + env(safe-area-inset-bottom))",
-      zIndex: 20
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      maxWidth: 640,
-      margin: "0 auto",
-      display: "flex",
-      flex: 1,
-      gap: 2
-    }
-  }, items.map(([id, label, Icon]) => {
-    const on = tab === id;
-    return /*#__PURE__*/React.createElement("button", {
-      key: id,
-      onClick: () => setTab(id),
-      style: {
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 3,
-        padding: "7px 2px",
-        borderRadius: 11,
-        border: "none",
-        cursor: "pointer",
-        background: on ? C.brass : "transparent",
-        color: on ? C.feltDeep : C.dim,
-        fontWeight: on ? 700 : 500,
-        fontSize: 11
-      }
-    }, /*#__PURE__*/React.createElement(Icon, {
-      size: 19
-    }), /*#__PURE__*/React.createElement("span", null, label, id === "sessions" && n ? ` ${n}` : ""));
-  })));
 }
 
 /* --------------------------- input -------------------------- */
@@ -1671,82 +1585,6 @@ function InputTab({
   }));
 }
 
-/* ------------------------ balance meter --------------------- */
-function BalanceMeter({
-  bal
-}) {
-  const {
-    pos,
-    neg,
-    gap
-  } = bal;
-  const total = Math.max(pos, neg, 1);
-  const ok = gap === 0;
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.card,
-      border: `1px solid ${ok ? C.line : C.brass}`,
-      borderRadius: 12,
-      padding: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      fontSize: 13,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: C.win
-    }
-  }, "\u05DE\u05D2\u05D9\u05E2 ", /*#__PURE__*/React.createElement("b", {
-    style: {
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, pos.toLocaleString())), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: C.loss
-    }
-  }, "\u05D7\u05D9\u05D9\u05D1 ", /*#__PURE__*/React.createElement("b", {
-    style: {
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, neg.toLocaleString()))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      height: 8,
-      borderRadius: 6,
-      overflow: "hidden",
-      background: C.feltDeep
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: `${pos / total * 50}%`,
-      background: C.win
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: `${neg / total * 50}%`,
-      background: C.loss,
-      marginRight: "auto"
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 10,
-      display: "flex",
-      alignItems: "center",
-      gap: 7,
-      fontSize: 13.5,
-      fontWeight: 600,
-      color: ok ? C.win : C.brass
-    }
-  }, ok ? /*#__PURE__*/React.createElement(CheckCircle2, {
-    size: 16
-  }) : /*#__PURE__*/React.createElement(AlertTriangle, {
-    size: 16
-  }), ok ? "הערב סגור מדויק" : `פער ${fmt(gap)} (${gap > 0 ? "עודף מגיע" : "עודף חייב"})`));
-}
 
 /* --------------------------- sessions ----------------------- */
 function SessionsTab({
@@ -4411,21 +4249,6 @@ function BackupCard({
   })));
 }
 
-/* ----------------------------- bits ------------------------- */
-function Style() {
-  return /*#__PURE__*/React.createElement("style", null, `
-    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap');
-    *{box-sizing:border-box;}
-    textarea::placeholder,input::placeholder{color:${C.dim};opacity:.7;}
-    button:focus-visible,textarea:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid ${C.brass};outline-offset:2px;}
-    textarea:focus,input:focus,select:focus{border-color:${C.brass};}
-    ::-webkit-scrollbar{width:8px;height:6px;}
-    ::-webkit-scrollbar-thumb{background:${C.line};border-radius:8px;}
-    .hscroll::-webkit-scrollbar{height:5px;}
-    option{background:${C.feltDeep};color:${C.cream};}
-    @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
-  `);
-}
 
 /* ------------------- גרף רווח מצטבר (SVG עצמאי) ------------------- */
 function CumChart({
