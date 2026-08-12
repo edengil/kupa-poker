@@ -52,3 +52,56 @@ export function Empty({ text }) {
     </div>
   );
 }
+
+/** בורר מקטעים (כמו טאבים קטנים): options = [[value, label], ...]. */
+export function SegBar({ value, onChange, options }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 5,
+        background: C.card,
+        padding: 5,
+        borderRadius: 11,
+        border: `1px solid ${C.line}`,
+      }}
+    >
+      {options.map(([v, l]) => (
+        <button
+          key={v}
+          onClick={() => onChange(v)}
+          style={{
+            flex: 1,
+            padding: 9,
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            fontSize: 14,
+            fontWeight: value === v ? 700 : 500,
+            background: value === v ? C.brass : "transparent",
+            color: value === v ? C.feltDeep : C.cream,
+          }}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** תג קטן במסגרת פליז. */
+export function Tag({ children }) {
+  return (
+    <span
+      style={{
+        color: C.brass,
+        fontSize: 11,
+        border: `1px solid ${C.brassSoft}`,
+        borderRadius: 6,
+        padding: "1px 5px",
+      }}
+    >
+      {children}
+    </span>
+  );
+}

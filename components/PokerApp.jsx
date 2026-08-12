@@ -10,7 +10,7 @@ import { buildReport, buildSettlement } from "../lib/report";
 import { settle, isCashOnly, transferVerb } from "../lib/settlement";
 import { planLabel } from "./Rsvp";
 import { C } from "./poker/colors";
-import { IconBtn, Empty } from "./poker/ui";
+import { IconBtn, Empty, SegBar, Tag } from "./poker/ui";
 import { EGMark, EGFooter } from "./Logo";
 
 const DB_KEY = "poker:db";
@@ -4482,36 +4482,6 @@ function BackupCard({
 }
 
 /* ----------------------------- bits ------------------------- */
-function SegBar({
-  value,
-  onChange,
-  options
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 5,
-      background: C.card,
-      padding: 5,
-      borderRadius: 11,
-      border: `1px solid ${C.line}`
-    }
-  }, options.map(([v, l]) => /*#__PURE__*/React.createElement("button", {
-    key: v,
-    onClick: () => onChange(v),
-    style: {
-      flex: 1,
-      padding: 9,
-      borderRadius: 8,
-      border: "none",
-      cursor: "pointer",
-      fontSize: 14,
-      fontWeight: value === v ? 700 : 500,
-      background: value === v ? C.brass : "transparent",
-      color: value === v ? C.feltDeep : C.cream
-    }
-  }, l)));
-}
 function Select({
   value,
   onChange,
@@ -4565,17 +4535,6 @@ function Select({
     }
   })));
 }
-const Tag = ({
-  children
-}) => /*#__PURE__*/React.createElement("span", {
-  style: {
-    color: C.brass,
-    fontSize: 11,
-    border: `1px solid ${C.brassSoft}`,
-    borderRadius: 6,
-    padding: "1px 5px"
-  }
-}, children);
 const inputStyle = {
   flex: 1,
   minWidth: 0,
