@@ -30,6 +30,14 @@ const leaks = [
   "function Banner(",
   "function TableTab(",
   "function Ledger(",
+  "function InputTab(",
+  "function AliasCard(",
+  "function BackupCard(",
+  "function parseEntries(",
+  "function parseDate(",
+  "function exportDb(",
+  "const normalize =",
+  "const KW =",
   "function aggregate(",
   "function yearTotals(",
   "function monthTotals(",
@@ -69,6 +77,8 @@ for (const imp of [
   "./poker/totals",
   "./poker/Banner",
   "./poker/TableTab",
+  "./poker/InputTab",
+  "./poker/db",
 ]) {
   ok(`import ${imp}`, app.includes(imp));
 }

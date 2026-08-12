@@ -18,6 +18,8 @@ import {
   monthTotals,
   allTimeTotals,
 } from "../components/poker/totals.js";
+import { parseEntries, parseDate } from "../components/poker/parse.js";
+import { normalize } from "../components/poker/db.js";
 
 describe("helpers — numeric", () => {
   it("r2 rounds to 2 decimals", () => {
@@ -187,5 +189,47 @@ describe("totals — period aggregation", () => {
   it("aggregate sorts by amount desc", () => {
     const t = aggregate(db.sessions, AL({ aliases: {} }));
     expect(t[0].amount).toBeGreaterThanOrEqual(t[t.length - 1].amount);
+  });
+});
+
+describe("parse — input text", () => {
+  it("parseEntries reads creditors and debtors", () => {
+    const entries = parseEntries("סיכום פוקר 1.8\nעדן מגיע 125\nאורן חייבת 50\nדן חייב 75");
+    expect(entries).toEqual([
+      { name: "עדן", amount: 125, combined: false },
+      { name: "אורן", amount: -50, combined: false },
+      { name: "דן", amount: -75, combined: false },
+    ]);
+  });
+
+  it("parseEntries skips noise lines", () => {
+    expect(parseEntries("כניסות 20\nבנתיים 10")).toEqual([]);
+  });
+
+  it("parseDate reads d.mo and optional year", () => {
+    expect(parseDate("סיכום פוקר 1.8", 2026)).toMatchObject({
+      d: 1,
+      mo: 8,
+      y: 2026,
+      iso: "2026-08-01",
+    });
+    expect(parseDate("סיכום 12/3/25", 2026)).toMatchObject({
+      d: 12,
+      mo: 3,
+      y: 2025,
+      iso: "2025-03-12",
+    });
+  });
+});
+
+describe("db — normalize", () => {
+  it("fills missing collections", () => {
+    expect(normalize({ sessions: [{ id: 1 }] })).toMatchObject({
+      sessions: [{ id: 1 }],
+      yearly: [],
+      monthly: [],
+      aliases: {},
+      roster: [],
+    });
   });
 });
