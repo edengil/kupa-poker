@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { sendToGroup } from "@/lib/whatsapp";
 import { dueReports, buildPeriodReport } from "@/lib/summary";
+import { reportError } from "@/lib/monitor";
 
 /* ============================================================================
    הדוחות התקופתיים לקבוצה.
@@ -65,7 +66,7 @@ export async function GET(request) {
       sent[rep.key] = true;
       results.push({ key: rep.key, sent: true });
     } catch (e) {
-      console.error("report send failed:", e.message);
+      await reportError(e, `reports/send ${rep.key}`);
       results.push({ key: rep.key, error: e.message });
     }
   }

@@ -130,6 +130,7 @@ export async function GET(request) {
       hasSupabaseKey: Boolean(process.env.SUPABASE_SECRET_KEY),
       hasKupaSlug: Boolean(process.env.KUPA_GROUP_SLUG),
       hasOwner: Boolean(process.env.WHATSAPP_OWNER),
+      hasErrorAlert: Boolean(process.env.ERROR_ALERT_WEBHOOK),
       siteUrl: process.env.NEXT_PUBLIC_SITE_URL || null,
     },
     whapi,
