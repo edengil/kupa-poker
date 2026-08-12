@@ -19,10 +19,9 @@ import {
 import { ShareSheet } from "./poker/ShareSheet";
 import { SessionsTab } from "./poker/SessionsTab";
 import {
-  Trash2, AlertTriangle, CheckCircle2, CalendarDays, Pencil, Users,
-  ChevronDown, ChevronLeft, ChevronRight, Crown, Plus, Minus, Share2, Copy,
-  TrendingUp, X, Eye, Trophy, Award, Send, Download, Upload, UserPlus, Coins,
-  ClipboardPaste, PlayCircle, BarChart3,
+  Trash2, AlertTriangle, CheckCircle2, CalendarDays, Users,
+  ChevronDown, ChevronLeft, ChevronRight, Crown, Plus, Minus, Share2,
+  TrendingUp, X, Award, Send, Download, Upload, UserPlus, Coins,
 } from "./poker/icons";
 import { EGFooter } from "./Logo";
 
