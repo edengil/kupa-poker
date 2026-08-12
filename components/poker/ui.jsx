@@ -105,3 +105,104 @@ export function Tag({ children }) {
     </span>
   );
 }
+
+/** כפתור ניווט קטן (חודש/שנה בבאנר). */
+export function NavBtn({ children, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: C.feltDeep,
+        border: `1px solid ${C.line}`,
+        borderRadius: 8,
+        padding: 5,
+        cursor: disabled ? "default" : "pointer",
+        color: disabled ? C.line : C.cream,
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** כפתור עגול קטן (+/− ליד שחקן בלייב). */
+export function RoundBtn({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: C.feltDeep,
+        border: `1px solid ${C.line}`,
+        borderRadius: "50%",
+        width: 32,
+        height: 32,
+        cursor: "pointer",
+        color: C.cream,
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** כותרת קבוצה קטנה מעל רשימת מרוויחים/מפסידים. */
+export function GroupLabel({ children }) {
+  return (
+    <div
+      style={{
+        fontSize: 11.5,
+        letterSpacing: 1,
+        color: C.dim,
+        padding: "6px 4px 2px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** כרטיס סטטיסטיקה קטן בפרופיל שחקן. */
+export function Stat({ label, value, color }) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        background: C.card,
+        border: `1px solid ${C.line}`,
+        borderRadius: 11,
+        padding: "10px 6px",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: 10.5, color: C.dim, marginBottom: 3 }}>{label}</div>
+      <div
+        style={{
+          fontSize: 14.5,
+          fontWeight: 700,
+          color: color || C.cream,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+/** סגנון בסיסי לשדות טקסט (לייב / כינויים). */
+export const inputStyle = {
+  flex: 1,
+  minWidth: 0,
+  background: C.feltDeep,
+  color: C.cream,
+  border: `1px solid ${C.line}`,
+  borderRadius: 9,
+  padding: "9px 11px",
+  fontSize: 14,
+  fontFamily: "inherit",
+};

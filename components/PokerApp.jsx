@@ -10,7 +10,7 @@ import { buildReport, buildSettlement } from "../lib/report";
 import { settle, isCashOnly, transferVerb } from "../lib/settlement";
 import { planLabel } from "./Rsvp";
 import { C } from "./poker/colors";
-import { IconBtn, Empty, SegBar, Tag } from "./poker/ui";
+import { IconBtn, Empty, SegBar, Tag, NavBtn, RoundBtn, GroupLabel, Stat, inputStyle } from "./poker/ui";
 import { EGMark, EGFooter } from "./Logo";
 
 const DB_KEY = "poker:db";
@@ -1380,25 +1380,6 @@ function Banner({
     size: 12
   }), "\u05DE\u05D0\u05D6\u05DF \u05E9\u05E0\u05EA\u05D9 \u05E8\u05E9\u05DE\u05D9"));
 }
-const NavBtn = ({
-  children,
-  onClick,
-  disabled
-}) => /*#__PURE__*/React.createElement("button", {
-  onClick: onClick,
-  disabled: disabled,
-  style: {
-    background: C.feltDeep,
-    border: `1px solid ${C.line}`,
-    borderRadius: 8,
-    padding: 5,
-    cursor: disabled ? "default" : "pointer",
-    color: disabled ? C.line : C.cream,
-    display: "grid",
-    placeItems: "center"
-  }
-}, children);
-
 /* --------------------------- tab bar ------------------------ */
 function TabBar({
   tab,
@@ -2073,17 +2054,6 @@ function Ledger({
     }
   }, official ? fmt(sum) : sum === 0 ? "✓ 0" : `${fmt(sum)} — פער מצטבר`)));
 }
-const GroupLabel = ({
-  children
-}) => /*#__PURE__*/React.createElement("div", {
-  style: {
-    fontSize: 11.5,
-    letterSpacing: 1,
-    color: C.dim,
-    padding: "6px 4px 2px"
-  }
-}, children);
-
 /* --------------------- שבירת שיאים בסוף ערב --------------------- */
 /* משווה את הערב שנשמר עכשיו מול כל ההיסטוריה שלפניו, ומחזיר שורות
    מוכנות לוואטסאפ על כל שיא שנשבר. רק שיאים "של ערב" נבדקים — דברים
@@ -2874,34 +2844,6 @@ function ProfileSheet({
     }
   }, fmt(r.cum))))))));
 }
-const Stat = ({
-  label,
-  value,
-  color
-}) => /*#__PURE__*/React.createElement("div", {
-  style: {
-    flex: 1,
-    background: C.card,
-    border: `1px solid ${C.line}`,
-    borderRadius: 11,
-    padding: "10px 6px",
-    textAlign: "center"
-  }
-}, /*#__PURE__*/React.createElement("div", {
-  style: {
-    fontSize: 10.5,
-    color: C.dim,
-    marginBottom: 3
-  }
-}, label), /*#__PURE__*/React.createElement("div", {
-  style: {
-    fontSize: 14.5,
-    fontWeight: 700,
-    color: color || C.cream,
-    fontVariantNumeric: "tabular-nums"
-  }
-}, value));
-
 /* ----------------------------- live ------------------------- */
 /* כתובות המארחים הקבועים — לחיצה ממלאת את שדה ההערה בתכנון ערב,
    כדי לא להקליד את אותה כתובת מחדש בכל פעם. */
@@ -3866,24 +3808,6 @@ function LiveTab({
     size: 15
   }))));
 }
-const RoundBtn = ({
-  children,
-  onClick
-}) => /*#__PURE__*/React.createElement("button", {
-  onClick: onClick,
-  style: {
-    background: C.feltDeep,
-    border: `1px solid ${C.line}`,
-    borderRadius: "50%",
-    width: 32,
-    height: 32,
-    cursor: "pointer",
-    color: C.cream,
-    display: "grid",
-    placeItems: "center"
-  }
-}, children);
-
 /* ------------------------- שולחן פוקר ----------------------- */
 /* סדר מושבים קבוע. עדן תמיד למטה, והשאר נשמרים באותו מקום יחסי מערב לערב.
    לשינוי — מספיק לערוך את השורה הזאת. מי שלא ברשימה מקבל מושב פנוי בסוף. */
@@ -4535,17 +4459,6 @@ function Select({
     }
   })));
 }
-const inputStyle = {
-  flex: 1,
-  minWidth: 0,
-  background: C.feltDeep,
-  color: C.cream,
-  border: `1px solid ${C.line}`,
-  borderRadius: 9,
-  padding: "9px 11px",
-  fontSize: 14,
-  fontFamily: "inherit"
-};
 function Style() {
   return /*#__PURE__*/React.createElement("style", null, `
     @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap');
