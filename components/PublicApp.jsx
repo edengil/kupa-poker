@@ -6,6 +6,7 @@ import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { getPushSupport, getPushSubscription, subscribePush, unsubscribePush } from "../lib/pushClient";
+import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 
@@ -238,6 +239,7 @@ export default function PublicApp({ slug }) {
       </div>
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "10px 13px 0" }}>
+        <InstallButton />
         <NotifyBell supabase={supabase} groupId={groupId} />
         {plan?.iso >= new Date().toISOString().slice(0, 10) && !running && (
           <RsvpCard supabase={supabase} groupId={groupId} plan={plan} />
