@@ -12,6 +12,12 @@ import {
   durWords,
 } from "../components/poker/helpers.js";
 import { fmt, MONTHS } from "../components/poker/format.js";
+import {
+  aggregate,
+  yearTotals,
+  monthTotals,
+  allTimeTotals,
+} from "../components/poker/totals.js";
 
 describe("helpers — numeric", () => {
   it("r2 rounds to 2 decimals", () => {
@@ -108,5 +114,78 @@ describe("format — MONTHS", () => {
     expect(MONTHS).toHaveLength(12);
     expect(MONTHS[0]).toBe("ינואר");
     expect(MONTHS[11]).toBe("דצמבר");
+  });
+});
+
+describe("totals — period aggregation", () => {
+  const db = {
+    aliases: {},
+    sessions: [
+      {
+        id: "1",
+        iso: "2026-01-10",
+        y: 2026,
+        mo: 1,
+        d: 10,
+        entries: [
+          { name: "עדן", amount: 100 },
+          { name: "דן", amount: -100 },
+        ],
+      },
+      {
+        id: "2",
+        iso: "2026-02-10",
+        y: 2026,
+        mo: 2,
+        d: 10,
+        entries: [
+          { name: "עדן", amount: 50 },
+          { name: "דן", amount: -50 },
+        ],
+      },
+    ],
+    yearly: [],
+  };
+
+  it("monthTotals sums one month with aliases", () => {
+    const t = monthTotals(db, 2026, 1);
+    expect(t.find((x) => x.name === "עדן גיל").amount).toBe(100);
+    expect(t.find((x) => x.name === "דן ינקלויץ").amount).toBe(-100);
+  });
+
+  it("yearTotals aggregates sessions when no official yearly", () => {
+    const { totals, official } = yearTotals(db, 2026);
+    expect(official).toBe(false);
+    expect(totals.find((x) => x.name === "עדן גיל").amount).toBe(150);
+  });
+
+  it("yearTotals prefers official yearly row", () => {
+    const withOfficial = {
+      ...db,
+      yearly: [
+        {
+          id: "y",
+          y: 2026,
+          official: true,
+          entries: [
+            { name: "עדן גיל", amount: 999 },
+            { name: "דן ינקלויץ", amount: -999 },
+          ],
+        },
+      ],
+    };
+    const { totals, official } = yearTotals(withOfficial, 2026);
+    expect(official).toBe(true);
+    expect(totals[0]).toMatchObject({ name: "עדן גיל", amount: 999 });
+  });
+
+  it("allTimeTotals sums across years", () => {
+    const t = allTimeTotals(db);
+    expect(t.find((x) => x.name === "עדן גיל").amount).toBe(150);
+  });
+
+  it("aggregate sorts by amount desc", () => {
+    const t = aggregate(db.sessions, AL({ aliases: {} }));
+    expect(t[0].amount).toBeGreaterThanOrEqual(t[t.length - 1].amount);
   });
 });

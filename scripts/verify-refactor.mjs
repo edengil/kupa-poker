@@ -27,6 +27,13 @@ const leaks = [
   "function TabBar(",
   "function BalanceMeter(",
   "function Style(",
+  "function Banner(",
+  "function TableTab(",
+  "function Ledger(",
+  "function aggregate(",
+  "function yearTotals(",
+  "function monthTotals(",
+  "function allTimeTotals(",
   "const r2 =",
   "const DEFAULT_ALIASES",
   "const FEMALE",
@@ -59,6 +66,9 @@ for (const imp of [
   "./poker/ui",
   "./poker/icons",
   "./poker/colors",
+  "./poker/totals",
+  "./poker/Banner",
+  "./poker/TableTab",
 ]) {
   ok(`import ${imp}`, app.includes(imp));
 }
