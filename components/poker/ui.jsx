@@ -2,6 +2,7 @@
 
 import React from "react";
 import { C } from "./colors";
+import { ChevronDown } from "./icons";
 
 /* ============================================================================
    רכיבי UI קטנים ומשותפים.
@@ -206,3 +207,54 @@ export const inputStyle = {
   fontSize: 14,
   fontFamily: "inherit",
 };
+
+/** בחירה מעוצבת (select מותאם) עם חץ מותאם. options = [[value, label], ...]. */
+export function Select({ value, onChange, options, label, grow }) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        flex: grow ? 1 : "0 0 auto",
+      }}
+    >
+      <span style={{ fontSize: 11.5, color: C.dim }}>{label}</span>
+      <div style={{ position: "relative" }}>
+        <select
+          value={value}
+          onChange={(e) => onChange(isNaN(+e.target.value) ? e.target.value : +e.target.value)}
+          style={{
+            appearance: "none",
+            width: "100%",
+            background: C.card,
+            color: C.cream,
+            border: `1px solid ${C.line}`,
+            borderRadius: 10,
+            padding: "11px 32px 11px 12px",
+            fontSize: 14.5,
+            fontFamily: "inherit",
+            cursor: "pointer",
+          }}
+        >
+          {options.map(([v, l]) => (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={16}
+          style={{
+            position: "absolute",
+            left: 10,
+            top: "50%",
+            transform: "translateY(-50%)",
+            pointerEvents: "none",
+            color: C.dim,
+          }}
+        />
+      </div>
+    </label>
+  );
+}
