@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { settle, isCashOnly, transferVerb, PAIRS } from "../lib/settlement.js";
+import { settle, isCashOnly, transferVerb } from "../lib/settlement.js";
 
 /* cps=2 → net = cashout/2 - buyin. */
 
@@ -37,20 +37,22 @@ describe("settle — basic balance", () => {
   });
 });
 
-describe("settle — fixed pairs", () => {
-  it("settles a configured pair between themselves first", () => {
-    // עדן & אורן are a configured PAIR
+describe("settle — biggest loser pays biggest winner", () => {
+  it("routes the biggest loss straight to the biggest win, no fixed-pair detour", () => {
+    // cps=1 so net = cashout - buyin
     const players = [
-      { name: "עדן", buyin: 0, cashout: "200" }, // +100
-      { name: "אורן", buyin: 100, cashout: "0" }, // -100
+      { name: "קובי", buyin: 200, cashout: "0" }, // -200 biggest loser
+      { name: "אורן", buyin: 0, cashout: "200" }, // +200 biggest winner
+      { name: "עדן", buyin: 50, cashout: "0" }, // -50
+      { name: "דנה", buyin: 0, cashout: "50" }, // +50
     ];
-    const { transfers } = settle(players, 2);
-    expect(transfers).toHaveLength(1);
-    expect(transfers[0]).toMatchObject({ from: "אורן", to: "עדן", amount: 100, pair: true });
-  });
-
-  it("keeps a known pair in the config", () => {
-    expect(PAIRS.some(([a, b]) => a === "עדן" && b === "אורן")).toBe(true);
+    const { transfers } = settle(players, 1);
+    expect(transfers).toHaveLength(2);
+    // biggest loser -> biggest winner, in full
+    expect(transfers[0]).toMatchObject({ from: "קובי", to: "אורן", amount: 200 });
+    expect(transfers[1]).toMatchObject({ from: "עדן", to: "דנה", amount: 50 });
+    // the old fixed-pair flag is gone
+    expect(transfers.every((t) => !("pair" in t))).toBe(true);
   });
 });
 
