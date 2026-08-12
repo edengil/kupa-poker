@@ -9,6 +9,8 @@ import { store } from "../lib/store";
 import { buildReport, buildSettlement } from "../lib/report";
 import { settle, isCashOnly, transferVerb } from "../lib/settlement";
 import { planLabel } from "./Rsvp";
+import { C } from "./poker/colors";
+import { IconBtn, Empty } from "./poker/ui";
 import { EGMark, EGFooter } from "./Logo";
 
 const DB_KEY = "poker:db";
@@ -880,19 +882,6 @@ const SEED_YEARLY = {
     name: "דור",
     amount: -2198
   }]
-};
-const C = {
-  felt: "#0E3B2E",
-  feltDeep: "#0A2B21",
-  card: "#15493A",
-  cardHi: "#1B5644",
-  line: "#2C6B54",
-  brass: "#D9A441",
-  brassSoft: "#B8862E",
-  cream: "#EFE7D2",
-  dim: "#9DBBAC",
-  win: "#5BC38C",
-  loss: "#E27A63"
 };
 const MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 
@@ -4576,23 +4565,6 @@ function Select({
     }
   })));
 }
-const IconBtn = ({
-  children,
-  onClick,
-  danger
-}) => /*#__PURE__*/React.createElement("button", {
-  onClick: onClick,
-  style: {
-    background: C.feltDeep,
-    border: `1px solid ${C.line}`,
-    borderRadius: 8,
-    padding: 7,
-    cursor: "pointer",
-    color: danger ? C.loss : C.dim,
-    display: "grid",
-    placeItems: "center"
-  }
-}, children);
 const Tag = ({
   children
 }) => /*#__PURE__*/React.createElement("span", {
@@ -4604,21 +4576,6 @@ const Tag = ({
     padding: "1px 5px"
   }
 }, children);
-const Empty = ({
-  text
-}) => /*#__PURE__*/React.createElement("div", {
-  style: {
-    marginTop: 16,
-    padding: 26,
-    textAlign: "center",
-    color: C.dim,
-    background: C.card,
-    border: `1px dashed ${C.line}`,
-    borderRadius: 14,
-    fontSize: 14,
-    lineHeight: 1.6
-  }
-}, text);
 const inputStyle = {
   flex: 1,
   minWidth: 0,
