@@ -1783,10 +1783,14 @@ function SessionsTab({
   if (!db.sessions.length) return /*#__PURE__*/React.createElement(Empty, {
     text: "\u05E2\u05D3\u05D9\u05D9\u05DF \u05D0\u05D9\u05DF \u05E2\u05E8\u05D1\u05D9\u05DD. \u05E2\u05D1\u05D5\u05E8 \u05DC\u05D4\u05D6\u05E0\u05D4 \u05D0\u05D5 \u05DC\u05DC\u05D9\u05D9\u05D1."
   });
-  const del = id => commit({
-    ...db,
-    sessions: db.sessions.filter(s => s.id !== id)
-  });
+  const del = id => {
+    // אישור לפני מחיקה — ערב שנמחק בטעות לוקח איתו את כל רישום הכסף שלו
+    if (typeof window !== "undefined" && !window.confirm("למחוק את הערב? אי אפשר לבטל.")) return;
+    commit({
+      ...db,
+      sessions: db.sessions.filter(s => s.id !== id)
+    });
+  };
   const edit = s => {
     const raw = s.raw || toWhatsApp(s.entries, s, null, A);
     commit({
