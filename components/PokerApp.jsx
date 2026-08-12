@@ -14,6 +14,11 @@ import { IconBtn, Empty, SegBar, Tag, NavBtn, RoundBtn, GroupLabel, Stat, inputS
 import { Header, TabBar, BalanceMeter, Style } from "./poker/chrome";
 import { fmt, MONTHS } from "./poker/format";
 import {
+  r2, AL, balance, canon, hhmm, dur, toWhatsApp, waOpen, waSend,
+} from "./poker/helpers";
+import { ShareSheet } from "./poker/ShareSheet";
+import { SessionsTab } from "./poker/SessionsTab";
+import {
   Trash2, AlertTriangle, CheckCircle2, CalendarDays, Pencil, Users,
   ChevronDown, ChevronLeft, ChevronRight, Crown, Plus, Minus, Share2, Copy,
   TrendingUp, X, Eye, Trophy, Award, Send, Download, Upload, UserPlus, Coins,
@@ -62,7 +67,6 @@ async function setConfig(patch) {
 }
 
 /* ---------------------- נקודה צפה: לעגל מיד ל-2 ספרות --------------------- */
-const r2 = v => Math.round(v * 100) / 100;
 const SEED = [{
   "iso": "2024-03-27",
   "d": 27,
@@ -772,44 +776,6 @@ const SEED = [{
   "y": 2026,
   "e": [["אורן", -65], ["איציק", -125], ["עדן", -310], ["דור", -225], ["אופיר", -90], ["דן", 200], ["קובי", 90], ["דוד בני", 340], ["שגיא", 135]]
 }];
-const DEFAULT_ALIASES = {
-  "דו": "דן ינקלויץ",
-  "דן": "דן ינקלויץ",
-  "דן הספר": "דן ויסמן",
-  "עדן": "עדן גיל",
-  "דוד בני": "בני גיל",
-  "בני": "בני גיל",
-  "מייק": "מייקי",
-  "רוי": "רוי סנדרוביץ",
-  "רועי": "רוי סנדרוביץ",
-  "איתו": "איתן אלרועי",
-  "איתן": "איתן אלרועי",
-  "עדן גורשומוב": "עדן לירז",
-  "עדן גושמרוב": "עדן לירז",
-  "עדן של דור": "עדן לירז",
-  "אורן": "אורן גיל",
-  "שגיא": "שגיא גיל",
-  "אופיר": "אופיר סנה",
-  "לאופיר": "אופיר סנה",
-  "נתנאל": "נתנאל כהן",
-  "איציק": "איציק תפילין",
-  "איתיק": "איציק תפילין",
-  "ירדן": "ירדן תפילין",
-  "איציק וירדן": "ירדן תפילין",
-  "אברהם": "אברהם חבבו",
-  "בן": "בן אפללו",
-  "קובי": "קובי סעדה",
-  "דור": "דור לירז",
-  "שפאק": "עדן שפאק",
-  "שי": "שי יעקובי",
-  "שמואל": "שמואל למפך",
-  "ניצן": "ניצן ניסים",
-  "יובל": "יובל ניסים",
-  "עמית": "עמית שלום",
-  "דני": "דני גוטניק",
-  "ירין": "ירין מלאך"
-};
-const FEMALE = new Set(["אורן גיל", "עדן לירז", "ירדן תפילין", "אורן", "עדן גורשומוב", "ירדן"]);
 const SEED_YEARLY = {
   id: "official_2025",
   y: 2025,
@@ -931,41 +897,6 @@ function parseDate(text, fy) {
     iso: `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`
   };
 }
-const balance = e => {
-  const p = r2(e.filter(x => x.amount > 0).reduce((s, x) => s + x.amount, 0));
-  const n = r2(e.filter(x => x.amount < 0).reduce((s, x) => s - x.amount, 0));
-  return {
-    pos: p,
-    neg: n,
-    gap: r2(p - n)
-  };
-};
-const canon = (n, a) => a[n] || n;
-const hhmm = ts => {
-  const d = new Date(ts);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
-const dur = ms => {
-  const t = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(t / 3600),
-    m = Math.floor(t % 3600 / 60),
-    sec = t % 60;
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
-};
-const durWords = ms => {
-  const t = Math.max(0, Math.floor(ms / 60000));
-  const h = Math.floor(t / 60),
-    m = t % 60;
-  return h > 0 ? m > 0 ? `${h} שעות ו-${m} דק'` : `${h} שעות` : `${m} דק'`;
-};
-// כינויים אפקטיביים: DEFAULT קובע, ותוספות המשתמש נשמרות. מחושב בזמן קריאה, לא נכתב.
-function AL(db) {
-  const o = {
-    ...DEFAULT_ALIASES
-  };
-  for (const [k, v] of Object.entries(db.aliases || {})) if (!(k in DEFAULT_ALIASES)) o[k] = v;
-  return o;
-}
 function aggregate(recs, aliases) {
   const acc = {};
   for (const r of recs) for (const e of r.entries) {
@@ -1046,34 +977,6 @@ function exportDb(db) {
 }
 // שיתוף אמין: (1) Web Share API — גיליון השיתוף של iOS, בוחרים וואטסאפ והקבוצה; הטקסט עובר נקי.
 // (2) נפילה להעתקה ללוח (כמו באפליקציית הטעינות). (3) נפילה אחרונה: deep-link ישיר לאפליקציה.
-// פתיחה ישירה של וואטסאפ עם הנוסח. בוחרים את הקבוצה ושולחים.
-function waOpen(text) {
-  try {
-    navigator.clipboard.writeText(text);
-  } catch {} // גיבוי: הנוסח גם בלוח
-  window.location.href = "whatsapp://send?text=" + encodeURIComponent(text);
-}
-// גיליון השיתוף של המערכת (לכל אפליקציה אחרת)
-async function waShare(text) {
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        text
-      });
-      return true;
-    } catch (e) {
-      if (e && e.name === "AbortError") return true;
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-    alert("הסיכום הועתק — הדבק בקבוצה");
-    return true;
-  } catch {}
-  return false;
-}
-const waSend = waOpen;
-
 /* ============================ APP ============================ */
 function App({ readOnly = false, onTabChange, statsPanel = null, onGameStart, renderRsvps, onRecords, onPlanShared, initialTab = "table" }) {
   const [db, setDb] = useState(null);
@@ -1585,110 +1488,6 @@ function InputTab({
   }));
 }
 
-
-/* --------------------------- sessions ----------------------- */
-function SessionsTab({
-  db,
-  commit,
-  goEdit
-}) {
-  const [share, setShare] = useState(null);
-  const A = AL(db);
-  if (!db.sessions.length) return /*#__PURE__*/React.createElement(Empty, {
-    text: "\u05E2\u05D3\u05D9\u05D9\u05DF \u05D0\u05D9\u05DF \u05E2\u05E8\u05D1\u05D9\u05DD. \u05E2\u05D1\u05D5\u05E8 \u05DC\u05D4\u05D6\u05E0\u05D4 \u05D0\u05D5 \u05DC\u05DC\u05D9\u05D9\u05D1."
-  });
-  const del = id => {
-    // אישור לפני מחיקה — ערב שנמחק בטעות לוקח איתו את כל רישום הכסף שלו
-    if (typeof window !== "undefined" && !window.confirm("למחוק את הערב? אי אפשר לבטל.")) return;
-    commit({
-      ...db,
-      sessions: db.sessions.filter(s => s.id !== id)
-    });
-  };
-  const edit = s => {
-    const raw = s.raw || toWhatsApp(s.entries, s, null, A);
-    commit({
-      ...db,
-      sessions: db.sessions.filter(x => x.id !== s.id)
-    });
-    goEdit(raw);
-  };
-  const list = [...db.sessions].sort((a, b) => b.iso.localeCompare(a.iso));
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 4,
-      display: "flex",
-      flexDirection: "column",
-      gap: 10
-    }
-  }, list.map(s => {
-    const b = balance(s.entries);
-    return /*#__PURE__*/React.createElement("div", {
-      key: s.id,
-      style: {
-        background: C.card,
-        border: `1px solid ${b.gap === 0 ? C.line : C.brass}`,
-        borderRadius: 12,
-        padding: 13
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 8
-      }
-    }, /*#__PURE__*/React.createElement("b", {
-      style: {
-        fontSize: 15
-      }
-    }, s.d, ".", s.mo, ".", s.y), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6
-      }
-    }, /*#__PURE__*/React.createElement(IconBtn, {
-      onClick: () => setShare(s)
-    }, /*#__PURE__*/React.createElement(Share2, {
-      size: 15
-    })), /*#__PURE__*/React.createElement(IconBtn, {
-      onClick: () => edit(s)
-    }, /*#__PURE__*/React.createElement(Pencil, {
-      size: 15
-    })), /*#__PURE__*/React.createElement(IconBtn, {
-      onClick: () => del(s.id),
-      danger: true
-    }, /*#__PURE__*/React.createElement(Trash2, {
-      size: 15
-    })))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 6
-      }
-    }, s.entries.map((e, i) => /*#__PURE__*/React.createElement("span", {
-      key: i,
-      style: {
-        fontSize: 12.5,
-        padding: "3px 9px",
-        borderRadius: 20,
-        background: C.feltDeep,
-        color: e.amount >= 0 ? C.win : C.loss,
-        fontVariantNumeric: "tabular-nums"
-      }
-    }, canon(e.name, A), " ", fmt(e.amount)))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 9,
-        fontSize: 12.5,
-        color: b.gap === 0 ? C.dim : C.brass
-      }
-    }, b.gap === 0 ? "✓ מאוזן" : `⚠ פער ${fmt(b.gap)}`));
-  }), share && /*#__PURE__*/React.createElement(ShareSheet, {
-    title: `סיכום פוקר ${share.d}.${share.mo}`,
-    text: toWhatsApp(share.entries, share, null, A),
-    onClose: () => setShare(null)
-  }));
-}
 
 /* ---------------------------- table ------------------------- */
 function TableTab({
@@ -3813,207 +3612,6 @@ function PokerTable({
       pointerEvents: "none"
     }
   }, "\u05DC\u05D7\u05D9\u05E6\u05D4 \u05E2\u05DC \u05E9\u05D7\u05E7\u05DF \u05DE\u05D5\u05E1\u05D9\u05E4\u05D4 ", addAmt, "\u20AA"));
-}
-
-/* ------------------------- whatsapp export ------------------ */
-function toWhatsApp(entries, dateObj, title, aliases, alreadyCanon) {
-  const head = title ? `סיכום פוקר — ${title}` : dateObj ? `סיכום פוקר ${dateObj.d}.${dateObj.mo}` : "סיכום פוקר";
-  const norm = entries.map(e => ({
-    name: alreadyCanon ? e.name : canon(e.name, aliases || {}),
-    amount: e.amount
-  }));
-  // קודם החייבים, אחר כך מי שסגר באפס, ובסוף מי שמגיע לו — רווח בין הקבוצות
-  const l = norm.filter(e => e.amount < 0).sort((a, b) => a.amount - b.amount).map(e => `${e.name} ${FEMALE.has(e.name) ? "חייבת" : "חייב"} ${Math.abs(e.amount)}`);
-  const z = norm.filter(e => e.amount === 0).map(e => `${e.name} ${FEMALE.has(e.name) ? "סגרה" : "סגר"} באפס`);
-  const w = norm.filter(e => e.amount > 0).sort((a, b) => b.amount - a.amount).map(e => `${e.name} ${FEMALE.has(e.name) ? "מגיעה" : "מגיע"} ${e.amount}`);
-  const out = [head, ...[l, z, w].filter(g => g.length).flatMap(g => ["", ...g])];
-  const sa = dateObj && dateObj.startedAt,
-    ea = dateObj && dateObj.endedAt;
-  if (sa && ea) out.push("", `🕐 ${hhmm(sa)} — ${hhmm(ea)} · ${durWords(ea - sa)}`);else if (sa) out.push("", `🕐 התחלנו ${hhmm(sa)}`);
-  return out.join("\n").trim();
-}
-function ShareSheet({
-  title,
-  text,
-  settlement,
-  onClose,
-  initialView = "summary"
-}) {
-  const [copied, setCopied] = useState(false);
-  const [view, setView] = useState(initialView);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [err, setErr] = useState("");
-  const body = view === "split" && settlement ? settlement : text;
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(body);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {}
-  };
-
-  // שליחה ישירה לקבוצה דרך הבוט. השרת מאמת שזה אתה לפני שהוא מפרסם.
-  const send = async () => {
-    setSending(true);
-    setErr("");
-    try {
-      const res = await fetch("/api/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: body })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "השליחה נכשלה");
-      setSent(true);
-      setTimeout(() => setSent(false), 4000);
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const tab = active => ({
-    flex: 1,
-    padding: "8px 10px",
-    borderRadius: 999,
-    border: "none",
-    cursor: "pointer",
-    fontFamily: "inherit",
-    fontSize: 13.5,
-    fontWeight: 600,
-    background: active ? C.brass : "transparent",
-    color: active ? C.feltDeep : C.dim
-  });
-  const ghost = {
-    flex: 1,
-    padding: 12,
-    borderRadius: 12,
-    border: `1px solid ${C.line}`,
-    fontSize: 14.5,
-    fontWeight: 600,
-    cursor: "pointer",
-    background: "transparent",
-    color: C.cream,
-    fontFamily: "inherit",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8
-  };
-
-  return /*#__PURE__*/React.createElement("div", {
-    onClick: onClose,
-    style: {
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,.55)",
-      zIndex: 50,
-      display: "flex",
-      alignItems: "flex-end",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: e => e.stopPropagation(),
-    dir: "rtl",
-    style: {
-      width: "100%",
-      maxWidth: 640,
-      background: C.felt,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      border: `1px solid ${C.line}`,
-      padding: "18px 16px 26px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("b", {
-    style: { fontSize: 16 }
-  }, title), /*#__PURE__*/React.createElement(IconBtn, {
-    onClick: onClose
-  }, /*#__PURE__*/React.createElement(X, { size: 17 }))),
-
-  settlement && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 4,
-      background: C.card,
-      border: `1px solid ${C.line}`,
-      borderRadius: 999,
-      padding: 4,
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setView("summary"),
-    style: tab(view === "summary")
-  }, "סיכום"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setView("split"),
-    style: tab(view === "split")
-  }, "חלוקה")),
-
-  /*#__PURE__*/React.createElement("textarea", {
-    readOnly: true,
-    value: body,
-    rows: Math.min(16, body.split("\n").length + 1),
-    onFocus: e => e.target.select(),
-    style: {
-      width: "100%",
-      boxSizing: "border-box",
-      background: C.card,
-      color: C.cream,
-      border: `1px solid ${C.line}`,
-      borderRadius: 12,
-      padding: 14,
-      fontSize: 14.5,
-      lineHeight: 1.6,
-      fontFamily: "inherit",
-      resize: "none"
-    }
-  }),
-
-  err && /*#__PURE__*/React.createElement("p", {
-    style: { color: C.loss, fontSize: 12.5, margin: "8px 2px 0" }
-  }, err, " — אפשר לשלוח ידנית למטה."),
-
-  /*#__PURE__*/React.createElement("button", {
-    onClick: send,
-    disabled: sending,
-    style: {
-      width: "100%",
-      marginTop: 12,
-      padding: 13,
-      borderRadius: 12,
-      border: "none",
-      fontSize: 15,
-      fontWeight: 700,
-      cursor: sending ? "default" : "pointer",
-      opacity: sending ? 0.6 : 1,
-      background: sent ? C.win : "#25D366",
-      color: "#06301B",
-      fontFamily: "inherit",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, sent ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(CheckCircle2, { size: 18 }), "נשלח לקבוצה") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Send, { size: 18 }), sending ? "שולח…" : "שלח לקבוצה"),
-
-  ), /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", gap: 8, marginTop: 8 }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: copy,
-    style: { ...ghost, color: copied ? C.win : C.cream }
-  }, copied ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(CheckCircle2, { size: 18 }), "הועתק") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Copy, { size: 18 }), "העתק")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => waOpen(body),
-    style: ghost
-  }, /*#__PURE__*/React.createElement(Share2, { size: 18 }), "פתח בוואטסאפ"))));
 }
 
 /* --------------------------- aliases ------------------------ */
