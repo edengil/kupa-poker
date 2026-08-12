@@ -38,6 +38,18 @@ const leaks = [
   "function exportDb(",
   "const normalize =",
   "const KW =",
+  "function RecordsTab(",
+  "function PlayersTab(",
+  "function ProfileSheet(",
+  "function CumChart(",
+  "function LiveTab(",
+  "function PlanCard(",
+  "function BotToggle(",
+  "function PokerTable(",
+  "export function brokenRecords",
+  "const HOSTS",
+  "const getConfig",
+  "const LIVE_KEY =",
   "function aggregate(",
   "function yearTotals(",
   "function monthTotals(",
@@ -64,28 +76,29 @@ const leaks = [
 ];
 for (const pat of leaks) ok(`no leak ${pat}`, !app.includes(pat));
 
-// --- required imports ---
+// --- required imports (shell only — leaf modules live under child tabs) ---
 for (const imp of [
-  "./poker/helpers",
-  "./poker/ShareSheet",
   "./poker/SessionsTab",
   "./poker/chrome",
-  "./poker/format",
-  "./poker/ui",
-  "./poker/icons",
   "./poker/colors",
-  "./poker/totals",
   "./poker/Banner",
   "./poker/TableTab",
   "./poker/InputTab",
   "./poker/db",
+  "./poker/brokenRecords",
+  "./poker/RecordsTab",
+  "./poker/PlayersTab",
+  "./poker/ProfileSheet",
+  "./poker/LiveTab",
+  "./poker/PokerTable",
+  "./poker/config",
 ]) {
   ok(`import ${imp}`, app.includes(imp));
 }
 
 // --- exports still available for PublicApp/OwnerApp ---
-ok("export brokenRecords", app.includes("export function brokenRecords"));
-ok("export PokerTable", app.includes("export { PokerTable }") || app.includes("export function PokerTable"));
+ok("export brokenRecords", /export\s*\{[^}]*brokenRecords/.test(app) || app.includes("export function brokenRecords"));
+ok("export PokerTable", /export\s*\{[^}]*PokerTable/.test(app) || app.includes("export function PokerTable"));
 ok("export default App", app.includes("export default App"));
 
 for (const f of ["components/PublicApp.jsx", "components/OwnerApp.jsx"]) {
