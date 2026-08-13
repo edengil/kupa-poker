@@ -35,13 +35,21 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap"
           rel="stylesheet"
         />
-        <style>{`
+        {/* dangerouslySetInnerHTML ולא children: כשה-CSS מגיע כטקסט-ילד, React
+            מקודד מחדש את המרכאות ('Rubik' → &#x27;) בצד השרת אך לא בלקוח, וזה
+            יצר שגיאת hydration שהחזירה את כל הדף לרינדור-לקוח. הזרקה ישירה
+            עוקפת את ההשוואה הזאת. */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
           html,body{margin:0;padding:0;background:#0A2B21;-webkit-text-size-adjust:100%;}
           /* באייפון (PWA) התוכן נמתח עד מתחת לשעון — הריווח מחזיר אותו למקום */
           body{padding-top:env(safe-area-inset-top);}
           body{font-family:'Rubik',system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;}
           *{-webkit-tap-highlight-color:transparent;}
-        `}</style>
+        `,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase, pingViewers } from "@/lib/supabaseAdmin";
 import { notifyGameStart } from "@/lib/push";
+import { reportError } from "@/lib/monitor";
 import {
   parseCommands, applyCommands, extractMessage, isAllowed,
   sendToGroup, listGroups, BOT_MARK, setPresenceOffline,
@@ -110,7 +111,7 @@ export async function POST(request) {
     .single();
 
   if (error || !row) {
-    console.error("group lookup failed:", error?.message);
+    await reportError(error || "group not found", "whatsapp/group-lookup");
     return ok({ skipped: "no group" });
   }
 
@@ -176,7 +177,7 @@ export async function POST(request) {
       .update({ live: nextLive })
       .eq("id", row.id);
     if (writeError) {
-      console.error("live write failed:", writeError.message);
+      await reportError(writeError, "whatsapp/live-write");
       return ok({ skipped: "write failed" });
     }
     await pingViewers(row.slug);

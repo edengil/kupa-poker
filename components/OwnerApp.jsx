@@ -7,6 +7,7 @@ import { configureStore, makeSupabaseStore, flushStore, clearLocalCache } from "
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
+import InstallButton from "./InstallButton";
 import { RsvpList, planLabel } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 
@@ -324,6 +325,7 @@ export default function OwnerApp() {
     <>
       <ShareBar slug={group.slug} onSignOut={signOut} />
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 13px" }}>
+        <InstallButton />
         <Viewers supabase={supabase} online={online} groupId={group.id} />
       </div>
       <PokerApp

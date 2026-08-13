@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabaseServer";
 import { sendToGroup } from "@/lib/whatsapp";
+import { reportError } from "@/lib/monitor";
 
 /* ============================================================================
    שליחת הודעה לקבוצה מתוך האפליקציה.
@@ -60,7 +61,7 @@ export async function POST(request) {
     await sendToGroup(text.trim(), { token, groupId });
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("send failed:", e.message);
+    await reportError(e, "send");
     return NextResponse.json({ error: "השליחה נכשלה" }, { status: 502 });
   }
 }
