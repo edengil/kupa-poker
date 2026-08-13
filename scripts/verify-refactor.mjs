@@ -73,6 +73,10 @@ const leaks = [
   "function GroupLabel(",
   "const Stat =",
   "const inputStyle =",
+  "const SEED =",
+  "const SEED_YEARLY =",
+  "const seedToSession =",
+  "const buildSeedDb =",
 ];
 for (const pat of leaks) ok(`no leak ${pat}`, !app.includes(pat));
 
@@ -92,9 +96,13 @@ for (const imp of [
   "./poker/LiveTab",
   "./poker/PokerTable",
   "./poker/config",
+  "./poker/seed",
 ]) {
   ok(`import ${imp}`, app.includes(imp));
 }
+
+ok("seed.js exists", fs.existsSync("components/poker/seed.js"));
+ok("seed.js exports SEED", fs.readFileSync("components/poker/seed.js", "utf8").includes("export const SEED ="));
 
 // --- exports still available for PublicApp/OwnerApp ---
 ok("export brokenRecords", /export\s*\{[^}]*brokenRecords/.test(app) || app.includes("export function brokenRecords"));
