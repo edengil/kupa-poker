@@ -102,7 +102,7 @@ export function RecordsTab({ db }) {
 
     const [bestStreak, bestStreak2, bestStreak3] = top3(s => s.maxStreak, s => s.maxStreak >= 2);
     const [liveStreak] = top3(s => s.tail, s => s.tail >= 2);
-    const [lossStreak] = top3(s => s.lossMax, s => s.lossMax >= 3);
+    const [lossStreak, lossStreak2, lossStreak3] = top3(s => s.lossMax, s => s.lossMax >= 3);
     const [winRate, winRate2, winRate3] = top3(s => s.rate, s => s.nights >= MIN_NIGHTS);
     const [bestAvg, bestAvg2, bestAvg3] = top3(s => s.avg, s => s.nights >= MIN_NIGHTS && s.avg > 0);
     const [mostWins, mostWins2, mostWins3] = top3(s => s.wins);
@@ -176,7 +176,7 @@ export function RecordsTab({ db }) {
     return {
       lastNight,
       bestNight, bestNight2, bestNight3, worstNight, worstNight2, worstNight3,
-      bestStreak, bestStreak2, bestStreak3, liveStreak, lossStreak,
+      bestStreak, bestStreak2, bestStreak3, liveStreak, lossStreak, lossStreak2, lossStreak3,
       winRate, winRate2, winRate3, bestAvg, bestAvg2, bestAvg3, mostWins, mostWins2, mostWins3,
       comeback, stormyNight, bestMonth, bestYear, roller,
       attendTop, attendTop2, attendTop3,
@@ -332,7 +332,9 @@ export function RecordsTab({ db }) {
         )}
         {recs.lossStreak && (
           <Card icon="🌧️" title="הרצף הקשה אי פעם" holder={recs.lossStreak.name}
-            value={`${recs.lossStreak.lossMax} ערבים`} tone={C.loss} />
+            value={`${recs.lossStreak.lossMax} ערבים`} tone={C.loss}
+            runner={recs.lossStreak2 && `${recs.lossStreak2.name} · ${recs.lossStreak2.lossMax} ערבים`}
+            third={recs.lossStreak3 && `${recs.lossStreak3.name} · ${recs.lossStreak3.lossMax} ערבים`} />
         )}
         {recs.comeback && (
           <Card icon="🎢" title="הקאמבק הגדול" holder={recs.comeback.name}
