@@ -6,6 +6,9 @@ import { fmt, MONTHS } from "./format";
 import { AL, canon, r2 } from "./helpers";
 import { yearTotals, monthTotals, allTimeTotals } from "./totals";
 import { brokenRecords } from "./brokenRecords";
+import { computeChipRecords } from "./chipRecords";
+import { computeTipRecords } from "./tipRecords";
+import { computeCoupleFillRecords } from "./coupleFills";
 import { Empty } from "./ui";
 
 /* טאב שיאים — חולץ מ-PokerApp.jsx. */
@@ -183,6 +186,9 @@ export function RecordsTab({ db }) {
       allKing: allT[0] || null, allKing2: allT[1] || null,
       most, most2,
       totalNights: sessions.length,
+      chips: computeChipRecords(db),
+      tips: computeTipRecords(db),
+      coupleFills: computeCoupleFillRecords(db),
     };
   }, [db]);
 
@@ -356,6 +362,108 @@ export function RecordsTab({ db }) {
           <Card icon="🎯" title="המתמיד — הכי הרבה ערבים" holder={recs.most.name}
             value={`${recs.most.nights}`}
             runner={recs.most2 && `${recs.most2.name} · ${recs.most2.nights}`} />
+        )}
+
+        {recs.chips && (
+          <>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+              🪙 שיאי ג&apos;יטונים · מ־{recs.chips.nightsWithChips} ערבים עם יציאה
+            </div>
+            {recs.chips.bestCashout && (
+              <Card icon="🪙" title="שיא הכי הרבה ג'יטונים ביציאה"
+                holder={recs.chips.bestCashout.name}
+                value={`${recs.chips.bestCashout.chips} ג'`}
+                tone={C.win}
+                sub={dt(recs.chips.bestCashout)}
+                runner={recs.chips.bestCashout2 &&
+                  `${recs.chips.bestCashout2.name} · ${recs.chips.bestCashout2.chips} ג' · ${dt(recs.chips.bestCashout2)}`} />
+            )}
+            {recs.chips.podium?.length > 0 && (
+              <div style={{
+                background: C.card, border: `1px solid ${C.line}`,
+                borderRadius: 14, padding: "12px 14px",
+              }}>
+                <div style={{ fontSize: 12, color: C.dim, marginBottom: 6 }}>
+                  פודיום לפי ג&apos;יטונים ביציאה · {recs.chips.monthLabel}
+                </div>
+                {recs.chips.podium.map((p, i) => (
+                  <div key={p.name} style={{
+                    display: "flex", justifyContent: "space-between",
+                    fontSize: 14, color: C.cream, lineHeight: 1.9,
+                  }}>
+                    <span>{["🥇", "🥈", "🥉"][i] || `${i + 1}.`} {p.name}</span>
+                    <b style={{ color: C.brass, fontVariantNumeric: "tabular-nums" }}>{p.chips} ג&apos;</b>
+                  </div>
+                ))}
+              </div>
+            )}
+            {recs.chips.allKing && (
+              <Card icon="👑" title="מלך/מלכה הג'יטונים · כל הזמנים (מערבים עם נתונים)"
+                holder={recs.chips.allKing.name}
+                value={`${recs.chips.allKing.chips} ג'`}
+                tone={C.win}
+                runner={recs.chips.allKing2 &&
+                  `${recs.chips.allKing2.name} · ${recs.chips.allKing2.chips} ג'`} />
+            )}
+          </>
+        )}
+
+        {recs.tips && (
+          <>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+              💸 שיאי טיפים
+            </div>
+            {recs.tips.biggestTip && (
+              <Card icon="💎" title="הטיפ הגדול ביותר" holder={recs.tips.biggestTip.name}
+                value={`${recs.tips.biggestTip.amount} ג'`} tone={C.win}
+                sub={dt(recs.tips.biggestTip)} />
+            )}
+            {recs.tips.mostTipsNight && (
+              <Card icon="🔁" title="הכי הרבה טיפים בערב אחד" holder={recs.tips.mostTipsNight.name}
+                value={`${recs.tips.mostTipsNight.count} טיפים`}
+                sub={dt(recs.tips.mostTipsNight)} />
+            )}
+            {recs.tips.mostTipChipsNight && (
+              <Card icon="🪙" title="הכי הרבה ג'יטוני טיפ בערב" holder={recs.tips.mostTipChipsNight.name}
+                value={`${recs.tips.mostTipChipsNight.chips} ג'`}
+                sub={dt(recs.tips.mostTipChipsNight)} />
+            )}
+            {recs.tips.monthKing && (
+              <Card icon="🏅" title={`מלך הטיפים · ${recs.tips.monthLabel}`}
+                holder={recs.tips.monthKing.name}
+                value={`${recs.tips.monthKing.chips} ג'`} tone={C.win}
+                runner={recs.tips.monthKing2 &&
+                  `${recs.tips.monthKing2.name} · ${recs.tips.monthKing2.chips} ג'`} />
+            )}
+            {recs.tips.allKing && (
+              <Card icon="🐐" title="מלך הטיפים · כל הזמנים" holder={recs.tips.allKing.name}
+                value={`${recs.tips.allKing.chips} ג'`} tone={C.win}
+                runner={recs.tips.allKing2 &&
+                  `${recs.tips.allKing2.name} · ${recs.tips.allKing2.chips} ג'`} />
+            )}
+          </>
+        )}
+
+        {recs.coupleFills && (
+          <>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+              ↔ מילוי זוגי
+            </div>
+            {recs.coupleFills.monthTop && (
+              <Card icon="🤝" title={`מילוי זוגי של החודש · ${recs.coupleFills.monthLabel}`}
+                holder={recs.coupleFills.monthTop.label}
+                value={`${recs.coupleFills.monthTop.chips} ג'`}
+                sub={`${recs.coupleFills.monthTop.count} פעמים`}
+                runner={recs.coupleFills.monthTop2 &&
+                  `${recs.coupleFills.monthTop2.label} · ${recs.coupleFills.monthTop2.chips} ג'`} />
+            )}
+            {recs.coupleFills.allTop && (
+              <Card icon="🔗" title="מילוי זוגי · כל הזמנים"
+                holder={recs.coupleFills.allTop.label}
+                value={`${recs.coupleFills.allTop.chips} ג'`}
+                sub={`${recs.coupleFills.allTop.count} פעמים`} />
+            )}
+          </>
         )}
       </div>
     </div>

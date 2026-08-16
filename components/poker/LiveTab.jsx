@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store } from "../../lib/store";
 import { buildReport, buildSettlement } from "../../lib/report";
 import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
@@ -9,6 +9,13 @@ import { fmt } from "./format";
 import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "./helpers";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "./config";
 import { brokenRecords } from "./brokenRecords";
+import {
+  partnerOf,
+  applyCoupleFill,
+  DEFAULT_FILL_CHIPS,
+  fillCountFor,
+  canonCoupleName,
+} from "./coupleFills";
 import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { ShareSheet } from "./ShareSheet";
 import { PlanCard } from "./PlanCard";
@@ -60,7 +67,7 @@ export function LiveTab({
   const [cfg, setCfg] = useState(getConfig());
   useEffect(() => onConfig(setCfg), []);
   const cps = cfg.chipsPerShekel || 2;
-  const [players, setPlayers] = useState([]); // {name, buyin(₪), cashout(chips string)}
+  const [players, setPlayers] = useState([]); // {name, buyin(₪), cashout(chips string), tipsGiven?}
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
@@ -69,6 +76,13 @@ export function LiveTab({
   const [startedAt, setStartedAt] = useState(null); // חותמת זמן התחלת המשחק
   const [prompt, setPrompt] = useState(null); // הצעה לשלוח עדכון אחרי כניסה
   const [nowTs, setNowTs] = useState(Date.now()); // מתקתק לטיימר החי
+  /* טיפים + מילוי זוגי — נשמרים בלייב; מילוי זוגי רק מהאפליקציה (לא בוואטסאפ) */
+  const [tips, setTips] = useState([]);
+  const [coupleFills, setCoupleFills] = useState([]);
+  const [menuIdx, setMenuIdx] = useState(null); // תפריט עדין למילוי זוגי
+  const longPressRef = useRef(null);
+  /* שדות שהבוט כותב (applied/pending/closing/מחמאות) — נשמרים כדי לא לדרוס אותם */
+  const liveMetaRef = useRef({});
 
   // שחזור משחק פעיל אחרי סגירת האפליקציה
   useEffect(() => {
@@ -82,6 +96,15 @@ export function LiveTab({
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
           if (d.startedAt) setStartedAt(d.startedAt);
+          if (Array.isArray(d.tips)) setTips(d.tips);
+          if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
+          liveMetaRef.current = {
+            applied: d.applied,
+            pending: d.pending,
+            closing: d.closing,
+            tipComplimentBag: d.tipComplimentBag,
+            tipComplimentLast: d.tipComplimentLast,
+          };
         } catch {}
       }
       if (alive) setHydrated(true);
@@ -101,14 +124,17 @@ export function LiveTab({
     store.set(
       LIVE_KEY,
       JSON.stringify({
+        ...liveMetaRef.current,
         players,
         entriesCount,
         addAmt,
         startedAt,
+        tips,
+        coupleFills,
         ts: Date.now(),
       })
     );
-  }, [players, entriesCount, addAmt, startedAt, hydrated]);
+  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, hydrated]);
 
   // ההצעה נעלמת לבד אחרי 15 שניות כדי לא להפריע
   useEffect(() => {
@@ -213,12 +239,23 @@ export function LiveTab({
     [players, entriesCount, startedAt, nowTs, cps]
   );
   function saveNight() {
-    const entries = nets
-      .filter((n) => n.net !== null && n.net !== 0)
-      .map((n) => ({
-        name: n.name,
-        amount: n.net,
-      }));
+    /* נטו ב־₪ כמו תמיד; בנוסף chips / tipsGiven על כל רשומה כדי ששיאי
+       ג'יטונים וטיפים יעבדו מכאן והלאה. */
+    const entries = players
+      .filter((p) => p.cashout !== "")
+      .map((p) => {
+        const chips = +p.cashout || 0;
+        const buyin = +p.buyin || 0;
+        const net = r2(chips / cps - buyin);
+        return {
+          name: p.name,
+          amount: net,
+          chips,
+          buyin,
+          tipsGiven: +p.tipsGiven || 0,
+        };
+      })
+      .filter((e) => e.amount !== 0 || e.chips > 0 || e.tipsGiven > 0);
     if (!entries.length) return;
     const d = now.getDate(),
       mo = now.getMonth() + 1,
@@ -232,6 +269,8 @@ export function LiveTab({
       mo,
       y,
       entries,
+      tips: tips.length ? tips.map(({ name, amount, at }) => ({ name, amount, at })) : undefined,
+      coupleFills: coupleFills.length ? coupleFills : undefined,
       startedAt: startedAt || null,
       endedAt,
     };
@@ -259,7 +298,7 @@ export function LiveTab({
       transferVerb,
     });
     setShare({
-      entries,
+      entries: entries.map(({ name, amount }) => ({ name, amount })),
       d,
       mo,
       final: true,
@@ -270,8 +309,26 @@ export function LiveTab({
     setPlayers([]);
     setEntriesCount("");
     setStartedAt(null);
+    setTips([]);
+    setCoupleFills([]);
+    setMenuIdx(null);
     // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
     if (getConfig().botOn) setConfig({ botOn: false });
+  }
+
+  /* מילוי זוגי: לחיצה ארוכה על שם בן/בת זוג → מילוי 30 מהערימה שלו לשותף.
+     גם כפתור ↔ קטן ליד השם (בלי תווית "תרומה"). */
+  function doCoupleFill(fromName) {
+    const res = applyCoupleFill(players, fromName, DEFAULT_FILL_CHIPS);
+    if (!res.ok) {
+      if (res.reason === "missing_partner") {
+        alert("בן/בת הזוג לא בשולחן — אי אפשר לרשום מילוי.");
+      }
+      return;
+    }
+    setPlayers(res.players);
+    setCoupleFills((f) => [...f, res.event]);
+    setMenuIdx(null);
   }
 
   return (
@@ -445,6 +502,11 @@ export function LiveTab({
             {players.map((p, i) => {
               const net =
                 p.cashout === "" ? null : r2((+p.cashout || 0) / cps - (+p.buyin || 0));
+              const partnerName = partnerOf(p.name);
+              const showFill =
+                !!partnerName &&
+                players.some((q) => canonCoupleName(q.name) === partnerName);
+              const fills = fillCountFor(coupleFills, p.name);
               return (
                 <div
                   key={i}
@@ -463,7 +525,74 @@ export function LiveTab({
                       marginBottom: 8,
                     }}
                   >
-                    <b style={{ fontSize: 15 }}>{p.name}</b>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {/* UX מילוי זוגי: לחיצה ארוכה על השם או ↔ → מילוי 30 מהערימה לשותף */}
+                      <b
+                        style={{ fontSize: 15, userSelect: "none", touchAction: "manipulation" }}
+                        onPointerDown={() => {
+                          if (!showFill) return;
+                          longPressRef.current = setTimeout(() => doCoupleFill(p.name), 550);
+                        }}
+                        onPointerUp={() => {
+                          if (longPressRef.current) clearTimeout(longPressRef.current);
+                        }}
+                        onPointerLeave={() => {
+                          if (longPressRef.current) clearTimeout(longPressRef.current);
+                        }}
+                        onClick={() => {
+                          if (!showFill) return;
+                          setMenuIdx(menuIdx === i ? null : i);
+                        }}
+                      >
+                        {p.name}
+                      </b>
+                      {showFill && (
+                        <button
+                          type="button"
+                          title="מילוי 30"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            doCoupleFill(p.name);
+                          }}
+                          style={{
+                            background: "transparent",
+                            border: `1px solid ${C.line}`,
+                            color: C.dim,
+                            borderRadius: 6,
+                            fontSize: 11,
+                            padding: "2px 6px",
+                            cursor: "pointer",
+                            opacity: 0.55,
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          ↔{fills > 0 ? fills : ""}
+                        </button>
+                      )}
+                      {menuIdx === i && showFill && (
+                        <button
+                          type="button"
+                          onClick={() => doCoupleFill(p.name)}
+                          style={{
+                            background: C.feltDeep,
+                            border: `1px solid ${C.line}`,
+                            color: C.dim,
+                            borderRadius: 8,
+                            fontSize: 11.5,
+                            padding: "4px 8px",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          מילוי {DEFAULT_FILL_CHIPS}
+                        </button>
+                      )}
+                      {(+p.tipsGiven || 0) > 0 && (
+                        <span style={{ fontSize: 11, color: C.dim }}>
+                          טיפ {p.tipsGiven}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {net !== null && (
                         <b
@@ -729,7 +858,12 @@ export function LiveTab({
             </span>
             <button
               onClick={() => {
-                if (confirm("לבטל את המשחק הפעיל? הנתונים שלו יימחקו.")) setPlayers([]);
+                if (confirm("לבטל את המשחק הפעיל? הנתונים שלו יימחקו.")) {
+                  setPlayers([]);
+                  setTips([]);
+                  setCoupleFills([]);
+                  setMenuIdx(null);
+                }
               }}
               style={{
                 background: "none",

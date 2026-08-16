@@ -2,6 +2,7 @@
 import { AL, canon, r2 } from "./helpers.js";
 import { fmt } from "./format.js";
 import { allTimeTotals } from "./totals.js";
+import { bestChipCashout, sessionHasChips, entryChips } from "./chipRecords.js";
 
 export function brokenRecords(db, rec) {
   const A = AL(db);
@@ -72,6 +73,22 @@ export function brokenRecords(db, rec) {
   const after = allTimeTotals({ ...db, sessions: [...db.sessions, rec] })[0];
   if (before && after && after.name !== before.name) {
     lines.push(`🐐 חילופי שלטון! ${after.name} עקף את ${before.name} והוא מלך כל הזמנים עם ${fmt(after.amount)}`);
+  }
+
+  /* שיא ג'יטונים ביציאה — רק מול ערבים עם נתוני chips אמיתיים */
+  if (sessionHasChips(rec)) {
+    const prevHigh = bestChipCashout(old, A);
+    for (const e of rec.entries) {
+      const c = entryChips(e);
+      if (c == null) continue;
+      const nm = canon(e.name, A);
+      if (!prevHigh || c > prevHigh.chips) {
+        const prev = prevHigh
+          ? ` (הקודם: ${prevHigh.name} · ${prevHigh.chips} ג')`
+          : "";
+        lines.push(`🪙 ${nm} קבע שיא ג'יטונים ביציאה: ${c} ג'${prev}`);
+      }
+    }
   }
 
   return lines;
