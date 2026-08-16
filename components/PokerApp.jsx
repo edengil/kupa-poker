@@ -22,6 +22,7 @@ import { LiveTab } from "./poker/LiveTab";
 import { PokerTable } from "./poker/PokerTable";
 import { DB_KEY, loadConfig } from "./poker/config";
 import { buildSeedDb } from "./poker/seed";
+import { applyChipBackfill } from "./poker/chipBackfill";
 import { EGFooter } from "./Logo";
 
 // שיתוף אמין: (1) Web Share API — גיליון השיתוף של iOS, בוחרים וואטסאפ והקבוצה; הטקסט עובר נקי.
@@ -62,9 +63,15 @@ function App({
           d = buildSeedDb();
         }
       } else d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
+      // גיבוי ג'יטונים מצ'אט אוג׳ 2026 — ממלא ערבים ישנים בלי שדה chips
+      const filled = applyChipBackfill(d);
       if (alive) {
         setDb(d);
         setReady(true);
+        // בעלים: שומרים פעם אחת למסד כדי ששיאי הג'יטונים יישארו
+        if (filled && !readOnly) {
+          store.set(DB_KEY, JSON.stringify(d));
+        }
       }
     })();
     return () => {
