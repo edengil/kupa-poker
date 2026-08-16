@@ -11,7 +11,7 @@ import {
   dur,
   durWords,
 } from "../components/poker/helpers.js";
-import { fmt, MONTHS } from "../components/poker/format.js";
+import { fmt, fmtGap, MONTHS } from "../components/poker/format.js";
 import {
   aggregate,
   yearTotals,
@@ -40,6 +40,12 @@ describe("helpers — numeric", () => {
     expect(fmt(12)).toBe("+12");
     expect(fmt(-3)).toBe("−3");
     expect(fmt(0)).toBe("0");
+  });
+
+  it("fmtGap uses פלוס / חוסר wording", () => {
+    expect(fmtGap(14)).toBe("פלוס 14");
+    expect(fmtGap(-14)).toBe("חוסר 14");
+    expect(fmtGap(0)).toBe("0");
   });
 });
 

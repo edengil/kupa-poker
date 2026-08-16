@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { C } from "./colors";
-import { fmt, MONTHS } from "./format";
+import { fmt, fmtGap, MONTHS } from "./format";
 import { AL, r2, toWhatsApp } from "./helpers";
 import { allTimeTotals, monthTotals, yearTotals } from "./totals";
 import { Empty, GroupLabel, IconBtn, SegBar, Select } from "./ui";
@@ -111,7 +111,7 @@ function Ledger({ totals, official, readOnly = false }) {
         >
           <span>{official ? 'סה"כ רשמי' : "בדיקת סגירה"}</span>
           <span style={{ fontVariantNumeric: "tabular-nums" }}>
-            {official ? fmt(sum) : sum === 0 ? "✓ 0" : `${fmt(sum)} — פער מצטבר`}
+            {official ? fmt(sum) : sum === 0 ? "✓ 0" : `${fmtGap(sum)} — פער מצטבר`}
           </span>
         </div>
       )}

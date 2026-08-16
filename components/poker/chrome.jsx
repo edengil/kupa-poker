@@ -3,7 +3,7 @@
 import React from "react";
 import { EGMark } from "../Logo";
 import { C } from "./colors";
-import { fmt } from "./format";
+import { fmtGap } from "./format";
 import {
   AlertTriangle,
   BarChart3,
@@ -188,7 +188,7 @@ export function BalanceMeter({ bal }) {
         {ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
         {ok
           ? "הערב סגור מדויק"
-          : `פער ${fmt(gap)} (${gap > 0 ? "עודף מגיע" : "עודף חייב"})`}
+          : `פער ${fmtGap(gap)} (${gap > 0 ? "עודף מגיע" : "עודף חייב"})`}
       </div>
     </div>
   );

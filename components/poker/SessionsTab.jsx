@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { C } from "./colors";
-import { fmt } from "./format";
+import { fmt, fmtGap } from "./format";
 import { AL, balance, canon, toWhatsApp } from "./helpers";
 import { Empty, IconBtn } from "./ui";
 import { Pencil, Share2, Trash2 } from "./icons";
@@ -104,7 +104,7 @@ export function SessionsTab({ db, commit, goEdit }) {
                 color: b.gap === 0 ? C.dim : C.brass,
               }}
             >
-              {b.gap === 0 ? "✓ מאוזן" : `⚠ פער ${fmt(b.gap)}`}
+              {b.gap === 0 ? "✓ מאוזן" : `⚠ פער ${fmtGap(b.gap)}`}
             </div>
           </div>
         );

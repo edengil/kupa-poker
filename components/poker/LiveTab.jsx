@@ -5,7 +5,7 @@ import { store } from "../../lib/store";
 import { buildReport, buildSettlement } from "../../lib/report";
 import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
 import { C } from "./colors";
-import { fmt } from "./format";
+import { fmt, fmtGap } from "./format";
 import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "./helpers";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "./config";
 import { brokenRecords } from "./brokenRecords";
@@ -850,10 +850,10 @@ export function LiveTab({
                   <AlertTriangle size={16} />
                 )}
                 {cashSumChips !== potChips
-                  ? `הג'יטונים לא תואמים לקופה — פער ${fmt(r2((cashSumChips - potChips) / cps))}₪`
+                  ? `הג'יטונים לא תואמים לקופה — פער ${fmtGap(r2((cashSumChips - potChips) / cps))}₪`
                   : netSum === 0
                     ? "מאוזן"
-                    : `פער ${fmt(netSum)}₪`}
+                    : `פער ${fmtGap(netSum)}₪`}
               </div>
             </div>
           )}
