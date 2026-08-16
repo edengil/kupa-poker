@@ -364,11 +364,22 @@ export function RecordsTab({ db }) {
             runner={recs.most2 && `${recs.most2.name} · ${recs.most2.nights}`} />
         )}
 
-        {recs.chips && (
+        {/* מקטעים חדשים — תמיד מוצגים, גם בלי נתונים, כדי שיראו שהפיצ'ר קיים.
+            ערבים ישנים נשמרו בלי שדה chips; מהערב הבא שיישמר מהלייב הם יופיעו. */}
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+          🪙 שיאי ג&apos;יטונים
+          {recs.chips ? ` · מ־${recs.chips.nightsWithChips} ערבים עם יציאה` : ""}
+        </div>
+        {!recs.chips ? (
+          <div style={{
+            background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            עדיין אין ערבים עם יציאת ג&apos;יטונים שמורה.
+            מהערב הבא שתשמור מהלייב (או מהבוט עם סגירה) — יופיעו כאן שיא היציאה, פודיום חודשי ומלך/מלכה.
+          </div>
+        ) : (
           <>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
-              🪙 שיאי ג&apos;יטונים · מ־{recs.chips.nightsWithChips} ערבים עם יציאה
-            </div>
             {recs.chips.bestCashout && (
               <Card icon="🪙" title="שיא הכי הרבה ג'יטונים ביציאה"
                 holder={recs.chips.bestCashout.name}
@@ -408,11 +419,19 @@ export function RecordsTab({ db }) {
           </>
         )}
 
-        {recs.tips && (
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+          💸 שיאי טיפים
+        </div>
+        {!recs.tips ? (
+          <div style={{
+            background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            עדיין אין טיפים. בקבוצה: <b style={{ color: C.cream }}>אופיר טיפ 10</b> או <b style={{ color: C.cream }}>אופיר נתן טיפ 10</b>
+            {" "}(ג&apos;יטונים מהערימה שלו). אחרי שמירת הערב השיאים יופיעו כאן.
+          </div>
+        ) : (
           <>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
-              💸 שיאי טיפים
-            </div>
             {recs.tips.biggestTip && (
               <Card icon="💎" title="הטיפ הגדול ביותר" holder={recs.tips.biggestTip.name}
                 value={`${recs.tips.biggestTip.amount} ג'`} tone={C.win}
@@ -444,11 +463,19 @@ export function RecordsTab({ db }) {
           </>
         )}
 
-        {recs.coupleFills && (
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+          ↔ מילוי זוגי
+        </div>
+        {!recs.coupleFills ? (
+          <div style={{
+            background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            עדיין אין מילויים. בלייב, כששני בני הזוג בשולחן: לחיצה ארוכה על השם / כפתור ↔ / «מילוי 30».
+            נשמר רק אצלך באפליקציה, לא נשלח לקבוצה.
+          </div>
+        ) : (
           <>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
-              ↔ מילוי זוגי
-            </div>
             {recs.coupleFills.monthTop && (
               <Card icon="🤝" title={`מילוי זוגי של החודש · ${recs.coupleFills.monthLabel}`}
                 holder={recs.coupleFills.monthTop.label}
