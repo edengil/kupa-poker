@@ -15,6 +15,9 @@ import {
   DEFAULT_FILL_CHIPS,
   fillCountFor,
   canonCoupleName,
+  summarizeCoupleFills,
+  formatFillBadge,
+  shortCoupleName,
 } from "./coupleFills";
 import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { ShareSheet } from "./ShareSheet";
@@ -104,6 +107,8 @@ export function LiveTab({
             closing: d.closing,
             tipComplimentBag: d.tipComplimentBag,
             tipComplimentLast: d.tipComplimentLast,
+            // שומרים ts קיים — לא לכתוב Date.now() בכל שמירה (גורם להבדל מול השרת)
+            ...(d.ts != null ? { ts: d.ts } : {}),
           };
         } catch {}
       }
@@ -131,7 +136,6 @@ export function LiveTab({
         startedAt,
         tips,
         coupleFills,
-        ts: Date.now(),
       })
     );
   }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, hydrated]);
@@ -316,8 +320,8 @@ export function LiveTab({
     if (getConfig().botOn) setConfig({ botOn: false });
   }
 
-  /* מילוי זוגי: לחיצה ארוכה על שם בן/בת זוג → מילוי 30 מהערימה שלו לשותף.
-     גם כפתור ↔ קטן ליד השם (בלי תווית "תרומה"). */
+  /* מילוי זוגי: כל לחיצה = 30 ג'יטונים מהערימה של from לשותף.
+     תפריט מאפשר לבחור כיוון (אני→שותף / שותף→אני). בלי תווית "תרומה". */
   function doCoupleFill(fromName) {
     const res = applyCoupleFill(players, fromName, DEFAULT_FILL_CHIPS);
     if (!res.ok) {
@@ -506,7 +510,10 @@ export function LiveTab({
               const showFill =
                 !!partnerName &&
                 players.some((q) => canonCoupleName(q.name) === partnerName);
-              const fills = fillCountFor(coupleFills, p.name);
+              const fillEvents = fillCountFor(coupleFills, p.name);
+              const fillSummaries = showFill ? summarizeCoupleFills(coupleFills, p.name) : [];
+              const partnerShort = partnerName ? shortCoupleName(partnerName) : "";
+              const meShort = shortCoupleName(p.name);
               return (
                 <div
                   key={i}
@@ -526,7 +533,7 @@ export function LiveTab({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      {/* UX מילוי זוגי: לחיצה ארוכה על השם או ↔ → מילוי 30 מהערימה לשותף */}
+                      {/* לחיצה ארוכה = מילוי 30 ממני לשותף; לחיצה קצרה = תפריט כיוונים */}
                       <b
                         style={{ fontSize: 15, userSelect: "none", touchAction: "manipulation" }}
                         onPointerDown={() => {
@@ -549,10 +556,10 @@ export function LiveTab({
                       {showFill && (
                         <button
                           type="button"
-                          title="מילוי 30"
+                          title={`${meShort} → ${partnerShort} · ${DEFAULT_FILL_CHIPS}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            doCoupleFill(p.name);
+                            setMenuIdx(menuIdx === i ? null : i);
                           }}
                           style={{
                             background: "transparent",
@@ -562,31 +569,58 @@ export function LiveTab({
                             fontSize: 11,
                             padding: "2px 6px",
                             cursor: "pointer",
-                            opacity: 0.55,
+                            opacity: 0.7,
                             fontFamily: "inherit",
                           }}
                         >
-                          ↔{fills > 0 ? fills : ""}
+                          ↔{fillEvents > 0 ? ` ${fillEvents}×${DEFAULT_FILL_CHIPS}` : ""}
                         </button>
                       )}
                       {menuIdx === i && showFill && (
-                        <button
-                          type="button"
-                          onClick={() => doCoupleFill(p.name)}
-                          style={{
-                            background: C.feltDeep,
-                            border: `1px solid ${C.line}`,
-                            color: C.dim,
-                            borderRadius: 8,
-                            fontSize: 11.5,
-                            padding: "4px 8px",
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                          }}
-                        >
-                          מילוי {DEFAULT_FILL_CHIPS}
-                        </button>
+                        <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={() => doCoupleFill(p.name)}
+                            style={{
+                              background: C.feltDeep,
+                              border: `1px solid ${C.line}`,
+                              color: C.cream,
+                              borderRadius: 8,
+                              fontSize: 11.5,
+                              padding: "4px 8px",
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            {meShort} → {partnerShort} · {DEFAULT_FILL_CHIPS}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => doCoupleFill(partnerName)}
+                            style={{
+                              background: C.feltDeep,
+                              border: `1px solid ${C.line}`,
+                              color: C.cream,
+                              borderRadius: 8,
+                              fontSize: 11.5,
+                              padding: "4px 8px",
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            {partnerShort} → {meShort} · {DEFAULT_FILL_CHIPS}
+                          </button>
+                        </span>
                       )}
+                      {fillSummaries.map((row) => (
+                        <span
+                          key={row.label}
+                          style={{ fontSize: 11, color: C.dim, fontVariantNumeric: "tabular-nums" }}
+                          title={row.ats?.length ? row.ats.map((t) => formatFillBadge({ ...row, lastAt: t })).join("\n") : undefined}
+                        >
+                          {formatFillBadge(row)}
+                        </span>
+                      ))}
                       {(+p.tipsGiven || 0) > 0 && (
                         <span style={{ fontSize: 11, color: C.dim }}>
                           טיפ {p.tipsGiven}

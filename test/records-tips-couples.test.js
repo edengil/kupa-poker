@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { parseCommands, applyCommands, BOT_MARK } from "../lib/whatsapp.js";
 import { nextTipCompliment, TIP_COMPLIMENTS } from "../lib/tipCompliments.js";
 import { computeChipRecords, bestChipCashout } from "../components/poker/chipRecords.js";
-import { applyCoupleFill, partnerOf, computeCoupleFillRecords } from "../components/poker/coupleFills.js";
+import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS } from "../components/poker/coupleFills.js";
 import { computeTipRecords } from "../components/poker/tipRecords.js";
 
 describe("tip commands", () => {
@@ -13,6 +13,16 @@ describe("tip commands", () => {
 
   it("parses אופיר נתן טיפ 10", () => {
     const cmds = parseCommands("אופיר נתן טיפ 10", 50, true);
+    expect(cmds[0]).toMatchObject({ kind: "tip", name: "אופיר", chips: 10 });
+  });
+
+  it("parses אופיר 10 טיפ", () => {
+    const cmds = parseCommands("אופיר 10 טיפ", 50, true);
+    expect(cmds[0]).toMatchObject({ kind: "tip", name: "אופיר", chips: 10 });
+  });
+
+  it("parses אופיר 10 טיפים", () => {
+    const cmds = parseCommands("אופיר 10 טיפים", 50, true);
     expect(cmds[0]).toMatchObject({ kind: "tip", name: "אופיר", chips: 10 });
   });
 
@@ -173,6 +183,22 @@ describe("couple fills", () => {
     const recs = computeCoupleFillRecords(db);
     expect(recs.monthTop.count).toBe(2);
     expect(recs.monthTop.chips).toBe(60);
+    expect(recs.monthTop.label).toContain("→");
+  });
+
+  it("summarizes direction and 30-chip fills for Live UI", () => {
+    const fills = [
+      { from: "עדן גיל", to: "אורן גיל", chips: DEFAULT_FILL_CHIPS, at: 1000 },
+      { from: "עדן גיל", to: "אורן גיל", chips: DEFAULT_FILL_CHIPS, at: 2000 },
+      { from: "אורן גיל", to: "עדן גיל", chips: DEFAULT_FILL_CHIPS, at: 3000 },
+    ];
+    const rows = summarizeCoupleFills(fills, "עדן גיל");
+    expect(rows).toHaveLength(2);
+    const edenToOren = rows.find((r) => r.from === "עדן גיל");
+    expect(edenToOren.count).toBe(2);
+    expect(edenToOren.total).toBe(60);
+    expect(formatFillBadge(edenToOren)).toMatch(/→/);
+    expect(formatFillBadge(edenToOren)).toMatch(/30×2/);
   });
 });
 

@@ -108,7 +108,9 @@ export function computeTipRecords(db) {
     mostTipChipsNight,
     monthKing: monthTotals[0] || null,
     monthKing2: monthTotals[1] || null,
+    monthKing3: monthTotals[2] || null,
     allKing: allTotals[0] || null,
     allKing2: allTotals[1] || null,
+    allKing3: allTotals[2] || null,
   };
 }

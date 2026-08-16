@@ -1,6 +1,7 @@
 /* מילוי זוגי (couple stack-help) — כשבן/בת זוג מעבירים ג'יטונים מהערימה
    שלהם לשותף במקום כניסה חדשה. לא לחשוף בקבוצה; רק באפליקציית המנהל.
-   השם בתצוגה: "מילוי זוגי" — לא תרומה/תורם. */
+   השם בתצוגה: "מילוי זוגי" — לא תרומה/תורם.
+   כל פעולה = DEFAULT_FILL_CHIPS (30) ג'יטונים, לא +1. */
 
 import { COUPLES } from "../../lib/settlement.js";
 import { r2 } from "./helpers.js";
@@ -42,6 +43,18 @@ export function coupleKey(a, b) {
 export function coupleLabel(a, b) {
   const [x, y] = [canonCoupleName(a), canonCoupleName(b)].sort((p, q) => p.localeCompare(q, "he"));
   return `${x} ↔ ${y}`;
+}
+
+/** תווית כיוון ברורה: נותן → מקבל */
+export function fillDirectionLabel(from, to) {
+  return `${shortCoupleName(from)} → ${shortCoupleName(to)}`;
+}
+
+/** שם קצר לתצוגה עדינה (שם פרטי אם יש משפחה) */
+export function shortCoupleName(name) {
+  const n = canonCoupleName(name);
+  const sp = n.indexOf(" ");
+  return sp > 0 ? n.slice(0, sp) : n;
 }
 
 /**
@@ -86,7 +99,76 @@ export function applyCoupleFill(players, fromName, chips = FILL_CHIPS, at = Date
 
 export const DEFAULT_FILL_CHIPS = FILL_CHIPS;
 
-/** שיא מילוי זוגי לחודש / כל הזמנים */
+/** מילויים של הזוג של השחקן בערב הנוכחי */
+export function fillsForCouple(coupleFills, name) {
+  const partner = partnerOf(name);
+  if (!partner) return [];
+  const key = coupleKey(name, partner);
+  return (coupleFills || []).filter((f) => coupleKey(f.from, f.to) === key);
+}
+
+/**
+ * סיכום לפי כיוון לערב: [{ from, to, label, chips, count, total, lastAt }]
+ * count = מספר אירועי מילוי (כל אחד DEFAULT_FILL_CHIPS אלא אם צוין אחרת).
+ */
+export function summarizeCoupleFills(coupleFills, name) {
+  const list = fillsForCouple(coupleFills, name);
+  const acc = {};
+  for (const f of list) {
+    const from = f.from;
+    const to = f.to;
+    const k = `${canonCoupleName(from)}|${canonCoupleName(to)}`;
+    const chips = +f.chips || FILL_CHIPS;
+    const cur = acc[k] || {
+      from,
+      to,
+      label: fillDirectionLabel(from, to),
+      chips,
+      count: 0,
+      total: 0,
+      lastAt: 0,
+      ats: [],
+    };
+    cur.count += 1;
+    cur.total += chips;
+    cur.chips = chips;
+    if (f.at) {
+      cur.ats.push(f.at);
+      if (f.at > cur.lastAt) cur.lastAt = f.at;
+    }
+    acc[k] = cur;
+  }
+  return Object.values(acc).sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
+}
+
+/** כמה אירועי מילוי נרשמו לזוג של השחקן בערב (לא סכום ג'יטונים) */
+export function fillCountFor(coupleFills, name) {
+  return fillsForCouple(coupleFills, name).length;
+}
+
+function fmtFillTime(at) {
+  if (!at) return "";
+  try {
+    return new Date(at).toLocaleTimeString("he-IL", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+/** שורת תצוגה עדינה ללייב, למשל: "אורן → עדן · 30×2 · 21:04" */
+export function formatFillBadge(summaryRow) {
+  if (!summaryRow) return "";
+  const { label, chips, count, lastAt } = summaryRow;
+  const amt = chips || FILL_CHIPS;
+  const body = count > 1 ? `${label} · ${amt}×${count}` : `${label} · ${amt}`;
+  const t = fmtFillTime(lastAt);
+  return t ? `${body} · ${t}` : body;
+}
+
+/** שיא מילוי זוגי לחודש / כל הזמנים — לפי כיוון (נותן→מקבל) וסך ג'יטונים */
 export function computeCoupleFillRecords(db) {
   const sessions = [...(db.sessions || [])].sort((a, b) => a.iso.localeCompare(b.iso));
   const fills = [];
@@ -103,9 +185,19 @@ export function computeCoupleFillRecords(db) {
   const rank = (list) => {
     const acc = {};
     for (const f of list) {
-      const key = coupleKey(f.from, f.to);
-      const cur = acc[key] || { key, label: coupleLabel(f.from, f.to), chips: 0, count: 0 };
-      cur.chips += +f.chips || 0;
+      const from = f.from;
+      const to = f.to;
+      const key = `${canonCoupleName(from)}|${canonCoupleName(to)}`;
+      const cur = acc[key] || {
+        key,
+        label: fillDirectionLabel(from, to),
+        couple: coupleLabel(from, to),
+        from,
+        to,
+        chips: 0,
+        count: 0,
+      };
+      cur.chips += +f.chips || FILL_CHIPS;
       cur.count += 1;
       acc[key] = cur;
     }
@@ -119,15 +211,10 @@ export function computeCoupleFillRecords(db) {
     monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
     monthTop: month[0] || null,
     monthTop2: month[1] || null,
+    monthTop3: month[2] || null,
     allTop: all[0] || null,
+    allTop2: all[1] || null,
+    allTop3: all[2] || null,
     // לא מייצאים ל-WhatsApp — רגיש
   };
-}
-
-/** כמה מילויים נרשמו לשחקן בערב הנוכחי (לסימון עדין ב-UI) */
-export function fillCountFor(coupleFills, name) {
-  const n = canonCoupleName(name);
-  return (coupleFills || []).filter(
-    (f) => canonCoupleName(f.from) === n || canonCoupleName(f.to) === n
-  ).length;
 }

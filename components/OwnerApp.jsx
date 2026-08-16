@@ -21,6 +21,29 @@ const C = {
   loss: "#E27A63",
 };
 
+/** טביעת אצבע ללייב בלי ts — כדי ששמירה מקומית/מרוץ כתיבה לא יחשבו כשינוי חיצוני. */
+function liveFingerprint(live) {
+  if (live == null) return "";
+  let obj = live;
+  if (typeof live === "string") {
+    if (live === "" || live === "null") return "";
+    try {
+      obj = JSON.parse(live);
+    } catch {
+      return live;
+    }
+  }
+  if (obj && typeof obj === "object") {
+    const { ts: _ts, ...rest } = obj;
+    return JSON.stringify(rest);
+  }
+  return JSON.stringify(obj);
+}
+
+function tabIsVisible() {
+  return typeof document !== "undefined" && document.visibilityState === "visible";
+}
+
 /** מזהה קצר, קריא ולא ניתן לניחוש, שמופיע בלינק לשיתוף. */
 function newSlug() {
   const bytes = new Uint8Array(8);
@@ -34,12 +57,35 @@ export default function OwnerApp() {
   const [group, setGroup] = useState(null);
   const [message, setMessage] = useState("");
   const [online, setOnline] = useState([]); // מי צופה עכשיו — נוכחות חיה
-  const [generation, setGeneration] = useState(0); // remount כשהלייב השתנה מבחוץ
+  const [generation, setGeneration] = useState(0); // remount רק כשבאמת צריך (רקע / חזרה לדף)
   const broadcasterRef = useRef(null);
   const groupRef = useRef(null); // גישה יציבה לקבוצה מתוך callbacks
   const lastLiveRef = useRef(undefined); // הלייב האחרון שידוע לדף — להשוואה מול פינגים
+  const lastLiveFpRef = useRef(undefined); // טביעה בלי ts
+  const pendingRemountRef = useRef(null); // null | "live" | "soft" — נדחה עד חזרה לדף
   const tabRef = useRef("table"); // הטאב הפתוח — נשמר בין רענונים
   const checkingLiveRef = useRef(false); // מונע checkLive חופפים שמרעננים פעמיים
+
+  const remountApp = useCallback(() => {
+    pendingRemountRef.current = null;
+    setGeneration((g) => g + 1);
+  }, []);
+
+  /* רענון מלא של PokerApp — רק כשהדף לא בשימוש פעיל (מוסתר),
+     אחרת מסמנים וממתינים לחזרה לטאב כדי לא לקפוץ באמצע לייב. */
+  const requestRemount = useCallback(
+    (opts = {}) => {
+      const { forgetLive = false, force = false } = opts;
+      if (!force && tabIsVisible()) {
+        // לא מוחקים מטמון לייב כל עוד המשתמש על הדף
+        pendingRemountRef.current = forgetLive ? "live" : "soft";
+        return;
+      }
+      if (forgetLive) forgetStoreKey(LIVE_KEY);
+      remountApp();
+    },
+    [remountApp]
+  );
 
   /* ------------------------------ סשן ------------------------------ */
   useEffect(() => {
@@ -60,12 +106,14 @@ export default function OwnerApp() {
     };
   }, [supabase]);
 
-  /* האם הלייב במסד שונה ממה שמוצג? אם כן — רענון (remount של PokerApp).
+  /* האם הלייב במסד שונה ממה שמוצג? אם כן — רענון (remount של PokerApp)
+     רק כשהדף לא גלוי/פעיל; בזמן שימוש נדחה כדי לא לקפוץ את הלייב.
      נקרא מפינג של הבוט, מסקר קבוע, ומחזרה לדף. lastLiveRef מתעדכן גם בכל
-     כתיבה מקומית, כדי שהשינויים של עצמנו לא ייחשבו "חיצוניים" ויקפיצו רענון.
+     כתיבה מקומית, כדי שהשינויים של עצמנו לא ייחשבו "חיצוניים".
 
      חשוב: לפני ההשוואה שומרים כל שינוי מקומי שעדיין בתור (debounce).
-     בלי זה, באמצע סגירת משחק הרענון היה טוען מהשרת גרסה ישנה ודורס את המסך. */
+     בלי זה, באמצע סגירת משחק הרענון היה טוען מהשרת גרסה ישנה ודורס את המסך.
+     השוואה בלי שדה ts — הוא משתנה בכל שמירה ולא אומר שינוי אמיתי. */
   const checkLive = useCallback(async () => {
     const row = groupRef.current;
     if (!row || checkingLiveRef.current) return;
@@ -79,21 +127,25 @@ export default function OwnerApp() {
         .single();
       if (error) return;
       const s = JSON.stringify(data?.live ?? null);
+      const fp = liveFingerprint(data?.live ?? null);
       if (lastLiveRef.current === undefined) {
-        lastLiveRef.current = s; // נקודת ייחוס ראשונה — בלי רענון סרק
+        lastLiveRef.current = s;
+        lastLiveFpRef.current = fp;
         return;
       }
-      if (lastLiveRef.current !== s) {
+      if (lastLiveFpRef.current === fp) {
+        // אותו תוכן (אולי ts אחר) — מיישרים בלי remount
         lastLiveRef.current = s;
-        // נקה מטמון לייב כדי שה-remount יטען את מה שהבוט כתב, לא את העותק הישן בזיכרון
-        forgetStoreKey(LIVE_KEY);
-        setGeneration((g) => g + 1);
+        return;
       }
+      lastLiveRef.current = s;
+      lastLiveFpRef.current = fp;
+      requestRemount({ forgetLive: true });
     } catch {
     } finally {
       checkingLiveRef.current = false;
     }
-  }, [supabase]);
+  }, [supabase, requestRemount]);
 
   /* -------------------- איתור או יצירה של הקבוצה --------------------
      שורת הקבוצה נשמרת ב-localStorage: בביקור חוזר האפליקציה עולה מיידית
@@ -108,14 +160,15 @@ export default function OwnerApp() {
             // כתיבה שלנו שנגעה בלייב — מעדכנים את נקודת הייחוס לפני הפינג
             if (patch && "live" in patch) {
               lastLiveRef.current = JSON.stringify(patch.live ?? null);
+              lastLiveFpRef.current = liveFingerprint(patch.live ?? null);
             }
             broadcaster.ping();
           },
-          // מטמון DB/config לא עדכני — קודם שומרים לייב מקומי, ואז מרעננים
-          // בלי forget על הלייב, כדי לא לאבד סגירה באמצע
+          // מטמון DB/config לא עדכני — קודם שומרים לייב מקומי; remount רק ברקע
+          // כדי לא לקפוץ באמצע לייב. בלי forget על הלייב.
           onStale: async () => {
             await flushStore();
-            setGeneration((g) => g + 1);
+            requestRemount({ forgetLive: false });
           },
         })
       );
@@ -213,7 +266,8 @@ export default function OwnerApp() {
   /* גיבוי לפינגים: WebSocket בטלפון נופל כשהמסך ננעל ולא תמיד מתאושש,
      ואז עדכונים מהבוט לא מגיעים עד שיוצאים וחוזרים. סקר קל (שאילתת לייב
      אחת) כל 12 שניות כשהמסך גלוי + בדיקה מיידית בכל חזרה לדף סוגרים את
-     החור — בדיוק כמו אצל הצופים. */
+     החור — בדיוק כמו אצל הצופים.
+     Remount בזמן שהדף גלוי נדחה; בחזרה מהרקע מריצים remount ממתינים. */
   useEffect(() => {
     if (phase !== "ready") return;
     let timer = null;
@@ -224,19 +278,30 @@ export default function OwnerApp() {
     };
     const onVis = () => {
       if (document.visibilityState === "visible") {
+        if (pendingRemountRef.current) {
+          if (pendingRemountRef.current === "live") forgetStoreKey(LIVE_KEY);
+          remountApp();
+        }
         checkLive();
         start();
       } else stop();
     };
+    const onFocus = () => {
+      if (pendingRemountRef.current) {
+        if (pendingRemountRef.current === "live") forgetStoreKey(LIVE_KEY);
+        remountApp();
+      }
+      checkLive();
+    };
     onVis();
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", checkLive);
+    window.addEventListener("focus", onFocus);
     return () => {
       stop();
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", checkLive);
+      window.removeEventListener("focus", onFocus);
     };
-  }, [phase, checkLive]);
+  }, [phase, checkLive, remountApp]);
 
   /* נוכחות חיה — מנוי אחד לכל הדף. גם פאנל "מי צופה" וגם טאב "צפיות"
      מקבלים את אותה רשימה כ-prop. שני מנויים לאותו ערוץ היו מפילים את

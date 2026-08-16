@@ -94,14 +94,17 @@ export function computeChipRecords(db) {
   }
   nights.sort((a, b) => b.chips - a.chips);
   if (nights.length > 1) high2 = nights[1];
+  const high3 = nights.length > 2 ? nights[2] : null;
 
   return {
     monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
     podium,
     allKing: all[0] || null,
     allKing2: all[1] || null,
+    allKing3: all[2] || null,
     bestCashout: high,
     bestCashout2: high2,
+    bestCashout3: high3,
     nightsWithChips: withChips.length,
   };
 }

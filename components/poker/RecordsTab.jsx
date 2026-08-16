@@ -52,12 +52,14 @@ export function RecordsTab({ db }) {
       if (!stormyNight || moved > stormyNight.moved) stormyNight = { moved, d: n.d, mo: n.mo, y: n.y };
     }
 
-    // ערבי השיא — הטוב והקשה, כל אחד עם הסגן שלו
+    // ערבי השיא — הטוב והקשה, עם סגן וארד
     nightList.sort((a, b) => b.amount - a.amount);
     const bestNight = nightList[0] || null;
     const bestNight2 = nightList[1] || null;
+    const bestNight3 = nightList[2] || null;
     const worstNight = nightList[nightList.length - 1] || null;
     const worstNight2 = nightList[nightList.length - 2] || null;
+    const worstNight3 = nightList[nightList.length - 3] || null;
 
     /* סטטיסטיקה פר שחקן — הכל מ-history הכרונולוגי: רצפים, אחוז ניצחונות,
        ממוצע, תנודתיות (סטיית תקן) והקאמבק. מחושב פעם אחת ואז ממוינים
@@ -92,21 +94,21 @@ export function RecordsTab({ db }) {
       };
     });
 
-    // שניים הראשונים לפי מדד — [שיאן, סגן]
-    const top2 = (key, filter = () => true) => {
+    // שלושה הראשונים לפי מדד — [שיאן, סגן, ארד]
+    const top3 = (key, filter = () => true) => {
       const s = stats.filter(filter).sort((a, b) => key(b) - key(a));
-      return [s[0] || null, s[1] || null];
+      return [s[0] || null, s[1] || null, s[2] || null];
     };
 
-    const [bestStreak, bestStreak2] = top2(s => s.maxStreak, s => s.maxStreak >= 2);
-    const [liveStreak] = top2(s => s.tail, s => s.tail >= 2);
-    const [lossStreak] = top2(s => s.lossMax, s => s.lossMax >= 3);
-    const [winRate, winRate2] = top2(s => s.rate, s => s.nights >= MIN_NIGHTS);
-    const [bestAvg, bestAvg2] = top2(s => s.avg, s => s.nights >= MIN_NIGHTS && s.avg > 0);
-    const [mostWins, mostWins2] = top2(s => s.wins);
-    const [most, most2] = top2(s => s.nights);
-    const [attendTop, attendTop2] = top2(s => s.attendMax, s => s.attendMax >= 3);
-    const [roller] = top2(s => s.sd, s => s.nights >= MIN_NIGHTS);
+    const [bestStreak, bestStreak2, bestStreak3] = top3(s => s.maxStreak, s => s.maxStreak >= 2);
+    const [liveStreak] = top3(s => s.tail, s => s.tail >= 2);
+    const [lossStreak] = top3(s => s.lossMax, s => s.lossMax >= 3);
+    const [winRate, winRate2, winRate3] = top3(s => s.rate, s => s.nights >= MIN_NIGHTS);
+    const [bestAvg, bestAvg2, bestAvg3] = top3(s => s.avg, s => s.nights >= MIN_NIGHTS && s.avg > 0);
+    const [mostWins, mostWins2, mostWins3] = top3(s => s.wins);
+    const [most, most2, most3] = top3(s => s.nights);
+    const [attendTop, attendTop2, attendTop3] = top3(s => s.attendMax, s => s.attendMax >= 3);
+    const [roller] = top3(s => s.sd, s => s.nights >= MIN_NIGHTS);
     const comeback = stats.reduce(
       (m, s) => s.comeback && (!m || s.comeback.jump > m.jump) ? { name: s.name, ...s.comeback } : m,
       null
@@ -173,18 +175,19 @@ export function RecordsTab({ db }) {
 
     return {
       lastNight,
-      bestNight, bestNight2, worstNight, worstNight2,
-      bestStreak, bestStreak2, liveStreak, lossStreak,
-      winRate, winRate2, bestAvg, bestAvg2, mostWins, mostWins2,
+      bestNight, bestNight2, bestNight3, worstNight, worstNight2, worstNight3,
+      bestStreak, bestStreak2, bestStreak3, liveStreak, lossStreak,
+      winRate, winRate2, winRate3, bestAvg, bestAvg2, bestAvg3, mostWins, mostWins2, mostWins3,
       comeback, stormyNight, bestMonth, bestYear, roller,
-      attendTop, attendTop2,
+      attendTop, attendTop2, attendTop3,
       crownKing: crowns[0] ? { name: crowns[0][0], count: crowns[0][1] } : null,
       crownKing2: crowns[1] ? { name: crowns[1][0], count: crowns[1][1] } : null,
-      monthKing: monthT[0] || null, monthKing2: monthT[1] || null,
+      crownKing3: crowns[2] ? { name: crowns[2][0], count: crowns[2][1] } : null,
+      monthKing: monthT[0] || null, monthKing2: monthT[1] || null, monthKing3: monthT[2] || null,
       monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
-      yearKing: yearT[0] || null, yearKing2: yearT[1] || null, yearLabel: `${last.y}`,
-      allKing: allT[0] || null, allKing2: allT[1] || null,
-      most, most2,
+      yearKing: yearT[0] || null, yearKing2: yearT[1] || null, yearKing3: yearT[2] || null, yearLabel: `${last.y}`,
+      allKing: allT[0] || null, allKing2: allT[1] || null, allKing3: allT[2] || null,
+      most, most2, most3,
       totalNights: sessions.length,
       chips: computeChipRecords(db),
       tips: computeTipRecords(db),
@@ -194,7 +197,7 @@ export function RecordsTab({ db }) {
 
   if (!recs) return <Empty text="עוד אין ערבים — אין שיאים." />;
 
-  const Card = ({ icon, title, holder, value, tone, sub, runner }) => (
+  const Card = ({ icon, title, holder, value, tone, sub, runner, third }) => (
     <div style={{
       background: C.card,
       border: `1px solid ${C.line}`,
@@ -211,6 +214,9 @@ export function RecordsTab({ db }) {
         {sub && <div style={{ fontSize: 11.5, color: C.dim }}>{sub}</div>}
         {runner && (
           <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>🥈 {runner}</div>
+        )}
+        {third && (
+          <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>🥉 {third}</div>
         )}
       </div>
       <b style={{
@@ -270,33 +276,40 @@ export function RecordsTab({ db }) {
         {recs.monthKing && (
           <Card icon="👑" title={`מלך ${recs.monthLabel}`} holder={recs.monthKing.name}
             value={fmt(recs.monthKing.amount)} tone={C.win}
-            runner={recs.monthKing2 && `${recs.monthKing2.name} · ${fmt(recs.monthKing2.amount)}`} />
+            runner={recs.monthKing2 && `${recs.monthKing2.name} · ${fmt(recs.monthKing2.amount)}`}
+            third={recs.monthKing3 && `${recs.monthKing3.name} · ${fmt(recs.monthKing3.amount)}`} />
         )}
         {recs.yearKing && (
           <Card icon="🏆" title={`מוביל ${recs.yearLabel}`} holder={recs.yearKing.name}
             value={fmt(recs.yearKing.amount)} tone={C.win}
-            runner={recs.yearKing2 && `${recs.yearKing2.name} · ${fmt(recs.yearKing2.amount)}`} />
+            runner={recs.yearKing2 && `${recs.yearKing2.name} · ${fmt(recs.yearKing2.amount)}`}
+            third={recs.yearKing3 && `${recs.yearKing3.name} · ${fmt(recs.yearKing3.amount)}`} />
         )}
         {recs.allKing && (
           <Card icon="🐐" title="מלך כל הזמנים" holder={recs.allKing.name}
             value={fmt(recs.allKing.amount)} tone={C.win}
-            runner={recs.allKing2 && `${recs.allKing2.name} · ${fmt(recs.allKing2.amount)}`} />
+            runner={recs.allKing2 && `${recs.allKing2.name} · ${fmt(recs.allKing2.amount)}`}
+            third={recs.allKing3 && `${recs.allKing3.name} · ${fmt(recs.allKing3.amount)}`} />
         )}
         {recs.crownKing && (
           <Card icon="🥇" title="מלך המלכים — הכי הרבה חודשים במקום הראשון" holder={recs.crownKing.name}
             value={`${recs.crownKing.count} כתרים`}
-            runner={recs.crownKing2 && `${recs.crownKing2.name} · ${recs.crownKing2.count} כתרים`} />
+            runner={recs.crownKing2 && `${recs.crownKing2.name} · ${recs.crownKing2.count} כתרים`}
+            third={recs.crownKing3 && `${recs.crownKing3.name} · ${recs.crownKing3.count} כתרים`} />
         )}
         {recs.bestNight && (
           <Card icon="🔥" title="ערב השיא בהיסטוריה" holder={recs.bestNight.name}
             value={fmt(recs.bestNight.amount)} tone={C.win} sub={dt(recs.bestNight)}
-            runner={recs.bestNight2 && `${recs.bestNight2.name} · ${fmt(recs.bestNight2.amount)} · ${dt(recs.bestNight2)}`} />
+            runner={recs.bestNight2 && `${recs.bestNight2.name} · ${fmt(recs.bestNight2.amount)} · ${dt(recs.bestNight2)}`}
+            third={recs.bestNight3 && `${recs.bestNight3.name} · ${fmt(recs.bestNight3.amount)} · ${dt(recs.bestNight3)}`} />
         )}
         {recs.worstNight && recs.worstNight.amount < 0 && (
           <Card icon="🥶" title="הערב הקשה בהיסטוריה" holder={recs.worstNight.name}
             value={fmt(recs.worstNight.amount)} tone={C.loss} sub={dt(recs.worstNight)}
             runner={recs.worstNight2 && recs.worstNight2.amount < 0 &&
-              `${recs.worstNight2.name} · ${fmt(recs.worstNight2.amount)} · ${dt(recs.worstNight2)}`} />
+              `${recs.worstNight2.name} · ${fmt(recs.worstNight2.amount)} · ${dt(recs.worstNight2)}`}
+            third={recs.worstNight3 && recs.worstNight3.amount < 0 &&
+              `${recs.worstNight3.name} · ${fmt(recs.worstNight3.amount)} · ${dt(recs.worstNight3)}`} />
         )}
         {recs.bestMonth && (
           <Card icon="📅" title="החודש הטוב אי פעם" holder={recs.bestMonth.name}
@@ -314,7 +327,8 @@ export function RecordsTab({ db }) {
         {recs.bestStreak && (
           <Card icon="🎖️" title="רצף הניצחונות הארוך אי פעם" holder={recs.bestStreak.name}
             value={`${recs.bestStreak.maxStreak} ערבים`}
-            runner={recs.bestStreak2 && `${recs.bestStreak2.name} · ${recs.bestStreak2.maxStreak} ערבים`} />
+            runner={recs.bestStreak2 && `${recs.bestStreak2.name} · ${recs.bestStreak2.maxStreak} ערבים`}
+            third={recs.bestStreak3 && `${recs.bestStreak3.name} · ${recs.bestStreak3.maxStreak} ערבים`} />
         )}
         {recs.lossStreak && (
           <Card icon="🌧️" title="הרצף הקשה אי פעם" holder={recs.lossStreak.name}
@@ -329,20 +343,24 @@ export function RecordsTab({ db }) {
           <Card icon="🎲" title="אחוז הניצחונות הגבוה ביותר" holder={recs.winRate.name}
             value={`${recs.winRate.rate}%`} tone={C.win}
             sub={`מתוך ${recs.winRate.nights} ערבים (מינימום 5)`}
-            runner={recs.winRate2 && `${recs.winRate2.name} · ${recs.winRate2.rate}%`} />
+            runner={recs.winRate2 && `${recs.winRate2.name} · ${recs.winRate2.rate}%`}
+            third={recs.winRate3 && `${recs.winRate3.name} · ${recs.winRate3.rate}%`} />
         )}
         {recs.bestAvg && (
           <Card icon="📈" title="הממוצע הטוב ביותר לערב" holder={recs.bestAvg.name}
             value={fmt(recs.bestAvg.avg)} tone={C.win}
             sub={`על פני ${recs.bestAvg.nights} ערבים (מינימום 5)`}
-            runner={recs.bestAvg2 && `${recs.bestAvg2.name} · ${fmt(recs.bestAvg2.avg)}`} />
+            runner={recs.bestAvg2 && `${recs.bestAvg2.name} · ${fmt(recs.bestAvg2.avg)}`}
+            third={recs.bestAvg3 && `${recs.bestAvg3.name} · ${fmt(recs.bestAvg3.avg)}`} />
         )}
         {recs.mostWins && recs.mostWins.wins > 0 && (
           <Card icon="✅" title="הכי הרבה ערבים חיוביים" holder={recs.mostWins.name}
             value={`${recs.mostWins.wins} ערבים`} tone={C.win}
             sub={`מתוך ${recs.mostWins.nights}`}
             runner={recs.mostWins2 && recs.mostWins2.wins > 0 &&
-              `${recs.mostWins2.name} · ${recs.mostWins2.wins} ערבים`} />
+              `${recs.mostWins2.name} · ${recs.mostWins2.wins} ערבים`}
+            third={recs.mostWins3 && recs.mostWins3.wins > 0 &&
+              `${recs.mostWins3.name} · ${recs.mostWins3.wins} ערבים`} />
         )}
         {recs.roller && recs.roller.sd > 0 && (
           <Card icon="🌪️" title="רכבת ההרים — הכי תנודתי" holder={recs.roller.name}
@@ -356,12 +374,14 @@ export function RecordsTab({ db }) {
         {recs.attendTop && (
           <Card icon="🪑" title="לא מפספס — הכי הרבה ערבים ברצף" holder={recs.attendTop.name}
             value={`${recs.attendTop.attendMax} ערבים`}
-            runner={recs.attendTop2 && `${recs.attendTop2.name} · ${recs.attendTop2.attendMax} ערבים`} />
+            runner={recs.attendTop2 && `${recs.attendTop2.name} · ${recs.attendTop2.attendMax} ערבים`}
+            third={recs.attendTop3 && `${recs.attendTop3.name} · ${recs.attendTop3.attendMax} ערבים`} />
         )}
         {recs.most && (
           <Card icon="🎯" title="המתמיד — הכי הרבה ערבים" holder={recs.most.name}
             value={`${recs.most.nights}`}
-            runner={recs.most2 && `${recs.most2.name} · ${recs.most2.nights}`} />
+            runner={recs.most2 && `${recs.most2.name} · ${recs.most2.nights}`}
+            third={recs.most3 && `${recs.most3.name} · ${recs.most3.nights}`} />
         )}
 
         {/* מקטעים חדשים — תמיד מוצגים, גם בלי נתונים, כדי שיראו שהפיצ'ר קיים.
@@ -387,7 +407,9 @@ export function RecordsTab({ db }) {
                 tone={C.win}
                 sub={dt(recs.chips.bestCashout)}
                 runner={recs.chips.bestCashout2 &&
-                  `${recs.chips.bestCashout2.name} · ${recs.chips.bestCashout2.chips} ג' · ${dt(recs.chips.bestCashout2)}`} />
+                  `${recs.chips.bestCashout2.name} · ${recs.chips.bestCashout2.chips} ג' · ${dt(recs.chips.bestCashout2)}`}
+                third={recs.chips.bestCashout3 &&
+                  `${recs.chips.bestCashout3.name} · ${recs.chips.bestCashout3.chips} ג' · ${dt(recs.chips.bestCashout3)}`} />
             )}
             {recs.chips.podium?.length > 0 && (
               <div style={{
@@ -414,7 +436,9 @@ export function RecordsTab({ db }) {
                 value={`${recs.chips.allKing.chips} ג'`}
                 tone={C.win}
                 runner={recs.chips.allKing2 &&
-                  `${recs.chips.allKing2.name} · ${recs.chips.allKing2.chips} ג'`} />
+                  `${recs.chips.allKing2.name} · ${recs.chips.allKing2.chips} ג'`}
+                third={recs.chips.allKing3 &&
+                  `${recs.chips.allKing3.name} · ${recs.chips.allKing3.chips} ג'`} />
             )}
           </>
         )}
@@ -427,7 +451,8 @@ export function RecordsTab({ db }) {
             background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
             padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
           }}>
-            עדיין אין טיפים. בקבוצה: <b style={{ color: C.cream }}>אופיר טיפ 10</b> או <b style={{ color: C.cream }}>אופיר נתן טיפ 10</b>
+            עדיין אין טיפים. בקבוצה: <b style={{ color: C.cream }}>אופיר טיפ 10</b>
+            {" "}או <b style={{ color: C.cream }}>אופיר 10 טיפ</b>
             {" "}(ג&apos;יטונים מהערימה שלו). אחרי שמירת הערב השיאים יופיעו כאן.
           </div>
         ) : (
@@ -452,13 +477,17 @@ export function RecordsTab({ db }) {
                 holder={recs.tips.monthKing.name}
                 value={`${recs.tips.monthKing.chips} ג'`} tone={C.win}
                 runner={recs.tips.monthKing2 &&
-                  `${recs.tips.monthKing2.name} · ${recs.tips.monthKing2.chips} ג'`} />
+                  `${recs.tips.monthKing2.name} · ${recs.tips.monthKing2.chips} ג'`}
+                third={recs.tips.monthKing3 &&
+                  `${recs.tips.monthKing3.name} · ${recs.tips.monthKing3.chips} ג'`} />
             )}
             {recs.tips.allKing && (
               <Card icon="🐐" title="מלך הטיפים · כל הזמנים" holder={recs.tips.allKing.name}
                 value={`${recs.tips.allKing.chips} ג'`} tone={C.win}
                 runner={recs.tips.allKing2 &&
-                  `${recs.tips.allKing2.name} · ${recs.tips.allKing2.chips} ג'`} />
+                  `${recs.tips.allKing2.name} · ${recs.tips.allKing2.chips} ג'`}
+                third={recs.tips.allKing3 &&
+                  `${recs.tips.allKing3.name} · ${recs.tips.allKing3.chips} ג'`} />
             )}
           </>
         )}
@@ -471,8 +500,8 @@ export function RecordsTab({ db }) {
             background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
             padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
           }}>
-            עדיין אין מילויים. בלייב, כששני בני הזוג בשולחן: לחיצה ארוכה על השם / כפתור ↔ / «מילוי 30».
-            נשמר רק אצלך באפליקציה, לא נשלח לקבוצה.
+            עדיין אין מילויים. בלייב, כששני בני הזוג בשולחן: לחיצה על השם / ↔ לבחירת כיוון
+            (למשל עדן → אורן · 30). כל פעולה = 30 ג&apos;יטונים. נשמר רק אצלך, לא נשלח לקבוצה.
           </div>
         ) : (
           <>
@@ -480,15 +509,21 @@ export function RecordsTab({ db }) {
               <Card icon="🤝" title={`מילוי זוגי של החודש · ${recs.coupleFills.monthLabel}`}
                 holder={recs.coupleFills.monthTop.label}
                 value={`${recs.coupleFills.monthTop.chips} ג'`}
-                sub={`${recs.coupleFills.monthTop.count} פעמים`}
+                sub={`${recs.coupleFills.monthTop.count} מילויים · ${recs.coupleFills.monthTop.couple || ""}`}
                 runner={recs.coupleFills.monthTop2 &&
-                  `${recs.coupleFills.monthTop2.label} · ${recs.coupleFills.monthTop2.chips} ג'`} />
+                  `${recs.coupleFills.monthTop2.label} · ${recs.coupleFills.monthTop2.chips} ג' (${recs.coupleFills.monthTop2.count}×)`}
+                third={recs.coupleFills.monthTop3 &&
+                  `${recs.coupleFills.monthTop3.label} · ${recs.coupleFills.monthTop3.chips} ג' (${recs.coupleFills.monthTop3.count}×)`} />
             )}
             {recs.coupleFills.allTop && (
               <Card icon="🔗" title="מילוי זוגי · כל הזמנים"
                 holder={recs.coupleFills.allTop.label}
                 value={`${recs.coupleFills.allTop.chips} ג'`}
-                sub={`${recs.coupleFills.allTop.count} פעמים`} />
+                sub={`${recs.coupleFills.allTop.count} פעמים · ${recs.coupleFills.allTop.couple || ""}`}
+                runner={recs.coupleFills.allTop2 &&
+                  `${recs.coupleFills.allTop2.label} · ${recs.coupleFills.allTop2.chips} ג'`}
+                third={recs.coupleFills.allTop3 &&
+                  `${recs.coupleFills.allTop3.label} · ${recs.coupleFills.allTop3.chips} ג'`} />
             )}
           </>
         )}
