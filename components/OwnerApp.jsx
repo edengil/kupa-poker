@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
-import { configureStore, makeSupabaseStore, flushStore, clearLocalCache } from "../lib/store";
+import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, LIVE_KEY } from "../lib/store";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
@@ -39,6 +39,7 @@ export default function OwnerApp() {
   const groupRef = useRef(null); // גישה יציבה לקבוצה מתוך callbacks
   const lastLiveRef = useRef(undefined); // הלייב האחרון שידוע לדף — להשוואה מול פינגים
   const tabRef = useRef("table"); // הטאב הפתוח — נשמר בין רענונים
+  const checkingLiveRef = useRef(false); // מונע checkLive חופפים שמרעננים פעמיים
 
   /* ------------------------------ סשן ------------------------------ */
   useEffect(() => {
@@ -61,11 +62,16 @@ export default function OwnerApp() {
 
   /* האם הלייב במסד שונה ממה שמוצג? אם כן — רענון (remount של PokerApp).
      נקרא מפינג של הבוט, מסקר קבוע, ומחזרה לדף. lastLiveRef מתעדכן גם בכל
-     כתיבה מקומית, כדי שהשינויים של עצמנו לא ייחשבו "חיצוniים" ויקפיצו רענון. */
+     כתיבה מקומית, כדי שהשינויים של עצמנו לא ייחשבו "חיצוניים" ויקפיצו רענון.
+
+     חשוב: לפני ההשוואה שומרים כל שינוי מקומי שעדיין בתור (debounce).
+     בלי זה, באמצע סגירת משחק הרענון היה טוען מהשרת גרסה ישנה ודורס את המסך. */
   const checkLive = useCallback(async () => {
     const row = groupRef.current;
-    if (!row) return;
+    if (!row || checkingLiveRef.current) return;
+    checkingLiveRef.current = true;
     try {
+      await flushStore();
       const { data, error } = await supabase
         .from("groups")
         .select("live")
@@ -79,9 +85,14 @@ export default function OwnerApp() {
       }
       if (lastLiveRef.current !== s) {
         lastLiveRef.current = s;
+        // נקה מטמון לייב כדי שה-remount יטען את מה שהבוט כתב, לא את העותק הישן בזיכרון
+        forgetStoreKey(LIVE_KEY);
         setGeneration((g) => g + 1);
       }
-    } catch {}
+    } catch {
+    } finally {
+      checkingLiveRef.current = false;
+    }
   }, [supabase]);
 
   /* -------------------- איתור או יצירה של הקבוצה --------------------
@@ -100,8 +111,12 @@ export default function OwnerApp() {
             }
             broadcaster.ping();
           },
-          // המטמון המקומי התגלה כלא עדכני — מרעננים עם הנתונים הטריים
-          onStale: () => setGeneration((g) => g + 1),
+          // מטמון DB/config לא עדכני — קודם שומרים לייב מקומי, ואז מרעננים
+          // בלי forget על הלייב, כדי לא לאבד סגירה באמצע
+          onStale: async () => {
+            await flushStore();
+            setGeneration((g) => g + 1);
+          },
         })
       );
       groupRef.current = row;
