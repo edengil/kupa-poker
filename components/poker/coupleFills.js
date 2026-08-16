@@ -1,15 +1,25 @@
 /* מילוי זוגי (couple stack-help) — כשבן/בת זוג מעבירים ג'יטונים מהערימה
    שלהם לשותף במקום כניסה חדשה. לא לחשוף בקבוצה; רק באפליקציית המנהל.
    השם בתצוגה: "מילוי זוגי" — לא תרומה/תורם.
-   כל פעולה = DEFAULT_FILL_CHIPS (30) ג'יטונים, לא +1. */
+   כל פעולה = DEFAULT_FILL_CHIPS (30) ג'יטונים, לא +1.
 
-import { COUPLES } from "../../lib/settlement.js";
+   רשימה נפרדת מ-settlement COUPLES: מילוי זוגי ≠ כיסוי כספי בסיום ערב. */
+
 import { r2 } from "./helpers.js";
 import { MONTHS } from "./format.js";
 
 const FILL_CHIPS = 30;
 
-/** כינויים קצרים כמו ב-settlement */
+/** זוגות למילוי 30 ג'יטונים בדיסקרטיות (לא settlement cover) */
+export const FILL_COUPLES = [
+  ["עדן גיל", "אורן גיל"],
+  ["דור לירז", "עדן לירז"],
+  ["שגיא גיל", "דוד בני גיל"],
+  ["אופיר סנה", "נתנאל כהן"],
+  ["איציק תפילין", "ירדן תפילין"],
+];
+
+/** כינויים קצרים → שם מלא לזיהוי זוג */
 const COUPLE_ALIASES = {
   עדן: "עדן גיל",
   אורן: "אורן גיל",
@@ -18,6 +28,14 @@ const COUPLE_ALIASES = {
   "עדן של דור": "עדן לירז",
   "עדן גורשומוב": "עדן לירז",
   "עדן גושמרוב": "עדן לירז",
+  שגיא: "שגיא גיל",
+  "דוד בני": "דוד בני גיל",
+  "בני גיל": "דוד בני גיל",
+  בני: "דוד בני גיל",
+  אופיר: "אופיר סנה",
+  נתנאל: "נתנאל כהן",
+  איציק: "איציק תפילין",
+  ירדן: "ירדן תפילין",
 };
 
 export function canonCoupleName(name) {
@@ -28,7 +46,7 @@ export function canonCoupleName(name) {
 /** מחזיר את בן/בת הזוג אם השם בזוג ידוע, אחרת null */
 export function partnerOf(name) {
   const n = canonCoupleName(name);
-  for (const [a, b] of COUPLES) {
+  for (const [a, b] of FILL_COUPLES) {
     if (n === a) return b;
     if (n === b) return a;
   }
@@ -53,6 +71,7 @@ export function fillDirectionLabel(from, to) {
 /** שם קצר לתצוגה עדינה (שם פרטי אם יש משפחה) */
 export function shortCoupleName(name) {
   const n = canonCoupleName(name);
+  if (n === "דוד בני גיל") return "דוד בני";
   const sp = n.indexOf(" ");
   return sp > 0 ? n.slice(0, sp) : n;
 }

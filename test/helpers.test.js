@@ -53,6 +53,9 @@ describe("helpers — aliases", () => {
   it("DEFAULT_ALIASES covers core nicknames", () => {
     expect(DEFAULT_ALIASES["דן"]).toBe("דן ינקלויץ");
     expect(DEFAULT_ALIASES["עדן"]).toBe("עדן גיל");
+    expect(DEFAULT_ALIASES["דוד בני"]).toBe("דוד בני גיל");
+    expect(DEFAULT_ALIASES["בני"]).toBe("דוד בני גיל");
+    expect(DEFAULT_ALIASES["בני גיל"]).toBe("דוד בני גיל");
     expect(Object.keys(DEFAULT_ALIASES).length).toBeGreaterThanOrEqual(30);
   });
 

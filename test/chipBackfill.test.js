@@ -16,6 +16,9 @@ describe("chip backfill from WhatsApp August 2026", () => {
     const map = CHIP_BACKFILL["2026-08-06"];
     expect(lookupChips(map, "קובי סעדה", DEFAULT_ALIASES)).toBe(400);
     expect(lookupChips(map, "אורן", DEFAULT_ALIASES)).toBe(1450);
+    expect(lookupChips(map, "דוד בני", DEFAULT_ALIASES)).toBe(710);
+    expect(lookupChips(map, "בני גיל", DEFAULT_ALIASES)).toBe(710);
+    expect(lookupChips(map, "דוד בני גיל", DEFAULT_ALIASES)).toBe(710);
   });
 
   it("fills missing chips on matching session iso", () => {

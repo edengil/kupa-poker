@@ -38,7 +38,9 @@ export function LiveTab({
   onPlanShared,
 }) {
   const A = AL(db);
-  const known = useMemo(() => {
+  /* נוכחות ~100 יום אחרונים + סה"כ — משותף להצעות ולהצגת שחקנים בשולחן */
+  const activity = useMemo(() => {
+    const aliases = AL(db);
     const dates = db.sessions.map((s) => s.iso).sort();
     const latest = dates.length ? dates[dates.length - 1] : null;
     // חלון "החודשים האחרונים": ~100 ימים אחורה מהערב האחרון
@@ -50,15 +52,20 @@ export function LiveTab({
     for (const s of db.sessions) {
       const seen = new Set();
       for (const e of s.entries) {
-        const n = canon(e.name, A);
+        const n = canon(e.name, aliases);
         if (seen.has(n)) continue;
         seen.add(n);
         allc[n] = (allc[n] || 0) + 1;
         if (s.iso >= cutoff) recent[n] = (recent[n] || 0) + 1;
       }
     }
+    return { recent, allc };
+  }, [db]);
+  const known = useMemo(() => {
+    const aliases = AL(db);
+    const { recent, allc } = activity;
     const names = new Set(Object.keys(allc));
-    (db.roster || []).forEach((n) => names.add(canon(n, A)));
+    (db.roster || []).forEach((n) => names.add(canon(n, aliases)));
     // הכי פעילים לאחרונה קודם, אחר כך לפי סה"כ, ואז א"ב
     return [...names].sort(
       (a, b) =>
@@ -66,11 +73,27 @@ export function LiveTab({
         (allc[b] || 0) - (allc[a] || 0) ||
         a.localeCompare(b, "he")
     );
-  }, [db]);
+  }, [db, activity]);
   const [cfg, setCfg] = useState(getConfig());
   useEffect(() => onConfig(setCfg), []);
   const cps = cfg.chipsPerShekel || 2;
   const [players, setPlayers] = useState([]); // {name, buyin(₪), cashout(chips string), tipsGiven?}
+  /** שורות לייב ממוינות לפי פעילות בחודשים האחרונים (אינדקס מקורי ל-bump/rm) */
+  const playersView = useMemo(() => {
+    const aliases = AL(db);
+    const { recent, allc } = activity;
+    return players
+      .map((p, index) => ({ p, index }))
+      .sort((a, b) => {
+        const na = canon(a.p.name, aliases);
+        const nb = canon(b.p.name, aliases);
+        return (
+          (recent[nb] || 0) - (recent[na] || 0) ||
+          (allc[nb] || 0) - (allc[na] || 0) ||
+          a.index - b.index
+        );
+      });
+  }, [players, activity, db]);
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
@@ -503,7 +526,7 @@ export function LiveTab({
           />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {players.map((p, i) => {
+            {playersView.map(({ p, index: i }) => {
               const net =
                 p.cashout === "" ? null : r2((+p.cashout || 0) / cps - (+p.buyin || 0));
               const partnerName = partnerOf(p.name);
@@ -516,7 +539,7 @@ export function LiveTab({
               const meShort = shortCoupleName(p.name);
               return (
                 <div
-                  key={i}
+                  key={p.name + ":" + i}
                   style={{
                     background: C.card,
                     border: `1px solid ${C.line}`,

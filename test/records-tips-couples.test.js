@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { parseCommands, applyCommands, BOT_MARK } from "../lib/whatsapp.js";
 import { nextTipCompliment, TIP_COMPLIMENTS } from "../lib/tipCompliments.js";
 import { computeChipRecords, bestChipCashout } from "../components/poker/chipRecords.js";
-import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS } from "../components/poker/coupleFills.js";
+import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS, FILL_COUPLES } from "../components/poker/coupleFills.js";
 import { computeTipRecords } from "../components/poker/tipRecords.js";
 
 describe("tip commands", () => {
@@ -164,9 +164,26 @@ describe("chip records", () => {
 });
 
 describe("couple fills", () => {
-  it("resolves Gil and Liraz partners", () => {
+  it("resolves Gil, Liraz, and new fill partners", () => {
     expect(partnerOf("עדן גיל")).toBe("אורן גיל");
     expect(partnerOf("דור")).toBe("עדן לירז");
+    expect(partnerOf("שגיא")).toBe("דוד בני גיל");
+    expect(partnerOf("דוד בני")).toBe("שגיא גיל");
+    expect(partnerOf("בני גיל")).toBe("שגיא גיל");
+    expect(partnerOf("אופיר")).toBe("נתנאל כהן");
+    expect(partnerOf("נתנאל כהן")).toBe("אופיר סנה");
+    expect(partnerOf("איציק")).toBe("ירדן תפילין");
+    expect(partnerOf("ירדן")).toBe("איציק תפילין");
+  });
+
+  it("lists all discreet fill couples", () => {
+    expect(FILL_COUPLES).toEqual([
+      ["עדן גיל", "אורן גיל"],
+      ["דור לירז", "עדן לירז"],
+      ["שגיא גיל", "דוד בני גיל"],
+      ["אופיר סנה", "נתנאל כהן"],
+      ["איציק תפילין", "ירדן תפילין"],
+    ]);
   });
 
   it("moves chips between seated partners", () => {
