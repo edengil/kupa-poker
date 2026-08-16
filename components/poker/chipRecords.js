@@ -1,9 +1,10 @@
 /* שיאי ג'יטונים — נפרדים משיאי הכסף (₪).
    מעדיפים שדות chips אמיתיים שנשמרו מהלייב. אם אין chips על ערך
-   ישן בכלל — מדלגים (לא ממציאים מ־₪×cps), כך ש"מלך כל הזמנים"
-   בג'יטונים מתחיל בפועל מהחודשים שיש בהם נתוני יציאה אמיתיים. */
+   ישן בכלל — מדלגים (לא ממציאים מ־₪×cps), כך ששיאי היציאה
+   מתחילים בפועל מהחודשים שיש בהם נתוני יציאה אמיתיים.
+   כל שיא כאן = יציאה בודדת (peak cashout), לא סכום על פני ערבים. */
 
-import { AL, canon, r2 } from "./helpers.js";
+import { AL, canon } from "./helpers.js";
 import { MONTHS } from "./format.js";
 
 /** האם לערב יש לפחות רשומת יציאה בג'יטונים */
@@ -18,59 +19,37 @@ export function entryChips(e) {
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * אגרגציה של ג'יטונים לפי שם מתוך ערבים שיש בהם נתוני chips.
- * @returns {{ name, chips }[]} ממוין יורד
- */
-export function aggregateChips(sessions, aliases) {
-  const acc = {};
+/** כל יציאות הג'יטונים מערבים עם נתונים, ממוין יורד */
+export function chipCashoutNights(sessions, aliases) {
+  const nights = [];
   for (const s of sessions) {
     if (!sessionHasChips(s)) continue;
     for (const e of s.entries) {
       const c = entryChips(e);
       if (c == null) continue;
-      const nm = canon(e.name, aliases);
-      acc[nm] = (acc[nm] || 0) + c;
+      nights.push({
+        name: canon(e.name, aliases),
+        chips: c,
+        d: s.d,
+        mo: s.mo,
+        y: s.y,
+        iso: s.iso,
+      });
     }
   }
-  return Object.entries(acc)
-    .map(([name, chips]) => ({ name, chips: r2(chips) }))
-    .sort((a, b) => b.chips - a.chips);
+  nights.sort((a, b) => b.chips - a.chips);
+  return nights;
 }
 
 /** שיא יציאה בודדת (הכי הרבה ג'יטונים בערב אחד) */
 export function bestChipCashout(sessions, aliases) {
-  let best = null;
-  for (const s of sessions) {
-    if (!sessionHasChips(s)) continue;
-    for (const e of s.entries) {
-      const c = entryChips(e);
-      if (c == null) continue;
-      const nm = canon(e.name, aliases);
-      if (!best || c > best.chips) {
-        best = { name: nm, chips: c, d: s.d, mo: s.mo, y: s.y, iso: s.iso };
-      }
-    }
-  }
-  return best;
-}
-
-/** פודיום 1–3 לפי סך ג'יטונים ביציאה בחודש נתון */
-export function monthChipPodium(db, y, mo) {
-  return aggregateChips(
-    db.sessions.filter((s) => s.y === y && s.mo === mo),
-    AL(db)
-  ).slice(0, 3);
-}
-
-/** מלך/מלכה כל הזמנים — רק ערבים עם נתוני chips אמיתיים */
-export function allTimeChipTotals(db) {
-  return aggregateChips(db.sessions, AL(db));
+  return chipCashoutNights(sessions, aliases)[0] || null;
 }
 
 /**
  * חישוב שיאי ג'יטונים לטאב השיאים.
- * monthLabel מצביע על החודש של הערב האחרון (כמו שיאי הכסף).
+ * monthLabel מצביע על החודש של הערב האחרון עם chips (כמו שיאי הכסף).
+ * שיאים = peak cashout בודד לחודש / שנה / כל הזמנים — לא סכומים.
  */
 export function computeChipRecords(db) {
   const sessions = [...(db.sessions || [])].sort((a, b) => a.iso.localeCompare(b.iso));
@@ -79,32 +58,22 @@ export function computeChipRecords(db) {
 
   const last = withChips[withChips.length - 1];
   const A = AL(db);
-  const podium = monthChipPodium(db, last.y, last.mo);
-  const all = allTimeChipTotals(db);
-  const high = bestChipCashout(sessions, A);
-  // סגן לשיא יציאה בודדת
-  let high2 = null;
-  const nights = [];
-  for (const s of withChips) {
-    for (const e of s.entries) {
-      const c = entryChips(e);
-      if (c == null) continue;
-      nights.push({ name: canon(e.name, A), chips: c, d: s.d, mo: s.mo, y: s.y });
-    }
-  }
-  nights.sort((a, b) => b.chips - a.chips);
-  if (nights.length > 1) high2 = nights[1];
-  const high3 = nights.length > 2 ? nights[2] : null;
+  const allNights = chipCashoutNights(withChips, A);
+  const monthNights = allNights.filter((n) => n.y === last.y && n.mo === last.mo);
+  const yearNights = allNights.filter((n) => n.y === last.y);
 
   return {
     monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
-    podium,
-    allKing: all[0] || null,
-    allKing2: all[1] || null,
-    allKing3: all[2] || null,
-    bestCashout: high,
-    bestCashout2: high2,
-    bestCashout3: high3,
+    yearLabel: String(last.y),
+    bestMonth: monthNights[0] || null,
+    bestMonth2: monthNights[1] || null,
+    bestMonth3: monthNights[2] || null,
+    bestYear: yearNights[0] || null,
+    bestYear2: yearNights[1] || null,
+    bestYear3: yearNights[2] || null,
+    bestCashout: allNights[0] || null,
+    bestCashout2: allNights[1] || null,
+    bestCashout3: allNights[2] || null,
     nightsWithChips: withChips.length,
   };
 }

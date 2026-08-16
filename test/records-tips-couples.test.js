@@ -119,6 +119,15 @@ describe("chip records", () => {
           { name: "ב", amount: 80, chips: 500 },
         ],
       },
+      {
+        iso: "2026-03-05",
+        d: 5,
+        mo: 3,
+        y: 2026,
+        entries: [
+          { name: "ג", amount: 120, chips: 450 },
+        ],
+      },
       // ערב ישן בלי chips — לא נספר בשיאי ג'יטונים
       {
         iso: "2025-01-01",
@@ -136,13 +145,21 @@ describe("chip records", () => {
     expect(high).toMatchObject({ name: "ב", chips: 500 });
   });
 
-  it("builds monthly podium and all-time from chip sessions only", () => {
+  it("builds month/year/all-time peak cashouts from chip sessions only", () => {
     const recs = computeChipRecords(db);
-    expect(recs.bestCashout.chips).toBe(500);
-    expect(recs.podium[0].name).toBe("א"); // סך חודשי 700 > ב 500
-    expect(recs.podium[1].name).toBe("ב");
-    expect(recs.allKing.name).toBe("א"); // 400+300=700 > ב 0+500=500
-    expect(recs.nightsWithChips).toBe(2);
+    expect(recs.monthLabel).toBe("אוגוסט 2026");
+    expect(recs.yearLabel).toBe("2026");
+    // אוגוסט: ב 500 > א 400 > א 300
+    expect(recs.bestMonth).toMatchObject({ name: "ב", chips: 500 });
+    expect(recs.bestMonth2).toMatchObject({ name: "א", chips: 400 });
+    expect(recs.bestMonth3).toMatchObject({ name: "א", chips: 300 });
+    // שנה: ב 500 > ג 450 > א 400
+    expect(recs.bestYear).toMatchObject({ name: "ב", chips: 500 });
+    expect(recs.bestYear2).toMatchObject({ name: "ג", chips: 450 });
+    expect(recs.bestCashout).toMatchObject({ name: "ב", chips: 500 });
+    expect(recs.podium).toBeUndefined();
+    expect(recs.allKing).toBeUndefined();
+    expect(recs.nightsWithChips).toBe(3);
   });
 });
 

@@ -396,12 +396,34 @@ export function RecordsTab({ db }) {
             padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
           }}>
             עדיין אין ערבים עם יציאת ג&apos;יטונים שמורה.
-            מהערב הבא שתשמור מהלייב (או מהבוט עם סגירה) — יופיעו כאן שיא היציאה, פודיום חודשי ומלך/מלכה.
+            מהערב הבא שתשמור מהלייב (או מהבוט עם סגירה) — יופיעו כאן שיאי יציאה לחודש, לשנה ולכל הזמנים.
           </div>
         ) : (
           <>
+            {recs.chips.bestMonth && (
+              <Card icon="🪙" title={`שיא הכי הרבה ג'יטונים בסיום · ${recs.chips.monthLabel}`}
+                holder={recs.chips.bestMonth.name}
+                value={`${recs.chips.bestMonth.chips} ג'`}
+                tone={C.win}
+                sub={dt(recs.chips.bestMonth)}
+                runner={recs.chips.bestMonth2 &&
+                  `${recs.chips.bestMonth2.name} · ${recs.chips.bestMonth2.chips} ג' · ${dt(recs.chips.bestMonth2)}`}
+                third={recs.chips.bestMonth3 &&
+                  `${recs.chips.bestMonth3.name} · ${recs.chips.bestMonth3.chips} ג' · ${dt(recs.chips.bestMonth3)}`} />
+            )}
+            {recs.chips.bestYear && (
+              <Card icon="🪙" title={`שיא הכי הרבה ג'יטונים בסיום · ${recs.chips.yearLabel}`}
+                holder={recs.chips.bestYear.name}
+                value={`${recs.chips.bestYear.chips} ג'`}
+                tone={C.win}
+                sub={dt(recs.chips.bestYear)}
+                runner={recs.chips.bestYear2 &&
+                  `${recs.chips.bestYear2.name} · ${recs.chips.bestYear2.chips} ג' · ${dt(recs.chips.bestYear2)}`}
+                third={recs.chips.bestYear3 &&
+                  `${recs.chips.bestYear3.name} · ${recs.chips.bestYear3.chips} ג' · ${dt(recs.chips.bestYear3)}`} />
+            )}
             {recs.chips.bestCashout && (
-              <Card icon="🪙" title="שיא הכי הרבה ג'יטונים ביציאה"
+              <Card icon="🪙" title="שיא הכי הרבה ג'יטונים בסיום · כל הזמנים"
                 holder={recs.chips.bestCashout.name}
                 value={`${recs.chips.bestCashout.chips} ג'`}
                 tone={C.win}
@@ -410,35 +432,6 @@ export function RecordsTab({ db }) {
                   `${recs.chips.bestCashout2.name} · ${recs.chips.bestCashout2.chips} ג' · ${dt(recs.chips.bestCashout2)}`}
                 third={recs.chips.bestCashout3 &&
                   `${recs.chips.bestCashout3.name} · ${recs.chips.bestCashout3.chips} ג' · ${dt(recs.chips.bestCashout3)}`} />
-            )}
-            {recs.chips.podium?.length > 0 && (
-              <div style={{
-                background: C.card, border: `1px solid ${C.line}`,
-                borderRadius: 14, padding: "12px 14px",
-              }}>
-                <div style={{ fontSize: 12, color: C.dim, marginBottom: 6 }}>
-                  פודיום לפי ג&apos;יטונים ביציאה · {recs.chips.monthLabel}
-                </div>
-                {recs.chips.podium.map((p, i) => (
-                  <div key={p.name} style={{
-                    display: "flex", justifyContent: "space-between",
-                    fontSize: 14, color: C.cream, lineHeight: 1.9,
-                  }}>
-                    <span>{["🥇", "🥈", "🥉"][i] || `${i + 1}.`} {p.name}</span>
-                    <b style={{ color: C.brass, fontVariantNumeric: "tabular-nums" }}>{p.chips} ג&apos;</b>
-                  </div>
-                ))}
-              </div>
-            )}
-            {recs.chips.allKing && (
-              <Card icon="👑" title="מלך/מלכה הג'יטונים · כל הזמנים (מערבים עם נתונים)"
-                holder={recs.chips.allKing.name}
-                value={`${recs.chips.allKing.chips} ג'`}
-                tone={C.win}
-                runner={recs.chips.allKing2 &&
-                  `${recs.chips.allKing2.name} · ${recs.chips.allKing2.chips} ג'`}
-                third={recs.chips.allKing3 &&
-                  `${recs.chips.allKing3.name} · ${recs.chips.allKing3.chips} ג'`} />
             )}
           </>
         )}
