@@ -12,7 +12,8 @@ import { RsvpList, planLabel } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "./poker/festive";
 import { C as festiveC } from "./poker/colors";
-import { inferLastView, isStandalone, shouldOpenAsViewer } from "../lib/viewerIdentity";
+import { fetchHome, inferLastView, isStandalone, writeLastView } from "../lib/viewerIdentity";
+import { resolveLanding } from "../lib/homeRoute";
 
 const C = {
   feltDeep: festiveC.feltDeep,
@@ -209,36 +210,57 @@ export default function OwnerApp() {
       return b;
     };
 
-    /* מסלול מהיר: עולים מהמטמון מיד, עוד לפני בדיקת הסשן.
-       getSession בספארי/PWA נתקע לפעמים עד שנוגעים במסך — אסור לחכות לו.
-       אם יתברר שאין סשן, האפקט של הסשן למעלה יעביר למסך התחברות.
-
-       צופה שהתקין למסך הבית נוחת על `/` (start_url הישן) — אם יש לו לינק
-       צפייה שמור, לא מעלים לו אפליקציית מנהל ריקה. */
+    /* דסקטופ: עולים מהמטמון מיד (getSession בספארי נתקע לפעמים).
+       אייפון standalone: האייקון כמעט תמיד פותח `/` (ספארי מתעלם מ-start_url
+       ושומר WebView נפרד בלי localStorage של ספארי). אסור לעלות מטמון בעלים
+       — זו בדרך כלל קופה ריקה שנוצרה בטעות. */
+    const standalone = isStandalone();
     const lastView = inferLastView();
     let cachedRow = null;
     try {
       cachedRow = JSON.parse(localStorage.getItem(cacheKey) || "null");
     } catch {}
-    /* מטמון של קבוצה אחרת + לינק צפייה — ב-PWA זה כמעט תמיד צופה
-       שנחת על `/` וקיבל קופה ריקה. לא מעלים את המעטפת הלא נכונה. */
-    if (lastView && cachedRow?.slug && cachedRow.slug !== lastView && isStandalone()) {
+    if (lastView && cachedRow?.slug && cachedRow.slug !== lastView) {
+      writeLastView(lastView);
       window.location.replace(`/g/${lastView}`);
       return () => {
         alive = false;
       };
     }
-    if (cachedRow?.id && cachedRow?.slug) {
+    if (!standalone && cachedRow?.id && cachedRow?.slug) {
       boot(cachedRow, mkBroadcaster(cachedRow.slug));
-      checkLive(); // קובע נקודת ייחוס ללייב
+      checkLive();
     }
 
-    (async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
-      if (!user) return;
+    let ran = false;
+    const placeUser = async (user) => {
+      if (!alive || !user || ran) return;
+      ran = true;
 
-      // אימות מול המסד — גם במסלול המהיר, ליישור המטמון
+      const home = await fetchHome();
+      const landing = resolveLanding({
+        ownerSlug: home.ownerSlug,
+        viewerSlug: home.viewerSlug,
+        localSlug: inferLastView(),
+        standalone,
+        ownerEmpty: home.ownerEmpty,
+      });
+
+      if (landing.type === "viewer" && landing.slug) {
+        writeLastView(landing.slug);
+        window.location.replace(`/g/${landing.slug}`);
+        return;
+      }
+      if (landing.type === "standalone-empty") {
+        if (alive) {
+          setMessage(
+            "אין כאן את נתוני הקבוצה. מחק את האייקון ממסך הבית, פתח את לינק הצפייה מהוואטסאפ (הכתובת עם /g/), התחבר, ואז שתף ← הוסף למסך הבית."
+          );
+          setPhase("error");
+        }
+        return;
+      }
+
       const { data: rows, error } = await supabase
         .from("groups")
         .select("id, slug, name")
@@ -255,24 +277,7 @@ export default function OwnerApp() {
       }
 
       let row = rows?.[0];
-      const viewSlug = inferLastView();
-      if (shouldOpenAsViewer(viewSlug, row?.slug)) {
-        window.location.replace(`/g/${viewSlug}`);
-        return;
-      }
-      if (!row) {
-        /* צופה ב-PWA בלי קבוצה משלו: לא יוצרים לו קופה ריקה עם כל הטאבים. */
-        if (viewSlug) {
-          window.location.replace(`/g/${viewSlug}`);
-          return;
-        }
-        if (isStandalone()) {
-          if (alive && !cachedRow) {
-            setMessage("אין קבוצה במסך הבית הזה. פתח את לינק הצפייה מהוואטסאפ והוסף אותו למסך הבית משם.");
-            setPhase("error");
-          }
-          return;
-        }
+      if (!row && landing.type === "create") {
         const { data: created, error: insertError } = await supabase
           .from("groups")
           .insert({ owner_id: user.id, slug: newSlug() })
@@ -287,21 +292,35 @@ export default function OwnerApp() {
         }
         row = created;
       }
+      if (!row) {
+        if (alive && !cachedRow) {
+          setMessage("אין קבוצה בחשבון הזה. פתח את לינק הצפייה מהוואטסאפ.");
+          setPhase("error");
+        }
+        return;
+      }
 
       try {
         localStorage.setItem(cacheKey, JSON.stringify(row));
       } catch {}
 
       if (!alive) return;
-      if (cachedRow?.id === row.id && cachedRow?.slug === row.slug) return; // המטמון היה נכון
+      if (!standalone && cachedRow?.id === row.id && cachedRow?.slug === row.slug) return;
 
-      // אין מטמון (או שהוא לא תואם) — עולים עם הנתונים מהמסד
       broadcasterRef.current?.dispose();
       boot(row, mkBroadcaster(row.slug));
       checkLive();
-    })();
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) placeUser(data.session.user);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session?.user) placeUser(session.user);
+    });
     return () => {
       alive = false;
+      sub.subscription.unsubscribe();
     };
   }, [supabase, phase === "signedOut", checkLive]);
 

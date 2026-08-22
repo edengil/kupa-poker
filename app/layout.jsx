@@ -9,7 +9,9 @@ export const metadata = {
     ],
     apple: "/apple-touch-icon.png?v=2",
   },
-  // "הוסף למסך הבית" באייפון: פותח כאפליקציה, בלי סרגלי הדפדפן
+  // אייפון: apple-mobile-web-app-capable פותח בלי סרגל ספארי.
+  // חשוב: הוסף-למסך-הבית שומר את ה-URL הנוכחי (לא manifest start_url).
+  // לכן צופה חייב להוסיף מ־/g/<slug> — אחרת האייקון פותח `/`.
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
