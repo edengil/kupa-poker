@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { planLabel } from "../Rsvp";
 import { C } from "./colors";
+import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./festive";
 
 /* תכנון ערב + כתובות מארחים — חולץ מ-PokerApp.jsx. */
 const HOSTS = [
@@ -82,19 +83,25 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
         onClick={startEdit}
         style={{
           width: "100%",
-          padding: "11px 12px",
-          borderRadius: 12,
-          border: `1px dashed ${C.line}`,
-          background: "transparent",
-          color: C.dim,
+          padding: "14px 14px",
+          borderRadius: 14,
+          border: `1px dashed ${C.brass}77`,
+          background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+          color: C.cream,
           fontFamily: "inherit",
-          fontSize: 13,
+          fontSize: 13.5,
           fontWeight: 600,
           cursor: "pointer",
           marginBottom: 12,
+          textAlign: "right",
+          lineHeight: 1.45,
         }}
       >
-        📅 תכנן את הערב הבא — החברים יאשרו הגעה מהלינק
+        <div style={{ ...sectionEyebrow, marginBottom: 4 }}>
+          <span style={{ fontSize: 13 }}>♠</span>
+          הערב הבא
+        </div>
+        <span style={{ color: C.dim }}>תכנן תאריך — החברים יאשרו הגעה מהלינק</span>
       </button>
     );
   }
@@ -102,129 +109,134 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   return (
     <div
       style={{
-        background: C.card,
-        border: `1px solid ${C.brass}66`,
-        borderRadius: 12,
-        padding: "11px 12px",
+        ...festiveCard,
+        padding: "13px 13px 12px",
         marginBottom: 12,
       }}
     >
-      {editing ? (
-        <>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: C.brass, marginBottom: 8 }}>
-            📅 תכנון הערב הבא
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input type="date" value={iso} min={todayIso}
-              onChange={(e) => setIso(e.target.value)} style={{ ...field, flex: 1.4 }} />
-            <input type="time" value={time}
-              onChange={(e) => setTime(e.target.value)} style={{ ...field, flex: 1 }} />
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
-            מיקום
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-            {HOSTS.map((h) => (
-              <button
-                key={h.label}
-                onClick={() => setLocation(h.text)}
-                style={{
-                  padding: "5px 11px", borderRadius: 999,
-                  border: `1px solid ${location === h.text ? C.brass : C.line}`,
-                  background: location === h.text ? `${C.brass}22` : "transparent",
-                  color: location === h.text ? C.brass : C.dim,
-                  fontFamily: "inherit", fontSize: 12, cursor: "pointer",
-                }}
-              >
-                📍 {h.label}
+      <div aria-hidden style={festiveGlow} />
+      <div style={{ position: "relative" }}>
+        {editing ? (
+          <>
+            <div style={{ ...sectionEyebrow, marginBottom: 10 }}>
+              <span style={{ fontSize: 13 }}>♠</span>
+              תכנון הערב הבא
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input type="date" value={iso} min={todayIso}
+                onChange={(e) => setIso(e.target.value)} style={{ ...field, flex: 1.4 }} />
+              <input type="time" value={time}
+                onChange={(e) => setTime(e.target.value)} style={{ ...field, flex: 1 }} />
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
+              מיקום
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+              {HOSTS.map((h) => (
+                <button
+                  key={h.label}
+                  onClick={() => setLocation(h.text)}
+                  style={{
+                    padding: "5px 11px", borderRadius: 999,
+                    border: `1px solid ${location === h.text ? C.brass : C.line}`,
+                    background: location === h.text ? `${C.brass}22` : "transparent",
+                    color: location === h.text ? C.brass : C.dim,
+                    fontFamily: "inherit", fontSize: 12, cursor: "pointer",
+                  }}
+                >
+                  📍 {h.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="כתובת / מיקום — לא חובה"
+              style={{ ...field, width: "100%", boxSizing: "border-box", marginBottom: 10 }}
+            />
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
+              הערות
+            </div>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="למשל: להביא חטיפים, חניה בחצר, לבוש חופשי…"
+              rows={2}
+              style={{
+                ...field,
+                width: "100%",
+                boxSizing: "border-box",
+                marginBottom: 10,
+                resize: "vertical",
+                lineHeight: 1.45,
+              }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={save} style={{
+                ...brassCta,
+                flex: 1, padding: "10px 12px", borderRadius: 10,
+                fontSize: 13.5,
+              }}>
+                שמור ושלח הזמנה
               </button>
-            ))}
-          </div>
-          <input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="כתובת / מיקום — לא חובה"
-            style={{ ...field, width: "100%", boxSizing: "border-box", marginBottom: 10 }}
-          />
-          <div style={{ fontSize: 12, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
-            הערות
-          </div>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="למשל: להביא חטיפים, חניה בחצר, לבוש חופשי…"
-            rows={2}
-            style={{
-              ...field,
-              width: "100%",
-              boxSizing: "border-box",
-              marginBottom: 10,
-              resize: "vertical",
-              lineHeight: 1.45,
-            }}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={save} style={{
-              flex: 1, padding: "10px 12px", borderRadius: 10, border: "none",
-              background: C.brass, color: C.feltDeep, fontFamily: "inherit",
-              fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-            }}>
-              שמור
-            </button>
-            <button onClick={() => setEditing(false)} style={{
-              padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.line}`,
-              background: "transparent", color: C.dim, fontFamily: "inherit",
-              fontSize: 13, cursor: "pointer",
-            }}>
-              ביטול
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: (display.location || display.note) ? 2 : 8 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: C.brass }}>♠ הערב הבא</div>
-              <div style={{ fontSize: 13.5, color: C.cream }}>{planLabel(plan)}</div>
+              <button onClick={() => setEditing(false)} style={{
+                padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.line}`,
+                background: "transparent", color: C.dim, fontFamily: "inherit",
+                fontSize: 13, cursor: "pointer",
+              }}>
+                ביטול
+              </button>
             </div>
-            <button onClick={startEdit} style={{
-              padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.line}`,
-              background: "transparent", color: C.cream, fontFamily: "inherit",
-              fontSize: 12, cursor: "pointer",
-            }}>
-              עריכה
-            </button>
-            <button onClick={clear} style={{
-              padding: "6px 12px", borderRadius: 8, border: "none",
-              background: "transparent", color: C.dim, fontFamily: "inherit",
-              fontSize: 12, cursor: "pointer",
-            }}>
-              בטל
-            </button>
-          </div>
-          {display.location && (
-            <div style={{ fontSize: 12.5, color: C.cream, marginBottom: display.note ? 4 : 8, opacity: 0.92 }}>
-              📍 {display.location}
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: (display.location || display.note) ? 2 : 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ ...sectionEyebrow, marginBottom: 3 }}>
+                  <span style={{ fontSize: 13 }}>♠</span>
+                  הערב הבא
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.cream }}>{planLabel(plan)}</div>
+              </div>
+              <button onClick={startEdit} style={{
+                padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.line}`,
+                background: "transparent", color: C.cream, fontFamily: "inherit",
+                fontSize: 12, cursor: "pointer",
+              }}>
+                עריכה
+              </button>
+              <button onClick={clear} style={{
+                padding: "6px 12px", borderRadius: 8, border: "none",
+                background: "transparent", color: C.dim, fontFamily: "inherit",
+                fontSize: 12, cursor: "pointer",
+              }}>
+                בטל
+              </button>
             </div>
-          )}
-          {display.note && (
-            <div style={{
-              fontSize: 12.5,
-              color: C.brass,
-              marginBottom: 8,
-              background: `${C.brass}14`,
-              border: `1px solid ${C.brass}33`,
-              borderRadius: 8,
-              padding: "7px 10px",
-              lineHeight: 1.4,
-            }}>
-              <span style={{ fontWeight: 700 }}>הערות · </span>
-              {display.note}
-            </div>
-          )}
-          {typeof renderRsvps === "function" && renderRsvps(plan.iso)}
-        </>
-      )}
+            {display.location && (
+              <div style={{ fontSize: 12.5, color: C.cream, marginBottom: display.note ? 4 : 8, opacity: 0.92 }}>
+                📍 {display.location}
+              </div>
+            )}
+            {display.note && (
+              <div style={{
+                fontSize: 12.5,
+                color: C.brass,
+                marginBottom: 8,
+                background: `${C.brass}14`,
+                border: `1px solid ${C.brass}33`,
+                borderRadius: 8,
+                padding: "7px 10px",
+                lineHeight: 1.4,
+              }}>
+                <span style={{ fontWeight: 700 }}>הערות · </span>
+                {display.note}
+              </div>
+            )}
+            {typeof renderRsvps === "function" && renderRsvps(plan.iso)}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { C } from "./poker/colors";
+import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./poker/festive";
 
 /* ============================================================================
    אישורי הגעה לערב מתוכנן.
@@ -9,18 +11,6 @@ import React, { useCallback, useEffect, useState } from "react";
    מגיע / אולי / לא מגיע. התשובות יושבות בטבלת game_rsvps, שורה לאדם, עם
    plan_iso — כך שקביעת ערב חדש מתחילה ספירה נקייה בלי למחוק כלום.
    ============================================================================ */
-
-const C = {
-  card: "#15493A",
-  cardHi: "#1B5644",
-  line: "#2C6B54",
-  brass: "#D9A441",
-  cream: "#EFE7D2",
-  dim: "#9DBBAC",
-  win: "#5BC38C",
-  loss: "#E27A63",
-  feltDeep: "#0A2B21",
-};
 
 const STATUS = [
   ["yes", "מאשר הגעה", "♠"],
@@ -102,7 +92,9 @@ function Groups({ rows }) {
         );
       })}
       {!rows.length && (
-        <span style={{ fontSize: 12, color: C.dim }}>עדיין מחכים לאישורים — תהיה הראשון?</span>
+        <span style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
+          ♠ עדיין מחכים לאישורים — תהיה הראשון?
+        </span>
       )}
     </div>
   );
@@ -111,7 +103,21 @@ function Groups({ rows }) {
 /* ------------------------- צד המנהל: רק הרשימה ------------------------- */
 export function RsvpList({ supabase, groupId, planIso }) {
   const [rows] = useRsvps(supabase, groupId, planIso);
-  return <Groups rows={rows} />;
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        paddingTop: 11,
+        borderTop: `1px solid ${C.line}`,
+      }}
+    >
+      <div style={{ ...sectionEyebrow, marginBottom: 8 }}>
+        <span style={{ fontSize: 13 }}>♠</span>
+        מי מגיע
+      </div>
+      <Groups rows={rows} />
+    </div>
+  );
 }
 
 /* --------------------- צד הצופה: הצבעה + הרשימה --------------------- */
@@ -160,14 +166,9 @@ export function RsvpCard({ supabase, groupId, plan }) {
   return (
     <section
       style={{
-        position: "relative",
-        overflow: "hidden",
-        background: `linear-gradient(165deg, ${C.cardHi} 0%, ${C.card} 55%, ${C.feltDeep} 100%)`,
-        border: `1px solid ${C.brass}88`,
-        borderRadius: 16,
+        ...festiveCard,
         padding: "16px 15px 14px",
         margin: "11px 0",
-        boxShadow: `0 0 0 1px ${C.brass}22, 0 10px 28px ${C.feltDeep}66`,
       }}
     >
       <style>{`
@@ -206,25 +207,14 @@ export function RsvpCard({ supabase, groupId, plan }) {
       <div
         aria-hidden
         style={{
-          position: "absolute",
-          inset: 0,
+          ...festiveGlow,
           background: `radial-gradient(ellipse at 85% 0%, ${C.brass}28 0%, transparent 55%)`,
           animation: "rsvpGlow 3.8s ease-in-out infinite",
-          pointerEvents: "none",
         }}
       />
 
       <div style={{ position: "relative" }}>
-        <div style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          fontSize: 11.5,
-          fontWeight: 700,
-          letterSpacing: "0.04em",
-          color: C.brass,
-          marginBottom: 6,
-        }}>
+        <div style={{ ...sectionEyebrow, marginBottom: 6 }}>
           <span style={{ fontSize: 14 }}>♠</span>
           הזמנה לערב
         </div>
@@ -301,19 +291,21 @@ export function RsvpCard({ supabase, groupId, plan }) {
                 onClick={() => vote(st)}
                 disabled={busy}
                 style={{
+                  ...(active
+                    ? {
+                        background: `${C.win}28`,
+                        color: C.win,
+                        border: `1px solid ${C.win}`,
+                        boxShadow: "none",
+                        fontWeight: 800,
+                        fontFamily: "inherit",
+                        cursor: busy ? "wait" : "pointer",
+                      }
+                    : { ...brassCta, border: `1px solid ${C.brass}aa`, cursor: busy ? "wait" : "pointer" }),
                   width: "100%",
                   padding: "14px 14px",
                   borderRadius: 12,
-                  border: `1px solid ${active ? C.win : `${C.brass}aa`}`,
-                  background: active
-                    ? `${C.win}28`
-                    : `linear-gradient(180deg, ${C.brass} 0%, #c4922e 100%)`,
-                  color: active ? C.win : C.feltDeep,
-                  fontFamily: "inherit",
                   fontSize: 16,
-                  fontWeight: 800,
-                  cursor: busy ? "wait" : "pointer",
-                  boxShadow: active ? "none" : `0 5px 16px ${C.brass}40`,
                 }}
               >
                 {icon} {label}

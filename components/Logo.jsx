@@ -117,7 +117,7 @@ export function EGSplash() {
         left: 0,
         right: 0,
         bottom: 0,
-        background: "#0A2B21",
+        background: "radial-gradient(ellipse at 50% 28%, rgba(217,164,65,0.16) 0%, transparent 48%), #0A2B21",
         display: "grid",
         placeItems: "center",
         padding: 24,

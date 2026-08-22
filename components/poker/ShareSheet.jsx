@@ -5,6 +5,7 @@ import { C } from "./colors";
 import { IconBtn } from "./ui";
 import { waOpen } from "./helpers";
 import { CheckCircle2, Copy, Send, Share2, X } from "./icons";
+import { sectionEyebrow } from "./festive";
 
 /* גיליון שיתוף לסיכום / חלוקה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ShareSheet({
@@ -99,22 +100,47 @@ export function ShareSheet({
         style={{
           width: "100%",
           maxWidth: 640,
-          background: C.felt,
+          background: `linear-gradient(180deg, ${C.cardHi} 0%, ${C.felt} 40%, ${C.feltDeep} 100%)`,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          border: `1px solid ${C.line}`,
+          border: `1px solid ${C.brass}55`,
+          boxShadow: `0 -8px 32px ${C.feltDeep}88`,
           padding: "18px 16px 26px",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: -6,
+            left: 12,
+            fontSize: 64,
+            color: C.brass,
+            opacity: 0.1,
+            pointerEvents: "none",
+            lineHeight: 1,
+          }}
+        >
+          ♠
+        </div>
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 12,
+            position: "relative",
           }}
         >
-          <b style={{ fontSize: 16 }}>{title}</b>
+          <div>
+            <div style={{ ...sectionEyebrow, marginBottom: 3 }}>
+              <span style={{ fontSize: 12 }}>♠</span>
+              שיתוף
+            </div>
+            <b style={{ fontSize: 16, color: C.cream }}>{title}</b>
+          </div>
           <IconBtn onClick={onClose}>
             <X size={17} />
           </IconBtn>

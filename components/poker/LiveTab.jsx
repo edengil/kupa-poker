@@ -27,6 +27,7 @@ import { PokerTable } from "./PokerTable";
 import {
   AlertTriangle, CheckCircle2, Plus, Minus, Send, UserPlus, Coins, X,
 } from "./icons";
+import { brassCta, brassCtaMuted, sectionEyebrow, sectionTitle } from "./festive";
 
 /* טאב לייב — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function LiveTab({
@@ -366,13 +367,17 @@ export function LiveTab({
       )}
       <div
         style={{
-          background: C.card,
-          border: `1px solid ${C.line}`,
-          borderRadius: 12,
+          background: `linear-gradient(165deg, ${C.cardHi} 0%, ${C.card} 100%)`,
+          border: `1px solid ${C.brass}44`,
+          borderRadius: 14,
           padding: 12,
           marginBottom: 12,
         }}
       >
+        <div style={{ ...sectionEyebrow, marginBottom: 8 }}>
+          <span style={{ fontSize: 13 }}>♠</span>
+          {players.length === 0 ? "פתח ערב חי" : "הוסף לשולחן"}
+        </div>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
           <div style={{ flex: 1 }}>
             <label
@@ -398,13 +403,9 @@ export function LiveTab({
           <button
             onClick={() => addPlayer(name)}
             style={{
-              background: C.brass,
-              color: C.feltDeep,
-              border: "none",
+              ...brassCta,
               borderRadius: 9,
               padding: "11px 15px",
-              fontWeight: 700,
-              cursor: "pointer",
             }}
           >
             <Plus size={18} />
@@ -478,9 +479,12 @@ export function LiveTab({
       </div>
 
       {players.length === 0 ? (
-        <Empty text="הוסף שחקנים כדי להתחיל ערב חי. כל כניסה מוסיפה כסף לקופה, והג'יטונים מתעדכנים אוטומטית." />
+        <Empty text="♠ השולחן מחכה. הוסף שחקן ראשון — כל כניסה מוסיפה לקופה, והג'יטונים מתעדכנים לבד." />
       ) : (
         <>
+          <div style={sectionTitle({ marginBottom: 8 })}>
+            ♠ שחקנים בשולחן · {players.length}
+          </div>
           <div
             style={{
               display: "flex",
@@ -885,16 +889,13 @@ export function LiveTab({
             onClick={saveNight}
             disabled={!settled.length}
             style={{
+              ...(settled.length ? brassCta : brassCtaMuted),
               width: "100%",
               marginTop: 12,
               padding: 14,
               borderRadius: 12,
-              border: "none",
               fontSize: 16,
-              fontWeight: 700,
               cursor: settled.length ? "pointer" : "not-allowed",
-              background: settled.length ? C.brass : C.card,
-              color: settled.length ? C.feltDeep : C.dim,
             }}
           >
             סיים · שמור · שלח סיכום

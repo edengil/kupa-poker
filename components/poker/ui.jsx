@@ -33,23 +33,40 @@ export function IconBtn({ children, onClick, danger }) {
   );
 }
 
-/** מצב ריק — טקסט מרוכז בתוך כרטיס מקווקו. */
+/** מצב ריק — טקסט מרוכז בתוך כרטיס מקווקו חגיגי. */
 export function Empty({ text }) {
   return (
     <div
       style={{
         marginTop: 16,
-        padding: 26,
+        padding: "28px 22px",
         textAlign: "center",
         color: C.dim,
-        background: C.card,
-        border: `1px dashed ${C.line}`,
+        background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+        border: `1px dashed ${C.brass}66`,
         borderRadius: 14,
         fontSize: 14,
-        lineHeight: 1.6,
+        lineHeight: 1.65,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      {text}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: 6,
+          left: 10,
+          fontSize: 42,
+          color: C.brass,
+          opacity: 0.12,
+          pointerEvents: "none",
+          lineHeight: 1,
+        }}
+      >
+        ♠
+      </div>
+      <div style={{ position: "relative" }}>{text}</div>
     </div>
   );
 }

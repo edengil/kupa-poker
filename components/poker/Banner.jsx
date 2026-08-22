@@ -6,6 +6,7 @@ import { fmt, MONTHS } from "./format";
 import { allTimeTotals, monthTotals, yearTotals } from "./totals";
 import { NavBtn } from "./ui";
 import { Award, ChevronLeft, ChevronRight, Crown } from "./icons";
+import { festiveCardSoft } from "./festive";
 
 /* באנר דירוג עליון — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function Banner({ db, onPlayer }) {
@@ -33,13 +34,30 @@ export function Banner({ db, onPlayer }) {
   return (
     <div
       style={{
-        background: `linear-gradient(160deg, ${C.card}, ${C.felt})`,
-        border: `1px solid ${C.line}`,
-        borderRadius: 16,
+        ...festiveCardSoft,
         padding: "12px 14px",
         marginBottom: 12,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: -10,
+          left: 8,
+          fontSize: 56,
+          color: C.brass,
+          opacity: 0.08,
+          pointerEvents: "none",
+          lineHeight: 1,
+          userSelect: "none",
+        }}
+      >
+        ♠
+      </div>
+      <div style={{ position: "relative" }}>
       <div
         style={{
           display: "flex",
@@ -55,6 +73,7 @@ export function Banner({ db, onPlayer }) {
             background: C.feltDeep,
             padding: 3,
             borderRadius: 9,
+            border: `1px solid ${C.line}`,
           }}
         >
           {[
@@ -181,6 +200,7 @@ export function Banner({ db, onPlayer }) {
           מאזן שנתי רשמי
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -10,15 +10,17 @@ import ViewerStats from "./ViewerStats";
 import InstallButton from "./InstallButton";
 import { RsvpList, planLabel } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
+import { authShell, brassCta } from "./poker/festive";
+import { C as festiveC } from "./poker/colors";
 
 const C = {
-  feltDeep: "#0A2B21",
-  card: "#15493A",
-  line: "#2C6B54",
-  brass: "#D9A441",
-  cream: "#EFE7D2",
-  dim: "#9DBBAC",
-  loss: "#E27A63",
+  feltDeep: festiveC.feltDeep,
+  card: festiveC.card,
+  line: festiveC.line,
+  brass: festiveC.brass,
+  cream: festiveC.cream,
+  dim: festiveC.dim,
+  loss: festiveC.loss,
 };
 
 /** טביעת אצבע ללייב בלי ts — כדי ששמירה מקומית/מרוץ כתיבה לא יחשבו כשינוי חיצוני. */
@@ -434,38 +436,25 @@ export default function OwnerApp() {
 /* ============================ מסך התחברות ============================ */
 function SignIn({ onSignIn }) {
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: C.feltDeep,
-        color: C.cream,
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        textAlign: "center",
-      }}
-    >
+    <main style={{ ...authShell }}>
       <div style={{ maxWidth: 340 }}>
         <EGMark size={84} style={{ margin: "0 auto" }} />
-        <h1 style={{ fontSize: 30, fontWeight: 800, margin: "16px 0 6px" }}>קופה — פוקר</h1>
+        <h1 style={{ fontSize: 30, fontWeight: 800, margin: "16px 0 6px", color: C.cream }}>
+          קופה <span style={{ color: C.brass }}>—</span> פוקר
+        </h1>
         <EGByline style={{ margin: "0 0 14px" }} />
         <p style={{ color: C.dim, fontSize: 15, lineHeight: 1.7, margin: "0 0 28px" }}>
-          התחבר כדי לנהל את ערבי הקבוצה. אחרי ההתחברות תקבל לינק לשיתוף שהחברים
+          ♠ התחבר כדי לנהל את ערבי הקבוצה. אחרי ההתחברות תקבל לינק לשיתוף שהחברים
           יוכלו לפתוח בלי חשבון.
         </p>
         <button
           onClick={onSignIn}
           style={{
+            ...brassCta,
             width: "100%",
             padding: "14px 18px",
             borderRadius: 14,
-            border: "none",
-            cursor: "pointer",
-            background: C.brass,
-            color: C.feltDeep,
-            fontFamily: "inherit",
             fontSize: 16,
-            fontWeight: 700,
           }}
         >
           התחברות עם Google
@@ -505,8 +494,8 @@ function ShareBar({ slug, onSignOut }) {
   return (
     <div
       style={{
-        background: C.card,
-        borderBottom: `1px solid ${C.line}`,
+        background: `linear-gradient(180deg, ${C.card} 0%, ${C.feltDeep} 120%)`,
+        borderBottom: `1px solid ${C.brass}44`,
         padding: "9px 13px",
       }}
     >
@@ -562,13 +551,8 @@ function Splash({ children, tone }) {
   return (
     <main
       style={{
-        minHeight: "100vh",
-        background: C.feltDeep,
+        ...authShell,
         color: tone === "error" ? C.loss : C.dim,
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        textAlign: "center",
         lineHeight: 1.7,
       }}
     >

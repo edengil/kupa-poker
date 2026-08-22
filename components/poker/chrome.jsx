@@ -29,22 +29,34 @@ export function Header() {
         alignItems: "center",
         gap: 12,
         padding: "20px 4px 12px",
+        position: "relative",
       }}
     >
-      <EGMark size={42} />
-      <div style={{ flex: 1 }}>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: "-8px -6px auto",
+          height: 72,
+          background: `radial-gradient(ellipse at 12% 40%, ${C.brass}20 0%, transparent 55%)`,
+          pointerEvents: "none",
+        }}
+      />
+      <EGMark size={42} style={{ position: "relative" }} />
+      <div style={{ flex: 1, position: "relative" }}>
         <h1
           style={{
             margin: 0,
             fontSize: 23,
             fontWeight: 800,
             letterSpacing: "-.5px",
+            color: C.cream,
           }}
         >
-          קופה — פוקר
+          קופה <span style={{ color: C.brass }}>—</span> פוקר
         </h1>
-        <p style={{ margin: 0, fontSize: 12, color: C.dim }}>
-          מאזן חי · שיתוף בווטסאפ
+        <p style={{ margin: "3px 0 0", fontSize: 12, color: C.dim }}>
+          ♠ מאזן חי · שיתוף בווטסאפ
         </p>
       </div>
     </header>

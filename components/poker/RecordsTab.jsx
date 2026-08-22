@@ -10,6 +10,7 @@ import { computeChipRecords } from "./chipRecords";
 import { computeTipRecords } from "./tipRecords";
 import { computeCoupleFillRecords } from "./coupleFills";
 import { Empty } from "./ui";
+import { festiveCardSoft, sectionTitle } from "./festive";
 
 /* טאב שיאים — חולץ מ-PokerApp.jsx. */
 export function RecordsTab({ db }) {
@@ -199,13 +200,13 @@ export function RecordsTab({ db }) {
 
   const Card = ({ icon, title, holder, value, tone, sub, runner, third }) => (
     <div style={{
-      background: C.card,
-      border: `1px solid ${C.line}`,
+      ...festiveCardSoft,
       borderRadius: 14,
       padding: "13px 14px",
       display: "flex",
       alignItems: "center",
       gap: 12,
+      boxShadow: `0 3px 12px ${C.feltDeep}33`,
     }}>
       <span style={{ fontSize: 26, flex: "0 0 auto" }}>{icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -232,14 +233,16 @@ export function RecordsTab({ db }) {
 
   return (
     <div style={{ marginTop: 4 }}>
-      <h2 style={{ fontSize: 17, fontWeight: 700, margin: "6px 2px 4px" }}>שיאים</h2>
+      <h2 style={{ fontSize: 17, fontWeight: 700, margin: "6px 2px 4px", color: C.cream }}>
+        ♠ שיאים
+      </h2>
       <p style={{ color: C.dim, fontSize: 12, margin: "0 2px 12px" }}>
         מ־{recs.totalNights} ערבים מתועדים
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {recs.lastNight && (
           <>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "2px 2px 0" }}>
+            <div style={sectionTitle()}>
               ♠ מהערב האחרון · {recs.lastNight.label} · {recs.lastNight.count} שחקנים
             </div>
             {recs.lastNight.top && (
@@ -268,7 +271,7 @@ export function RecordsTab({ db }) {
                 ))}
               </div>
             )}
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "8px 2px 0" }}>
+            <div style={sectionTitle({ margin: "8px 2px 0" })}>
               🏛 כל הזמנים
             </div>
           </>
@@ -388,13 +391,15 @@ export function RecordsTab({ db }) {
 
         {/* מקטעים חדשים — תמיד מוצגים, גם בלי נתונים, כדי שיראו שהפיצ'ר קיים.
             ערבים ישנים נשמרו בלי שדה chips; מהערב הבא שיישמר מהלייב הם יופיעו. */}
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
           🪙 שיאי ג&apos;יטונים
           {recs.chips ? ` · מ־${recs.chips.nightsWithChips} ערבים עם יציאה` : ""}
         </div>
         {!recs.chips ? (
           <div style={{
-            background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
             padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
           }}>
             עדיין אין ערבים עם יציאת ג&apos;יטונים שמורה.
@@ -438,12 +443,14 @@ export function RecordsTab({ db }) {
           </>
         )}
 
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
           💸 שיאי טיפים
         </div>
         {!recs.tips ? (
           <div style={{
-            background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
             padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
           }}>
             עדיין אין טיפים. בקבוצה: <b style={{ color: C.cream }}>אופיר טיפ 10</b>
@@ -487,12 +494,14 @@ export function RecordsTab({ db }) {
           </>
         )}
 
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, margin: "12px 2px 0" }}>
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
           ↔ מילוי זוגי
         </div>
         {!recs.coupleFills ? (
           <div style={{
-            background: C.card, border: `1px solid ${C.line}`, borderRadius: 14,
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
             padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
           }}>
             עדיין אין מילויים. בלייב, כששני בני הזוג בשולחן: לחיצה על השם / ↔ לבחירת כיוון
