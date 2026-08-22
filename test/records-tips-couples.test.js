@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { parseCommands, applyCommands, BOT_MARK } from "../lib/whatsapp.js";
-import { nextTipCompliment, TIP_COMPLIMENTS } from "../lib/tipCompliments.js";
+import { nextTipCompliment, formatTipCompliment, TIP_COMPLIMENTS } from "../lib/tipCompliments.js";
 import { computeChipRecords, bestChipCashout } from "../components/poker/chipRecords.js";
 import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS, FILL_COUPLES } from "../components/poker/coupleFills.js";
 import { computeTipRecords } from "../components/poker/tipRecords.js";
@@ -84,14 +84,19 @@ describe("tip compliment rotation", () => {
     let live = {};
     const seen = [];
     for (let i = 0; i < TIP_COMPLIMENTS.length; i++) {
-      const { compliment, bag, last } = nextTipCompliment(live);
-      seen.push(compliment);
+      const { template, bag, last } = nextTipCompliment(live);
+      seen.push(template);
       live = { tipComplimentBag: bag, tipComplimentLast: last };
     }
     expect(new Set(seen).size).toBe(TIP_COMPLIMENTS.length);
-    // bag empty → reshuffle; with random=0 first index is 0, but last was also 0 so swap
     const next = nextTipCompliment(live);
-    expect(TIP_COMPLIMENTS).toContain(next.compliment);
+    expect(TIP_COMPLIMENTS).toContain(next.template);
+  });
+
+  it("formats tip line with name and amount, without ג'", () => {
+    const line = formatTipCompliment("{name} תותח! כל הכבוד על הטיפ {amount} 👏", "דן ינקלויץ", 10);
+    expect(line).toBe("דן ינקלויץ תותח! כל הכבוד על הטיפ 10 👏");
+    expect(line).not.toMatch(/ג'/);
   });
 });
 
