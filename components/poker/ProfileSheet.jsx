@@ -8,6 +8,8 @@ import { allTimeTotals } from "./totals";
 import { IconBtn, Stat } from "./ui";
 import { TrendingUp, X } from "./icons";
 import { CumChart } from "./CumChart";
+import { playerAllTimeDelta } from "./monthCompare";
+import { MoMDelta } from "./MoMDelta";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ProfileSheet({ db, name, onClose }) {
@@ -40,6 +42,7 @@ export function ProfileSheet({ db, name, onClose }) {
 
   const official = allTimeTotals(db).find((t) => t.name === cn);
   const total = official ? official.amount : rows.length ? rows[rows.length - 1].cum : 0;
+  const mom = playerAllTimeDelta(db, cn);
   const best = rows.reduce((m, r) => (r.night > (m?.night ?? -1e9) ? r : m), null);
   const worst = rows.reduce((m, r) => (r.night < (m?.night ?? 1e9) ? r : m), null);
 
@@ -90,6 +93,22 @@ export function ProfileSheet({ db, name, onClose }) {
           <Stat label="ערב שיא" value={best ? fmt(best.night) : "—"} color={C.win} />
           <Stat label="ערב גרוע" value={worst ? fmt(worst.night) : "—"} color={C.loss} />
         </div>
+        {mom && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 10,
+              margin: "-6px 2px 14px",
+              fontSize: 12.5,
+              color: C.dim,
+            }}
+          >
+            <span>מול אותו יום בחודש שעבר ({fmt(mom.previous)})</span>
+            <MoMDelta delta={mom.delta} />
+          </div>
+        )}
         {rows.length > 1 ? (
           <div
             style={{

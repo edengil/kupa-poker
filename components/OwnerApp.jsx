@@ -12,6 +12,7 @@ import { RsvpList, planLabel } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "./poker/festive";
 import { C as festiveC } from "./poker/colors";
+import { inferLastView, isStandalone, shouldOpenAsViewer } from "../lib/viewerIdentity";
 
 const C = {
   feltDeep: festiveC.feltDeep,
@@ -210,11 +211,23 @@ export default function OwnerApp() {
 
     /* מסלול מהיר: עולים מהמטמון מיד, עוד לפני בדיקת הסשן.
        getSession בספארי/PWA נתקע לפעמים עד שנוגעים במסך — אסור לחכות לו.
-       אם יתברר שאין סשן, האפקט של הסשן למעלה יעביר למסך התחברות. */
+       אם יתברר שאין סשן, האפקט של הסשן למעלה יעביר למסך התחברות.
+
+       צופה שהתקין למסך הבית נוחת על `/` (start_url הישן) — אם יש לו לינק
+       צפייה שמור, לא מעלים לו אפליקציית מנהל ריקה. */
+    const lastView = inferLastView();
     let cachedRow = null;
     try {
       cachedRow = JSON.parse(localStorage.getItem(cacheKey) || "null");
     } catch {}
+    /* מטמון של קבוצה אחרת + לינק צפייה — ב-PWA זה כמעט תמיד צופה
+       שנחת על `/` וקיבל קופה ריקה. לא מעלים את המעטפת הלא נכונה. */
+    if (lastView && cachedRow?.slug && cachedRow.slug !== lastView && isStandalone()) {
+      window.location.replace(`/g/${lastView}`);
+      return () => {
+        alive = false;
+      };
+    }
     if (cachedRow?.id && cachedRow?.slug) {
       boot(cachedRow, mkBroadcaster(cachedRow.slug));
       checkLive(); // קובע נקודת ייחוס ללייב
@@ -242,7 +255,24 @@ export default function OwnerApp() {
       }
 
       let row = rows?.[0];
+      const viewSlug = inferLastView();
+      if (shouldOpenAsViewer(viewSlug, row?.slug)) {
+        window.location.replace(`/g/${viewSlug}`);
+        return;
+      }
       if (!row) {
+        /* צופה ב-PWA בלי קבוצה משלו: לא יוצרים לו קופה ריקה עם כל הטאבים. */
+        if (viewSlug) {
+          window.location.replace(`/g/${viewSlug}`);
+          return;
+        }
+        if (isStandalone()) {
+          if (alive && !cachedRow) {
+            setMessage("אין קבוצה במסך הבית הזה. פתח את לינק הצפייה מהוואטסאפ והוסף אותו למסך הבית משם.");
+            setPhase("error");
+          }
+          return;
+        }
         const { data: created, error: insertError } = await supabase
           .from("groups")
           .insert({ owner_id: user.id, slug: newSlug() })

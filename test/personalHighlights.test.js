@@ -82,6 +82,18 @@ describe("matchViewerToPlayer", () => {
     expect(matchViewerToPlayer(db, {})).toBeNull();
   });
 
+  it("reuses a saved playerName when the roster still has them", () => {
+    expect(
+      matchViewerToPlayer(db, { full_name: "Random Guest", playerName: "אופיר סנה" })
+    ).toBe("אופיר סנה");
+  });
+
+  it("ignores a saved playerName that is not in the table", () => {
+    expect(
+      matchViewerToPlayer(db, { full_name: "Random Guest", playerName: "מישהו" })
+    ).toBeNull();
+  });
+
   it("lists known players via aliases", () => {
     const names = knownPlayerNames(db);
     expect(names).toContain("עדן גיל");

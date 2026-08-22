@@ -8,8 +8,10 @@ import { allTimeTotals, monthTotals, yearTotals } from "./totals";
 import { Empty, GroupLabel, IconBtn, SegBar, Select } from "./ui";
 import { Award, Crown, Share2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
+import { compareToLastMonth } from "./monthCompare";
+import { GroupMoMLine, MoMDelta } from "./MoMDelta";
 
-function Ledger({ totals, official, readOnly = false }) {
+function Ledger({ totals, official, readOnly = false, deltas = {}, moved = null }) {
   const winners = totals.filter((t) => t.amount > 0),
     losers = totals.filter((t) => t.amount < 0),
     zeros = totals.filter((t) => t.amount === 0);
@@ -59,15 +61,18 @@ function Ledger({ totals, official, readOnly = false }) {
           }}
         />
       </div>
-      <b
-        style={{
-          color: t.amount >= 0 ? C.win : C.loss,
-          fontVariantNumeric: "tabular-nums",
-          fontSize: 15,
-        }}
-      >
-        {fmt(t.amount)}
-      </b>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+        <b
+          style={{
+            color: t.amount >= 0 ? C.win : C.loss,
+            fontVariantNumeric: "tabular-nums",
+            fontSize: 15,
+          }}
+        >
+          {fmt(t.amount)}
+        </b>
+        <MoMDelta delta={deltas[t.name]?.delta} compact />
+      </div>
     </div>
   );
 
@@ -115,6 +120,7 @@ function Ledger({ totals, official, readOnly = false }) {
           </span>
         </div>
       )}
+      {moved && <GroupMoMLine moved={moved} />}
     </div>
   );
 }
@@ -149,6 +155,7 @@ export function TableTab({ db, years, readOnly = false }) {
       recCount: db.sessions.filter((s) => s.y === y && s.mo === mo).length,
     };
   }, [db, scope, y, mo]);
+  const mom = useMemo(() => compareToLastMonth(db, scope, y, mo), [db, scope, y, mo]);
   const yearHasOfficial = scope === "month" && db.yearly.some((x) => x.y === y && x.official);
   const title =
     scope === "all" ? "כל הזמן" : scope === "year" ? `${y}` : `${MONTHS[mo - 1]} ${y}`;
@@ -215,7 +222,7 @@ export function TableTab({ db, years, readOnly = false }) {
         <Empty text="אין נתונים לתקופה הזו." />
       ) : (
         <>
-          <Ledger totals={totals} official={official} readOnly={readOnly} />
+          <Ledger totals={totals} official={official} readOnly={readOnly} deltas={mom.deltas} moved={mom.moved} />
           <p
             style={{
               color: official ? C.brass : C.dim,

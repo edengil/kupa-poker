@@ -8,4 +8,9 @@ export default function PublicGroupPage({ params }) {
   return <PublicApp slug={params.slug} />;
 }
 
-export const metadata = { title: "קופה — פוקר · צפייה" };
+export async function generateMetadata({ params }) {
+  return {
+    title: "קופה — פוקר · צפייה",
+    manifest: `/g/${params.slug}/manifest.webmanifest`,
+  };
+}
