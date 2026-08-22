@@ -60,6 +60,7 @@ export default function OwnerApp() {
   const [message, setMessage] = useState("");
   const [online, setOnline] = useState([]); // מי צופה עכשיו — נוכחות חיה
   const [generation, setGeneration] = useState(0); // remount רק כשבאמת צריך (רקע / חזרה לדף)
+  const [viewerAuth, setViewerAuth] = useState(null);
   const broadcasterRef = useRef(null);
   const groupRef = useRef(null); // גישה יציבה לקבוצה מתוך callbacks
   const lastLiveRef = useRef(undefined); // הלייב האחרון שידוע לדף — להשוואה מול פינגים
@@ -93,13 +94,31 @@ export default function OwnerApp() {
   useEffect(() => {
     let alive = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (alive && !data.session) setPhase("signedOut");
+      if (!alive) return;
+      if (!data.session) {
+        setPhase("signedOut");
+        return;
+      }
+      const u = data.session.user;
+      setViewerAuth({
+        name: u.user_metadata?.name || null,
+        full_name: u.user_metadata?.full_name || u.user_metadata?.name || null,
+        email: u.email || null,
+      });
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!alive) return;
       if (!session) {
         setPhase("signedOut");
         setGroup(null);
+        setViewerAuth(null);
+      } else {
+        const u = session.user;
+        setViewerAuth({
+          name: u.user_metadata?.name || null,
+          full_name: u.user_metadata?.full_name || u.user_metadata?.name || null,
+          email: u.email || null,
+        });
       }
     });
     return () => {
@@ -415,6 +434,7 @@ export default function OwnerApp() {
       </div>
       <PokerApp
         key={generation}
+        viewerAuth={viewerAuth}
         initialTab={tabRef.current}
         onTabChange={(t) => {
           tabRef.current = t;

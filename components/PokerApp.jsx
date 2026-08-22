@@ -23,6 +23,8 @@ import { PokerTable } from "./poker/PokerTable";
 import { DB_KEY, loadConfig } from "./poker/config";
 import { buildSeedDb } from "./poker/seed";
 import { applyChipBackfill } from "./poker/chipBackfill";
+import { PersonalHighlightsCard } from "./poker/PersonalHighlightsCard";
+import { matchViewerToPlayer } from "./poker/personalHighlights";
 import { EGFooter } from "./Logo";
 
 // שיתוף אמין: (1) Web Share API — גיליון השיתוף של iOS, בוחרים וואטסאפ והקבוצה; הטקסט עובר נקי.
@@ -37,6 +39,8 @@ function App({
   onRecords,
   onPlanShared,
   initialTab = "table",
+  /** { name?, full_name?, email? } מ-Google auth — לשיאים אישיים */
+  viewerAuth = null,
 }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
@@ -92,6 +96,12 @@ function App({
     return [...s].sort((a, b) => b - a);
   }, [db]);
 
+  const viewerName = useMemo(
+    () => (db && viewerAuth ? matchViewerToPlayer(db, viewerAuth) : null),
+    [db, viewerAuth]
+  );
+  const showPersonal = !!viewerAuth;
+
   if (!ready || !db) {
     return (
       <div
@@ -131,6 +141,9 @@ function App({
       >
         <Header />
         <Banner db={db} onPlayer={setProfile} />
+        {showPersonal && tab === "table" && (
+          <PersonalHighlightsCard db={db} playerName={viewerName} />
+        )}
         {tab === "input" ? (
           <InputTab db={db} commit={commit} years={years} />
         ) : tab === "live" ? (
@@ -156,7 +169,7 @@ function App({
         ) : tab === "stats" && statsPanel ? (
           statsPanel
         ) : tab === "records" ? (
-          <RecordsTab db={db} />
+          <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} />
         ) : (
           <PlayersTab db={db} onPlayer={setProfile} />
         )}

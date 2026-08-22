@@ -1,202 +1,34 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { C } from "./colors";
 import { fmt, MONTHS } from "./format";
-import { AL, canon, r2 } from "./helpers";
-import { yearTotals, monthTotals, allTimeTotals } from "./totals";
-import { brokenRecords } from "./brokenRecords";
-import { computeChipRecords } from "./chipRecords";
-import { computeTipRecords } from "./tipRecords";
-import { computeCoupleFillRecords } from "./coupleFills";
+import { computeRecords } from "./computeRecords";
 import { Empty } from "./ui";
 import { festiveCardSoft, sectionTitle } from "./festive";
+import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
 
 /* טאב שיאים — חולץ מ-PokerApp.jsx. */
-export function RecordsTab({ db }) {
-  const A = AL(db);
-  const recs = useMemo(() => {
-    const sessions = [...db.sessions].sort((a, b) => a.iso.localeCompare(b.iso));
-    if (!sessions.length) return null;
-
-    // סכום לילה לכל שחקן, לכל ערב
-    const perNight = sessions.map(s => {
-      const t = {};
-      for (const e of s.entries) {
-        const nm = canon(e.name, A);
-        t[nm] = r2((t[nm] || 0) + e.amount);
-      }
-      return { iso: s.iso, d: s.d, mo: s.mo, y: s.y, totals: t };
-    });
-
-    let stormyNight = null;
-    const nightList = []; // כל תוצאה של כל שחקן בכל ערב — למציאת שיא + סגן
-    const history = {}; // name -> [amount, amount...] כרונולוגי
-    const monthAgg = {}; // "name|y-mo" -> סכום החודש לשחקן
-    const attend = {}; // name -> {cur, max} — נוכחות בערבים רצופים
-
-    for (const n of perNight) {
-      let moved = 0;
-      const present = new Set(Object.keys(n.totals));
-      for (const [nm, amount] of Object.entries(n.totals)) {
-        (history[nm] = history[nm] || []).push(amount);
-        nightList.push({ name: nm, amount, d: n.d, mo: n.mo, y: n.y });
-        if (amount > 0) moved = r2(moved + amount);
-        const mk = `${nm}|${n.y}-${n.mo}`;
-        monthAgg[mk] = r2((monthAgg[mk] || 0) + amount);
-        const at = attend[nm] = attend[nm] || { cur: 0, max: 0 };
-        at.cur += 1;
-        if (at.cur > at.max) at.max = at.cur;
-      }
-      for (const nm of Object.keys(attend)) if (!present.has(nm)) attend[nm].cur = 0;
-      // "הערב הסוער" — כמה כסף החליף ידיים (סכום הזכיות של אותו ערב)
-      if (!stormyNight || moved > stormyNight.moved) stormyNight = { moved, d: n.d, mo: n.mo, y: n.y };
-    }
-
-    // ערבי השיא — הטוב והקשה, עם סגן וארד
-    nightList.sort((a, b) => b.amount - a.amount);
-    const bestNight = nightList[0] || null;
-    const bestNight2 = nightList[1] || null;
-    const bestNight3 = nightList[2] || null;
-    const worstNight = nightList[nightList.length - 1] || null;
-    const worstNight2 = nightList[nightList.length - 2] || null;
-    const worstNight3 = nightList[nightList.length - 3] || null;
-
-    /* סטטיסטיקה פר שחקן — הכל מ-history הכרונולוגי: רצפים, אחוז ניצחונות,
-       ממוצע, תנודתיות (סטיית תקן) והקאמבק. מחושב פעם אחת ואז ממוינים
-       לכל שיא בנפרד, כך שקל לשלוף גם את הסגן. */
-    const MIN_NIGHTS = 5;
-    const stats = Object.entries(history).map(([nm, arr]) => {
-      let cur = 0, max = 0, lcur = 0, lmax = 0;
-      for (const v of arr) {
-        cur = v > 0 ? cur + 1 : 0;
-        if (cur > max) max = cur;
-        lcur = v < 0 ? lcur + 1 : 0;
-        if (lcur > lmax) lmax = lcur;
-      }
-      let tail = 0;
-      for (let i = arr.length - 1; i >= 0 && arr[i] > 0; i--) tail++;
-      let comeback = null;
-      for (let i = 1; i < arr.length; i++) {
-        if (arr[i - 1] < 0 && arr[i] > 0) {
-          const jump = r2(arr[i] - arr[i - 1]);
-          if (!comeback || jump > comeback.jump) comeback = { jump, from: arr[i - 1], to: arr[i] };
-        }
-      }
-      const wins = arr.filter(v => v > 0).length;
-      const sum = r2(arr.reduce((s, v) => s + v, 0));
-      const avg = r2(sum / arr.length);
-      const sd = Math.round(Math.sqrt(arr.reduce((s, v) => s + (v - avg) ** 2, 0) / arr.length));
-      return {
-        name: nm, nights: arr.length, wins, sum, avg, sd,
-        rate: Math.round(wins / arr.length * 100),
-        maxStreak: max, tail, lossMax: lmax, comeback,
-        attendMax: attend[nm]?.max || 0,
-      };
-    });
-
-    // שלושה הראשונים לפי מדד — [שיאן, סגן, ארד]
-    const top3 = (key, filter = () => true) => {
-      const s = stats.filter(filter).sort((a, b) => key(b) - key(a));
-      return [s[0] || null, s[1] || null, s[2] || null];
-    };
-
-    const [bestStreak, bestStreak2, bestStreak3] = top3(s => s.maxStreak, s => s.maxStreak >= 2);
-    const [liveStreak] = top3(s => s.tail, s => s.tail >= 2);
-    const [lossStreak, lossStreak2, lossStreak3] = top3(s => s.lossMax, s => s.lossMax >= 3);
-    const [winRate, winRate2, winRate3] = top3(s => s.rate, s => s.nights >= MIN_NIGHTS);
-    const [bestAvg, bestAvg2, bestAvg3] = top3(s => s.avg, s => s.nights >= MIN_NIGHTS && s.avg > 0);
-    const [mostWins, mostWins2, mostWins3] = top3(s => s.wins);
-    const [most, most2, most3] = top3(s => s.nights);
-    const [attendTop, attendTop2, attendTop3] = top3(s => s.attendMax, s => s.attendMax >= 3);
-    const [roller] = top3(s => s.sd, s => s.nights >= MIN_NIGHTS);
-    const comeback = stats.reduce(
-      (m, s) => s.comeback && (!m || s.comeback.jump > m.jump) ? { name: s.name, ...s.comeback } : m,
-      null
-    );
-
-    // החודש הטוב אי פעם — שחקן + חודש עם הנטו הגבוה ביותר
-    let bestMonth = null;
-    for (const [key, amount] of Object.entries(monthAgg)) {
-      if (!bestMonth || amount > bestMonth.amount) {
-        const [nm, ym] = key.split("|");
-        const [yy, mm] = ym.split("-");
-        bestMonth = { name: nm, amount, y: +yy, mo: +mm };
-      }
-    }
-
-    // מלך המלכים — מי סיים הכי הרבה חודשים במקום הראשון
-    const bestOfMonth = {};
-    for (const [key, amount] of Object.entries(monthAgg)) {
-      const [nm, ym] = key.split("|");
-      if (!bestOfMonth[ym] || amount > bestOfMonth[ym].amount) bestOfMonth[ym] = { name: nm, amount };
-    }
-    const crownCount = {};
-    for (const b of Object.values(bestOfMonth)) crownCount[b.name] = (crownCount[b.name] || 0) + 1;
-    const crowns = Object.entries(crownCount).sort((a, b) => b[1] - a[1]);
-
-    // השנה הטובה אי פעם — לפי המאזן הרשמי כשקיים
-    const yearsSet = new Set([...sessions.map(s => s.y), ...db.yearly.map(x => x.y)]);
-    let bestYear = null;
-    for (const y of yearsSet) {
-      for (const t of yearTotals(db, y).totals) {
-        if (!bestYear || t.amount > bestYear.amount) bestYear = { name: t.name, amount: t.amount, y };
-      }
-    }
-
-    // מלכי התקופה: החודש האחרון שיש בו ערבים, השנה, וכל הזמנים
-    const last = sessions[sessions.length - 1];
-    const monthT = monthTotals(db, last.y, last.mo);
-    const yearT = yearTotals(db, last.y).totals;
-    const allT = allTimeTotals(db);
-
-    /* הערב האחרון — תמיד מעניין מה קרה הרגע: מי לקח, מי נתן, כמה עבר
-       ידיים, והאם נשברו שיאים (אותה בדיקה שמפעילה את ההכרזה בוואטסאפ). */
-    const lastN = perNight[perNight.length - 1];
-    const lastRows = Object.entries(lastN.totals).sort((a, b) => b[1] - a[1]);
-    let lastBroken = [];
-    try {
-      lastBroken = brokenRecords({ ...db, sessions: sessions.slice(0, -1) }, last);
-    } catch {}
-    const topRow = lastRows[0] && lastRows[0][1] > 0 ? { name: lastRows[0][0], amount: lastRows[0][1] } : null;
-    const prevOfTop = topRow
-      ? perNight.slice(0, -1).map(n => n.totals[topRow.name]).filter(v => v != null)
-      : [];
-    const lastNight = {
-      label: `${lastN.d}.${lastN.mo}.${String(lastN.y).slice(2)}`,
-      count: lastRows.length,
-      top: topRow,
-      bottom: lastRows.length && lastRows[lastRows.length - 1][1] < 0
-        ? { name: lastRows[lastRows.length - 1][0], amount: lastRows[lastRows.length - 1][1] }
-        : null,
-      moved: r2(lastRows.reduce((s, [, v]) => s + (v > 0 ? v : 0), 0)),
-      personalBest: !!(topRow && prevOfTop.length >= 3 && topRow.amount > Math.max(...prevOfTop)),
-      broken: lastBroken,
-    };
-
-    return {
-      lastNight,
-      bestNight, bestNight2, bestNight3, worstNight, worstNight2, worstNight3,
-      bestStreak, bestStreak2, bestStreak3, liveStreak, lossStreak, lossStreak2, lossStreak3,
-      winRate, winRate2, winRate3, bestAvg, bestAvg2, bestAvg3, mostWins, mostWins2, mostWins3,
-      comeback, stormyNight, bestMonth, bestYear, roller,
-      attendTop, attendTop2, attendTop3,
-      crownKing: crowns[0] ? { name: crowns[0][0], count: crowns[0][1] } : null,
-      crownKing2: crowns[1] ? { name: crowns[1][0], count: crowns[1][1] } : null,
-      crownKing3: crowns[2] ? { name: crowns[2][0], count: crowns[2][1] } : null,
-      monthKing: monthT[0] || null, monthKing2: monthT[1] || null, monthKing3: monthT[2] || null,
-      monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
-      yearKing: yearT[0] || null, yearKing2: yearT[1] || null, yearKing3: yearT[2] || null, yearLabel: `${last.y}`,
-      allKing: allT[0] || null, allKing2: allT[1] || null, allKing3: allT[2] || null,
-      most, most2, most3,
-      totalNights: sessions.length,
-      chips: computeChipRecords(db),
-      tips: computeTipRecords(db),
-      coupleFills: computeCoupleFillRecords(db),
-    };
-  }, [db]);
+export function RecordsTab({ db, viewerName = null, showMine = false }) {
+  const [mineOnly, setMineOnly] = useState(false);
+  const recs = useMemo(() => computeRecords(db), [db]);
 
   if (!recs) return <Empty text="עוד אין ערבים — אין שיאים." />;
+
+  if (showMine && mineOnly) {
+    return (
+      <div style={{ marginTop: 4 }}>
+        <h2 style={{ fontSize: 17, fontWeight: 700, margin: "6px 2px 4px", color: C.cream }}>
+          ♠ שיאים
+        </h2>
+        <div style={{ display: "flex", gap: 6, margin: "6px 2px 12px" }}>
+          <ScopeChip active={false} onClick={() => setMineOnly(false)}>הכל</ScopeChip>
+          <ScopeChip active onClick={() => setMineOnly(true)}>שלי</ScopeChip>
+        </div>
+        <PersonalHighlightsCard db={db} playerName={viewerName} />
+      </div>
+    );
+  }
 
   const Card = ({ icon, title, holder, value, tone, sub, runner, third }) => (
     <div style={{
@@ -239,6 +71,12 @@ export function RecordsTab({ db }) {
       <p style={{ color: C.dim, fontSize: 12, margin: "0 2px 12px" }}>
         מ־{recs.totalNights} ערבים מתועדים
       </p>
+      {showMine && (
+        <div style={{ display: "flex", gap: 6, margin: "0 2px 12px" }}>
+          <ScopeChip active={!mineOnly} onClick={() => setMineOnly(false)}>הכל</ScopeChip>
+          <ScopeChip active={mineOnly} onClick={() => setMineOnly(true)}>שלי</ScopeChip>
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {recs.lastNight && (
           <>
@@ -533,5 +371,27 @@ export function RecordsTab({ db }) {
         )}
       </div>
     </div>
+  );
+}
+
+function ScopeChip({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${active ? C.brass : C.line}`,
+        background: active ? C.brass : "transparent",
+        color: active ? C.feltDeep : C.dim,
+        borderRadius: 999,
+        padding: "5px 12px",
+        fontSize: 12.5,
+        fontWeight: active ? 700 : 500,
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      {children}
+    </button>
   );
 }

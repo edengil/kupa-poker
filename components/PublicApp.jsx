@@ -35,6 +35,7 @@ export default function PublicApp({ slug }) {
   const [fresh, setFresh] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [generation, setGeneration] = useState(0);
+  const [viewerAuth, setViewerAuth] = useState(null);
   const dataRef = useRef(null);
   const loggedRef = useRef(false);
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
@@ -113,6 +114,11 @@ export default function PublicApp({ slug }) {
         setPhase("signedOut");
         return;
       }
+      setViewerAuth({
+        name: user.user_metadata?.name || null,
+        full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+        email: user.email || null,
+      });
       const snap = await load();
       // רישום ביומן פעם אחת לטעינה, ולא בכל רענון של הנתונים.
       // השורה שנפתחת כאן ממשיכה להתעדכן כל הביקור: טאבים וזמן יציאה.
@@ -265,6 +271,7 @@ export default function PublicApp({ slug }) {
       <PokerApp
         key={generation}
         readOnly
+        viewerAuth={viewerAuth}
         initialTab={tabRef.current}
         onTabChange={(tab) => {
           tabRef.current = tab;
