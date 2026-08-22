@@ -130,6 +130,12 @@ export function matchViewerToPlayer(db, viewer) {
     return playerSet.has(c) ? c : null;
   };
 
+  /* התאמה שנשמרה בביקור קודם (PWA / getSession תקוע) — רק אם השחקן עדיין בטבלה */
+  if (viewer.playerName) {
+    const cached = accept(viewer.playerName);
+    if (cached) return cached;
+  }
+
   /** כינוי קצר (טוקן אחד) — רק אם אין עוד שחקנים עם אותו פרטי. */
   const acceptShort = (token) => {
     if (!token || token.includes(" ")) return null;

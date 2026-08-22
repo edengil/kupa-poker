@@ -7,6 +7,8 @@ import { allTimeTotals, monthTotals, yearTotals } from "./totals";
 import { NavBtn } from "./ui";
 import { Award, ChevronLeft, ChevronRight, Crown } from "./icons";
 import { festiveCardSoft } from "./festive";
+import { compareToLastMonth } from "./monthCompare";
+import { GroupMoMLine, MoMDelta } from "./MoMDelta";
 
 /* באנר דירוג עליון — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function Banner({ db, onPlayer }) {
@@ -28,6 +30,7 @@ export function Banner({ db, onPlayer }) {
     if (scope === "year") return yearTotals(db, y);
     return { totals: monthTotals(db, y, mo), official: false };
   }, [db, scope, y, mo]);
+  const mom = useMemo(() => compareToLastMonth(db, scope, y, mo), [db, scope, y, mo]);
   const label =
     scope === "all" ? "כל הזמן" : scope === "year" ? `${y}` : `${MONTHS[mo - 1]} ${y}`;
 
@@ -156,7 +159,7 @@ export function Banner({ db, onPlayer }) {
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 2,
-                minWidth: 66,
+                minWidth: 74,
               }}
             >
               <span
@@ -181,10 +184,12 @@ export function Banner({ db, onPlayer }) {
               >
                 {fmt(t.amount)}
               </b>
+              <MoMDelta delta={mom.deltas[t.name]?.delta} compact />
             </button>
           ))}
         </div>
       )}
+      {totals.length > 0 && <GroupMoMLine moved={mom.moved} />}
       {official && (
         <div
           style={{

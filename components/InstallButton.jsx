@@ -56,7 +56,10 @@ export default function InstallButton() {
     window.addEventListener("appinstalled", onInstalled);
 
     // ספארי באייפון לא יורה beforeinstallprompt — נציג הסבר ידני
-    if (isIOS()) setState("ios");
+    if (isIOS()) {
+      setState("ios");
+      setShowHelp(true);
+    }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);
@@ -100,18 +103,31 @@ export default function InstallButton() {
         {label}
       </button>
       {state === "ios" && showHelp && (
-        <p
+        <ol
           style={{
-            margin: "8px 2px 0",
+            margin: "10px 2px 0",
+            paddingInlineStart: 20,
             fontSize: 12.5,
-            lineHeight: 1.7,
+            lineHeight: 1.75,
             color: C.dim,
-            textAlign: "center",
+            textAlign: "right",
           }}
         >
-          פתח את תפריט השיתוף של ספארי (הריבוע עם החץ למעלה), גלול ובחר
-          <b style={{ color: C.cream }}> „הוסף למסך הבית“</b>. תיפתח כמו אפליקציה רגילה.
-        </p>
+          <li>
+            מחק את האייקון הישן ממסך הבית (לחיצה ארוכה על האייקון ← הסר את הקיצור).
+            אייקון ישן נשאר על האתר הישן ופותח את <b style={{ color: C.cream }}>/</b> בלי הנתונים.
+          </li>
+          <li>
+            פתח את לינק הקבוצה מהוואטסאפ. בשורת הכתובת חייב להיות{" "}
+            <b style={{ color: C.cream }}>/g/</b> — לא רק kupa-poker.vercel.app.
+          </li>
+          <li>התחבר עם Google עד שרואים את הטבלה ואת השדות שלך.</li>
+          <li>
+            תפריט השיתוף של ספארי (הריבוע עם החץ) ←{" "}
+            <b style={{ color: C.cream }}>הוסף למסך הבית</b>. האייפון שומר את הדף
+            הנוכחי, לא את כתובת המניפסט.
+          </li>
+        </ol>
       )}
     </div>
   );

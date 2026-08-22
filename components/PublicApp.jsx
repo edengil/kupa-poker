@@ -11,6 +11,13 @@ import { RsvpCard } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "./poker/festive";
 import { C as festiveC } from "./poker/colors";
+import { matchViewerToPlayer } from "./poker/personalHighlights";
+import {
+  readViewerAuth,
+  viewerAuthFromUser,
+  writeLastView,
+  writeViewerAuth,
+} from "../lib/viewerIdentity";
 
 const C = {
   feltDeep: festiveC.feltDeep,
@@ -35,7 +42,7 @@ export default function PublicApp({ slug }) {
   const [fresh, setFresh] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [generation, setGeneration] = useState(0);
-  const [viewerAuth, setViewerAuth] = useState(null);
+  const [viewerAuth, setViewerAuth] = useState(() => readViewerAuth(slug));
   const dataRef = useRef(null);
   const loggedRef = useRef(false);
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
@@ -88,12 +95,27 @@ export default function PublicApp({ slug }) {
     return snap;
   }, [supabase, slug]);
 
+  const rememberViewer = useCallback(
+    (auth, data) => {
+      if (!auth) return auth;
+      const playerName = data ? matchViewerToPlayer(data, auth) : auth.playerName || null;
+      const next = playerName ? { ...auth, playerName } : auth;
+      writeViewerAuth(slug, next);
+      setViewerAuth(next);
+      return next;
+    },
+    [slug]
+  );
+
   useEffect(() => {
     let alive = true;
 
+    writeLastView(slug);
+
     /* מסלול מהיר: עולים מהמטמון מיד, עוד לפני בדיקת הסשן.
        getSession בספארי/PWA נתקע לפעמים עד שנוגעים במסך — אסור לחכות לו.
-       אם יתברר שאין סשן, נעבור למסך ההתחברות מיד אחר כך. */
+       זהות הצופה (לשיאים) משוחזרת מהמטמון המקומי כדי שמאשר הגעה
+       יראה את השיאים שלו גם לפני שהסשן מתעורר. */
     try {
       const cached = JSON.parse(localStorage.getItem(`poker:cache:pub:${slug}`) || "null");
       if (cached?.id) {
@@ -103,23 +125,17 @@ export default function PublicApp({ slug }) {
         setLive(cached.live ?? null);
         setPlan(cached.data?.plan ?? null);
         setPhase("ready");
+        const saved = readViewerAuth(slug);
+        if (saved) rememberViewer(saved, cached.data);
       }
     } catch {}
 
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
-      if (!alive) return;
-      if (!user) {
-        setPhase("signedOut");
-        return;
-      }
-      setViewerAuth({
-        name: user.user_metadata?.name || null,
-        full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
-        email: user.email || null,
-      });
+    const applySession = async (user) => {
+      if (!alive || !user) return;
+      const auth = viewerAuthFromUser(user);
       const snap = await load();
+      if (!alive) return;
+      rememberViewer(auth, snap?.data);
       // רישום ביומן פעם אחת לטעינה, ולא בכל רענון של הנתונים.
       // השורה שנפתחת כאן ממשיכה להתעדכן כל הביקור: טאבים וזמן יציאה.
       if (snap && !loggedRef.current) {
@@ -128,9 +144,27 @@ export default function PublicApp({ slug }) {
         if (alive) visitRef.current = trackVisit(supabase, viewId);
         else visitRef.current?.stop?.();
       }
+    };
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+      if (!alive) return;
+      if (!user) {
+        // זהות שמורה: נשארים על המטמון (שיאים + נתונים) עד ש-onAuthStateChange
+        // מאשר שאין סשן. בלי זה PWA/ספארי זורקים למסך התחברות ומאבדים שיאים.
+        if (!readViewerAuth(slug)) setPhase("signedOut");
+        return;
+      }
+      await applySession(user);
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (alive && !session) setPhase("signedOut");
+      if (!alive) return;
+      if (!session) {
+        if (!readViewerAuth(slug)) setPhase("signedOut");
+        return;
+      }
+      applySession(session.user);
     });
     return () => {
       alive = false;
@@ -138,7 +172,7 @@ export default function PublicApp({ slug }) {
       visitRef.current?.stop?.();
       visitRef.current = null;
     };
-  }, [supabase, load]);
+  }, [supabase, load, rememberViewer, slug]);
 
   /* ------------------------- נוכחות חיה ------------------------- */
   useEffect(() => {

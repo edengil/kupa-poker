@@ -7,6 +7,8 @@ import { AL, canon, r2 } from "./helpers";
 import { allTimeTotals, monthTotals, yearTotals } from "./totals";
 import { Empty } from "./ui";
 import { ChevronLeft, Crown } from "./icons";
+import { compareToLastMonth } from "./monthCompare";
+import { GroupMoMLine, MoMDelta } from "./MoMDelta";
 
 /* טאב שחקנים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function PlayersTab({ db, onPlayer }) {
@@ -26,6 +28,7 @@ export function PlayersTab({ db, onPlayer }) {
     if (scope === "month") return monthTotals(db, y, mo);
     return allTimeTotals(db);
   }, [db, scope, y, mo]);
+  const mom = useMemo(() => compareToLastMonth(db, scope, y, mo), [db, scope, y, mo]);
 
   // ספירת הערבים חייבת להיות באותו חתך כמו הסכומים, אחרת הממוצע לא מייצג
   const counts = useMemo(() => {
@@ -184,21 +187,32 @@ export function PlayersTab({ db, onPlayer }) {
                     </span>
                   )}
                 </span>
-                <b
+                <span
                   style={{
-                    fontSize: 16,
-                    color: t.amount >= 0 ? C.win : C.loss,
-                    fontVariantNumeric: "tabular-nums",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: 2,
                     minWidth: 62,
-                    textAlign: "left",
                   }}
                 >
-                  {fmt(t.amount)}
-                </b>
+                  <b
+                    style={{
+                      fontSize: 16,
+                      color: t.amount >= 0 ? C.win : C.loss,
+                      fontVariantNumeric: "tabular-nums",
+                      textAlign: "left",
+                    }}
+                  >
+                    {fmt(t.amount)}
+                  </b>
+                  <MoMDelta delta={mom.deltas[t.name]?.delta} compact />
+                </span>
                 <ChevronLeft size={16} color={C.dim} />
               </button>
             );
           })}
+          <GroupMoMLine moved={mom.moved} />
         </div>
       )}
     </div>

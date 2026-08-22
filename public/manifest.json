@@ -5,6 +5,8 @@
   "dir": "rtl",
   "lang": "he",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#0A2B21",
   "theme_color": "#0A2B21",
