@@ -23,9 +23,9 @@ const C = {
 };
 
 const STATUS = [
-  ["yes", "מגיע ✅"],
-  ["maybe", "אולי 🤔"],
-  ["no", "לא מגיע ❌"],
+  ["yes", "מאשר הגעה", "♠"],
+  ["maybe", "אולי", "·"],
+  ["no", "לא מגיע", ""],
 ];
 const STATUS_LABEL = { yes: "מגיעים", maybe: "אולי", no: "לא מגיעים" };
 const STATUS_COLOR = { yes: C.win, maybe: C.brass, no: C.loss };
@@ -37,6 +37,17 @@ export const planLabel = (plan) => {
   const date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
   return `${weekday} · ${date}${plan.time ? ` · ${plan.time}` : ""}`;
 };
+
+/** מיקום + הערות — תומך גם בתוכניות ישנות שבהן note שימש למיקום */
+export function planPlace(plan) {
+  if (!plan) return { location: "", note: "" };
+  if (plan.location) return { location: plan.location, note: plan.note || "" };
+  /* תוכניות ישנות: כתובת מארח נשמרה ב-note */
+  if (plan.note && /^אצל\s/.test(plan.note)) {
+    return { location: plan.note, note: "" };
+  }
+  return { location: "", note: plan.note || "" };
+}
 
 function useRsvps(supabase, groupId, planIso) {
   const [rows, setRows] = useState([]);
@@ -91,7 +102,7 @@ function Groups({ rows }) {
         );
       })}
       {!rows.length && (
-        <span style={{ fontSize: 12, color: C.dim }}>אף אחד עוד לא ענה.</span>
+        <span style={{ fontSize: 12, color: C.dim }}>עדיין מחכים לאישורים — תהיה הראשון?</span>
       )}
     </div>
   );
@@ -108,6 +119,7 @@ export function RsvpCard({ supabase, groupId, plan }) {
   const [rows, refresh] = useRsvps(supabase, groupId, plan?.iso);
   const [me, setMe] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [justVoted, setJustVoted] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -122,6 +134,8 @@ export function RsvpCard({ supabase, groupId, plan }) {
   if (!plan?.iso || !groupId) return null;
 
   const mine = me && rows.find((r) => r.user_id === me.id)?.status;
+  const { location, note } = planPlace(plan);
+  const confirmed = mine === "yes";
 
   const vote = async (status) => {
     if (!me || busy) return;
@@ -139,54 +153,211 @@ export function RsvpCard({ supabase, groupId, plan }) {
       { onConflict: "group_id,user_id" }
     );
     await refresh();
+    setJustVoted(status);
     setBusy(false);
   };
 
   return (
     <section
       style={{
-        background: C.card,
-        border: `1px solid ${C.brass}66`,
-        borderRadius: 14,
-        padding: "12px 14px",
+        position: "relative",
+        overflow: "hidden",
+        background: `linear-gradient(165deg, ${C.cardHi} 0%, ${C.card} 55%, ${C.feltDeep} 100%)`,
+        border: `1px solid ${C.brass}88`,
+        borderRadius: 16,
+        padding: "16px 15px 14px",
         margin: "11px 0",
+        boxShadow: `0 0 0 1px ${C.brass}22, 0 10px 28px ${C.feltDeep}66`,
       }}
     >
-      <div style={{ fontSize: 14.5, fontWeight: 700, color: C.brass, marginBottom: 2 }}>
-        ♠ ערב פוקר מתוכנן
-      </div>
-      <div style={{ fontSize: 13.5, color: C.cream, marginBottom: plan.note ? 2 : 10 }}>
-        {planLabel(plan)}
-      </div>
-      {plan.note && (
-        <div style={{ fontSize: 12.5, color: C.dim, marginBottom: 10 }}>{plan.note}</div>
-      )}
+      <style>{`
+        @keyframes rsvpGlow {
+          0%, 100% { opacity: .35; transform: scale(1); }
+          50% { opacity: .55; transform: scale(1.04); }
+        }
+        @keyframes rsvpSpade {
+          0%, 100% { transform: rotate(-8deg) translateY(0); opacity: .12; }
+          50% { transform: rotate(-4deg) translateY(-3px); opacity: .2; }
+        }
+        @keyframes rsvpPop {
+          0% { transform: scale(.92); opacity: 0; }
+          60% { transform: scale(1.04); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-        {STATUS.map(([st, label]) => (
-          <button
-            key={st}
-            onClick={() => vote(st)}
-            disabled={busy}
-            style={{
-              flex: 1,
-              padding: "9px 6px",
-              borderRadius: 10,
-              border: `1px solid ${mine === st ? STATUS_COLOR[st] : C.line}`,
-              background: mine === st ? `${STATUS_COLOR[st]}22` : "transparent",
-              color: mine === st ? STATUS_COLOR[st] : C.cream,
-              fontFamily: "inherit",
-              fontSize: 12.5,
-              fontWeight: mine === st ? 700 : 500,
-              cursor: "pointer",
-            }}
-          >
-            {label}
-          </button>
-        ))}
+      {/* מוטיב חגיגי עדין ברקע */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: -18,
+          left: -8,
+          fontSize: 88,
+          color: C.brass,
+          animation: "rsvpSpade 4.5s ease-in-out infinite",
+          pointerEvents: "none",
+          lineHeight: 1,
+          userSelect: "none",
+        }}
+      >
+        ♠
       </div>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(ellipse at 85% 0%, ${C.brass}28 0%, transparent 55%)`,
+          animation: "rsvpGlow 3.8s ease-in-out infinite",
+          pointerEvents: "none",
+        }}
+      />
 
-      <Groups rows={rows} />
+      <div style={{ position: "relative" }}>
+        <div style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 7,
+          fontSize: 11.5,
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+          color: C.brass,
+          marginBottom: 6,
+        }}>
+          <span style={{ fontSize: 14 }}>♠</span>
+          הזמנה לערב
+        </div>
+
+        <div style={{
+          fontSize: 18,
+          fontWeight: 800,
+          color: C.cream,
+          marginBottom: 4,
+          lineHeight: 1.25,
+        }}>
+          {confirmed ? "נתראה בשולחן!" : "בא לערב פוקר?"}
+        </div>
+        <div style={{
+          fontSize: 13,
+          color: C.dim,
+          marginBottom: 12,
+          lineHeight: 1.4,
+        }}>
+          {confirmed
+            ? "המקום שלך שמור. אפשר תמיד לעדכן."
+            : "אשרו הגעה — נשמח לראות אתכם מסביב לשולחן."}
+        </div>
+
+        <div style={{
+          background: `${C.feltDeep}99`,
+          border: `1px solid ${C.line}`,
+          borderRadius: 12,
+          padding: "11px 12px",
+          marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.brass, marginBottom: location || note ? 6 : 0 }}>
+            {planLabel(plan)}
+          </div>
+          {location && (
+            <div style={{ fontSize: 13, color: C.cream, marginBottom: note ? 6 : 0, lineHeight: 1.4 }}>
+              📍 {location}
+            </div>
+          )}
+          {note && (
+            <div style={{
+              fontSize: 13,
+              color: C.cream,
+              lineHeight: 1.45,
+              paddingTop: location ? 8 : 0,
+              borderTop: location ? `1px solid ${C.line}` : "none",
+              marginTop: location ? 2 : 0,
+            }}>
+              <span style={{ color: C.brass, fontWeight: 700 }}>הערות · </span>
+              {note}
+            </div>
+          )}
+        </div>
+
+        {justVoted === "yes" && (
+          <div style={{
+            animation: "rsvpPop .45s ease-out",
+            textAlign: "center",
+            fontSize: 13,
+            fontWeight: 700,
+            color: C.win,
+            marginBottom: 10,
+          }}>
+            ♠ מעולה — נתראה בערב!
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+          {(() => {
+            const [st, label, icon] = STATUS[0];
+            const active = mine === st;
+            return (
+              <button
+                onClick={() => vote(st)}
+                disabled={busy}
+                style={{
+                  width: "100%",
+                  padding: "14px 14px",
+                  borderRadius: 12,
+                  border: `1px solid ${active ? C.win : `${C.brass}aa`}`,
+                  background: active
+                    ? `${C.win}28`
+                    : `linear-gradient(180deg, ${C.brass} 0%, #c4922e 100%)`,
+                  color: active ? C.win : C.feltDeep,
+                  fontFamily: "inherit",
+                  fontSize: 16,
+                  fontWeight: 800,
+                  cursor: busy ? "wait" : "pointer",
+                  boxShadow: active ? "none" : `0 5px 16px ${C.brass}40`,
+                }}
+              >
+                {icon} {label}
+              </button>
+            );
+          })()}
+          <div style={{ display: "flex", gap: 8 }}>
+            {STATUS.slice(1).map(([st, label]) => {
+              const active = mine === st;
+              return (
+                <button
+                  key={st}
+                  onClick={() => vote(st)}
+                  disabled={busy}
+                  style={{
+                    flex: 1,
+                    padding: "11px 10px",
+                    borderRadius: 11,
+                    border: `1px solid ${active ? STATUS_COLOR[st] : C.line}`,
+                    background: active ? `${STATUS_COLOR[st]}22` : "transparent",
+                    color: active ? STATUS_COLOR[st] : C.cream,
+                    fontFamily: "inherit",
+                    fontSize: 13.5,
+                    fontWeight: active ? 700 : 600,
+                    cursor: busy ? "wait" : "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{
+          borderTop: `1px solid ${C.line}`,
+          paddingTop: 11,
+        }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: C.dim, marginBottom: 7 }}>
+            מי מגיע
+          </div>
+          <Groups rows={rows} />
+        </div>
+      </div>
     </section>
   );
 }

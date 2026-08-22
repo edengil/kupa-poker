@@ -13,6 +13,18 @@ const HOSTS = [
   { label: "איציק", text: "אצל איציק · יוסף בורג 10, נתניה · קומה 2, דירה 6 · קוד בניין #7580" },
 ];
 
+function splitPlanFields(plan) {
+  if (!plan) return { location: "", note: "" };
+  if (plan.location != null && plan.location !== "") {
+    return { location: plan.location || "", note: plan.note || "" };
+  }
+  /* תוכניות ישנות: note שימש גם למיקום וגם להערות */
+  if (plan.note && (HOSTS.some((h) => h.text === plan.note) || /^אצל\s/.test(plan.note))) {
+    return { location: plan.note || "", note: "" };
+  }
+  return { location: "", note: plan.note || "" };
+}
+
 /* תכנון הערב הבא. נשמר בתוך ה-DB (db.plan) ולכן זורם לצופים דרך אותו
    snapshot — הם רואים את התאריך ועונים מגיע/לא בטבלת ה-RSVP. */
 export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
@@ -21,17 +33,26 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const [editing, setEditing] = useState(false);
   const [iso, setIso] = useState("");
   const [time, setTime] = useState("21:00");
+  const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
 
   const startEdit = () => {
+    const fields = splitPlanFields(plan);
     setIso(plan?.iso || todayIso);
     setTime(plan?.time || "21:00");
-    setNote(plan?.note || "");
+    setLocation(fields.location);
+    setNote(fields.note);
     setEditing(true);
   };
   const save = () => {
     if (!iso) return;
-    const next = { iso, time, note: note.trim(), createdAt: Date.now() };
+    const next = {
+      iso,
+      time,
+      location: location.trim(),
+      note: note.trim(),
+      createdAt: Date.now(),
+    };
     commit({ ...db, plan: next });
     setEditing(false);
     // ההזמנה יוצאת לקבוצת הוואטסאפ עם הלינק — שהחברים יאשרו הגעה
@@ -52,6 +73,8 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     padding: "9px 10px",
     colorScheme: "dark",
   };
+
+  const display = plan ? splitPlanFields(plan) : null;
 
   if (!plan && !editing) {
     return (
@@ -97,16 +120,19 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
             <input type="time" value={time}
               onChange={(e) => setTime(e.target.value)} style={{ ...field, flex: 1 }} />
           </div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
+            מיקום
+          </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
             {HOSTS.map((h) => (
               <button
                 key={h.label}
-                onClick={() => setNote(h.text)}
+                onClick={() => setLocation(h.text)}
                 style={{
                   padding: "5px 11px", borderRadius: 999,
-                  border: `1px solid ${note === h.text ? C.brass : C.line}`,
-                  background: note === h.text ? `${C.brass}22` : "transparent",
-                  color: note === h.text ? C.brass : C.dim,
+                  border: `1px solid ${location === h.text ? C.brass : C.line}`,
+                  background: location === h.text ? `${C.brass}22` : "transparent",
+                  color: location === h.text ? C.brass : C.dim,
                   fontFamily: "inherit", fontSize: 12, cursor: "pointer",
                 }}
               >
@@ -115,10 +141,27 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
             ))}
           </div>
           <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="כתובת / מיקום — לא חובה"
+            style={{ ...field, width: "100%", boxSizing: "border-box", marginBottom: 10 }}
+          />
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
+            הערות
+          </div>
+          <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="הערה (איפה, מה להביא…) — לא חובה"
-            style={{ ...field, width: "100%", boxSizing: "border-box", marginBottom: 10 }}
+            placeholder="למשל: להביא חטיפים, חניה בחצר, לבוש חופשי…"
+            rows={2}
+            style={{
+              ...field,
+              width: "100%",
+              boxSizing: "border-box",
+              marginBottom: 10,
+              resize: "vertical",
+              lineHeight: 1.45,
+            }}
           />
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={save} style={{
@@ -139,7 +182,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
         </>
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: plan.note ? 2 : 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: (display.location || display.note) ? 2 : 8 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: C.brass }}>♠ הערב הבא</div>
               <div style={{ fontSize: 13.5, color: C.cream }}>{planLabel(plan)}</div>
@@ -159,8 +202,25 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               בטל
             </button>
           </div>
-          {plan.note && (
-            <div style={{ fontSize: 12.5, color: C.dim, marginBottom: 8 }}>{plan.note}</div>
+          {display.location && (
+            <div style={{ fontSize: 12.5, color: C.cream, marginBottom: display.note ? 4 : 8, opacity: 0.92 }}>
+              📍 {display.location}
+            </div>
+          )}
+          {display.note && (
+            <div style={{
+              fontSize: 12.5,
+              color: C.brass,
+              marginBottom: 8,
+              background: `${C.brass}14`,
+              border: `1px solid ${C.brass}33`,
+              borderRadius: 8,
+              padding: "7px 10px",
+              lineHeight: 1.4,
+            }}>
+              <span style={{ fontWeight: 700 }}>הערות · </span>
+              {display.note}
+            </div>
           )}
           {typeof renderRsvps === "function" && renderRsvps(plan.iso)}
         </>

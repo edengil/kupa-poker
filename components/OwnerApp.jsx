@@ -362,10 +362,13 @@ export default function OwnerApp() {
       if (!slug) return;
       const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
       const head = isUpdate ? "עדכון לערב הפוקר! ♠" : "ערב פוקר מתוכנן! ♠";
+      const location = plan.location || "";
+      const note = plan.note || "";
       const text = [
         `🤖 ${head}`,
         planLabel(plan),
-        ...(plan.note ? [plan.note] : []),
+        ...(location ? [`📍 ${location}`] : []),
+        ...(note ? [`📝 הערות: ${note}`] : []),
         "",
         "מגיעים? מאשרים הגעה כאן:",
         `${base}/g/${slug}`,
