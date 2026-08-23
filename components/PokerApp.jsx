@@ -23,6 +23,7 @@ import { PokerTable } from "./poker/PokerTable";
 import { DB_KEY, loadConfig } from "./poker/config";
 import { buildSeedDb } from "./poker/seed";
 import { applyChipBackfill } from "./poker/chipBackfill";
+import { applyTipBackfill } from "./poker/tipBackfill";
 import { PersonalHighlightsCard } from "./poker/PersonalHighlightsCard";
 import { matchViewerToPlayer } from "./poker/personalHighlights";
 import { EGFooter } from "./Logo";
@@ -68,11 +69,14 @@ function App({
         }
       } else d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
       // גיבוי ג'יטונים מצ'אט אוג׳ 2026 — ממלא ערבים ישנים בלי שדה chips
-      const filled = applyChipBackfill(d);
+      const chipsFilled = applyChipBackfill(d);
+      // גיבוי טיפים חד־פעמי (למשל טיפ שנרשם אחרי סגירת הערב)
+      const tipsFilled = applyTipBackfill(d);
+      const filled = chipsFilled || tipsFilled;
       if (alive) {
         setDb(d);
         setReady(true);
-        // בעלים: שומרים פעם אחת למסד כדי ששיאי הג'יטונים יישארו
+        // בעלים: שומרים פעם אחת למסד כדי ששיאי הג'יטונים / הטיפים יישארו
         if (filled && !readOnly) {
           store.set(DB_KEY, JSON.stringify(d));
         }
