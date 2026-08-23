@@ -8,6 +8,7 @@ import { allTimeTotals, monthTotals, yearTotals } from "./totals";
 import { Empty, GroupLabel, IconBtn, SegBar, Select } from "./ui";
 import { Award, Crown, Share2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
+import { LastSettlementCard } from "./LastSettlementCard";
 
 function Ledger({ totals, official, readOnly = false }) {
   const winners = totals.filter((t) => t.amount > 0),
@@ -155,6 +156,7 @@ export function TableTab({ db, years, readOnly = false }) {
 
   return (
     <div style={{ marginTop: 4 }}>
+      <LastSettlementCard db={db} />
       <SegBar
         value={scope}
         onChange={setScope}

@@ -7,6 +7,7 @@ import { AL, balance, canon, toWhatsApp } from "./helpers";
 import { Empty, IconBtn } from "./ui";
 import { Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
+import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function SessionsTab({ db, commit, goEdit }) {
@@ -32,6 +33,14 @@ export function SessionsTab({ db, commit, goEdit }) {
       sessions: db.sessions.filter((x) => x.id !== s.id),
     });
     goEdit(raw);
+  };
+
+  const openShare = (s) => {
+    setShare({
+      session: s,
+      text: nightSummaryText(s, A),
+      settlement: settlementTextForSession(s) || undefined,
+    });
   };
 
   const list = [...db.sessions].sort((a, b) => b.iso.localeCompare(a.iso));
@@ -69,7 +78,7 @@ export function SessionsTab({ db, commit, goEdit }) {
                 {s.d}.{s.mo}.{s.y}
               </b>
               <div style={{ display: "flex", gap: 6 }}>
-                <IconBtn onClick={() => setShare(s)}>
+                <IconBtn onClick={() => openShare(s)}>
                   <Share2 size={15} />
                 </IconBtn>
                 <IconBtn onClick={() => edit(s)}>
@@ -111,8 +120,9 @@ export function SessionsTab({ db, commit, goEdit }) {
       })}
       {share && (
         <ShareSheet
-          title={`סיכום פוקר ${share.d}.${share.mo}`}
-          text={toWhatsApp(share.entries, share, null, A)}
+          title={`סיכום פוקר ${share.session.d}.${share.session.mo}`}
+          text={share.text}
+          settlement={share.settlement}
           onClose={() => setShare(null)}
         />
       )}

@@ -100,3 +100,46 @@ describe("isAllowed", () => {
     expect(isAllowed({ fromMe: false, from: "972999999999" }, "972521234567", "")).toBe(false);
   });
 });
+
+describe("settle / end replies — app CTA", () => {
+  it("appends the app link when siteUrl+slug are on the settle command", () => {
+    const live = {
+      players: [
+        { name: "א", buyin: 100, cashout: "400" },
+        { name: "ב", buyin: 100, cashout: "0" },
+      ],
+      tips: [],
+      applied: {},
+    };
+    const { reply } = applyCommands(
+      live,
+      [{ kind: "settle", siteUrl: "https://example.com", slug: "kupa" }],
+      null
+    );
+    expect(reply).toContain("חשבון סופי");
+    expect(reply).toContain("📱 לראות את החלוקה באפליקציה:");
+    expect(reply).toContain("https://example.com/g/kupa");
+    /* לא שולחים רשימת העברות לקבוצה — רק לינק */
+    expect(reply).not.toMatch(/מעביר \d+ ל/);
+  });
+
+  it("appends the app link on last cashout in closing mode", () => {
+    const live = {
+      closing: true,
+      players: [
+        { name: "א", buyin: 100, cashout: "400" },
+        { name: "ב", buyin: 100, cashout: "" },
+      ],
+      tips: [],
+      applied: {},
+    };
+    const { reply } = applyCommands(
+      live,
+      [{ kind: "cashout", name: "ב", chips: 0, siteUrl: "https://example.com", slug: "kupa" }],
+      "m-close"
+    );
+    expect(reply).toContain("כולם סגורים");
+    expect(reply).toContain("https://example.com/g/kupa");
+    expect(reply).not.toContain("לשמירת הערב וחלוקת ההעברות — האפליקציה.");
+  });
+});

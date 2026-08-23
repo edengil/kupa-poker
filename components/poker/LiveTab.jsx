@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store } from "../../lib/store";
 import { buildReport, buildSettlement } from "../../lib/report";
 import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
+import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "./colors";
 import { fmt, fmtGap } from "./format";
 import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "./helpers";
@@ -328,6 +329,8 @@ export function LiveTab({
       isCashOnly,
       transferVerb,
     });
+    /* סיכום + טיפים כמו בשיתוף מטאב ערבים; החלוקה בטאב נפרד ב־ShareSheet */
+    const summaryText = nightSummaryText({ ...rec, cps }, A);
     setShare({
       entries: entries.map(({ name, amount }) => ({ name, amount })),
       d,
@@ -336,6 +339,7 @@ export function LiveTab({
       startedAt: startedAt || null,
       endedAt,
       settlement: split,
+      raw: summaryText,
     });
     setPlayers([]);
     setEntriesCount("");

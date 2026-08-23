@@ -154,16 +154,14 @@ export async function POST(request) {
   const cmds = parseCommands(msg.text, live?.addAmt || 50, gameActive);
   if (!cmds.length) return ok({ skipped: "not a command" });
 
-  /* פקודת "לינק" צריכה את הכתובת ואת ה-slug — הם ידועים רק כאן, לא בפרסר.
-     בלעדיהם הבוט ענה "הלינק לא מוגדר" גם כשהכל היה תקין. */
+  /* כתובת האפליקציה + slug — לפקודת "לינק" ול־CTA בסוף ערב (חלוקה באפליקציה).
+     ידועים רק כאן, לא בפרסר. */
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null);
   for (const c of cmds) {
-    if (c.kind === "link") {
-      c.siteUrl = siteUrl;
-      c.slug = row.slug;
-    }
+    c.siteUrl = siteUrl;
+    c.slug = row.slug;
   }
 
   // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה
