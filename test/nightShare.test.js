@@ -8,6 +8,8 @@ import {
 } from "../lib/nightShare.js";
 import {
   NON_TIPPER_ROASTS,
+  FIRST_PLACE_PRAISE_M,
+  FIRST_PLACE_PRAISE_F,
   tipRankPlaces,
   formatFirstPlaceLine,
   formatNonTipperLine,
@@ -195,7 +197,7 @@ describe("tipSummaryForSession", () => {
       ],
     };
     const text = tipSummaryForSession(session, undefined, { now: fixedNow });
-    expect(text).toMatch(/מלכה|תותחית|נותנת|אחות|אגדה|מלכת/);
+    expect(text).toMatch(/מלכה|תותחית|נותנת|אחות|אגדה|מלכת|מזמינה|פותחת|מפנקת|עלייך/);
     expect(text).not.toMatch(/יא מלך[^ה]|אתה נותן|תותח על הטיפ/);
   });
 
@@ -257,7 +259,7 @@ describe("tipSummaryForSession", () => {
     ];
     const text = tipSummaryForSession(state, withNet, { now: fixedNow });
     expect(text).toContain("אופיר");
-    expect(text).toMatch(/מלך|תותח|ציסר|אגדה/);
+    expect(text).toMatch(/מלך|תותח|ציסר|אגדה|מזמין|פותח|מפנק|על החשבון/);
     expect(text).toMatch(/דן/);
   });
 
@@ -306,9 +308,17 @@ describe("tipSummaryForSession", () => {
     expect(noTipLine).not.toMatch(/אלון|בני|גיא|דוד/);
   });
 
+  it("first-place praise bags grew and keep gender pairs", () => {
+    expect(FIRST_PLACE_PRAISE_M.length).toBeGreaterThanOrEqual(14);
+    expect(FIRST_PLACE_PRAISE_F.length).toBe(FIRST_PLACE_PRAISE_M.length);
+    expect(FIRST_PLACE_PRAISE_M.every((s) => s.includes("{name}"))).toBe(true);
+    expect(FIRST_PLACE_PRAISE_F.every((s) => s.includes("{name}"))).toBe(true);
+    expect(FIRST_PLACE_PRAISE_F.some((s) => /את |מלכה|תותחית|מזמינה|פותחת|מפנקת/.test(s))).toBe(true);
+  });
+
   it("first-place formatter genders by isFemaleName", () => {
-    expect(formatFirstPlaceLine(["אורן"], isFemaleName, fixedNow)).toMatch(/מלכה|תותחית|נותנת|אחות/);
-    expect(formatFirstPlaceLine(["איציק"], isFemaleName, fixedNow)).toMatch(/מלך|תותח|נותן|אח /);
+    expect(formatFirstPlaceLine(["אורן"], isFemaleName, fixedNow)).toMatch(/מלכה|תותחית|נותנת|אחות|מזמינה|פותחת|מפנקת/);
+    expect(formatFirstPlaceLine(["איציק"], isFemaleName, fixedNow)).toMatch(/מלך|תותח|נותן|אח |מזמין|פותח|מפנק/);
   });
 
   it("bolds the entire no-tip line in WhatsApp markup", () => {
