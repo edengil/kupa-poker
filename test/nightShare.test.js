@@ -86,6 +86,53 @@ describe("tipSummaryForSession", () => {
     expect(text).toMatch(/קובי/);
   });
 
+  it("uses tipsGiven on entries when tips array is empty (live save shape)", () => {
+    /* כמו saveNight: tipsGiven על entries, tips: [] / undefined */
+    const session = {
+      entries: [
+        { name: "אופיר", amount: 50, buyin: 100, chips: 300, tipsGiven: 12 },
+        { name: "דן", amount: -20, buyin: 100, chips: 160, tipsGiven: 0 },
+        { name: "קובי", amount: -30, buyin: 100, chips: 140 },
+      ],
+      tips: [],
+    };
+    const text = tipSummaryForSession(session);
+    expect(text).toContain("💸 טיפים הערב");
+    expect(text).toContain("🥇");
+    expect(text).toContain("אופיר");
+    expect(text).toContain("12");
+    expect(text).toMatch(/דן|קובי/);
+  });
+
+  it("merges tips[] events with tipsGiven on entries", () => {
+    const session = {
+      entries: [
+        { name: "אופיר", amount: 10, tipsGiven: 20 },
+        { name: "דן", amount: -10, tipsGiven: 5 },
+      ],
+      tips: [{ name: "אופיר", amount: 8, at: 1 }],
+    };
+    const text = tipSummaryForSession(session);
+    /* tipsGiven גבוה יותר מיומן — לוקחים את המקסימום */
+    expect(text).toContain("אופיר");
+    expect(text).toContain("20");
+    expect(text).toContain("דן");
+    expect(text).toContain("5");
+  });
+
+  it("always shows tip block when nobody tipped", () => {
+    const session = {
+      entries: [
+        { name: "א", amount: 40 },
+        { name: "ב", amount: -40 },
+      ],
+    };
+    const text = tipSummaryForSession(session);
+    expect(text).toContain("💸 טיפים הערב");
+    expect(text).toContain("אף אחד לא שם טיפ הערב");
+    expect(text).toMatch(/א|ב/);
+  });
+
   it("works with live-style players + tips array", () => {
     const state = {
       players: [
@@ -119,5 +166,45 @@ describe("nightSummaryText", () => {
     expect(text).toContain("סיכום פוקר 20.8");
     expect(text).toContain("אופיר");
     expect(text).toContain("💸 טיפים הערב");
+  });
+
+  it("appends tip summary for tipsGiven-only night (no tips array) like Sessions share", () => {
+    const session = {
+      d: 23,
+      mo: 8,
+      y: 2026,
+      entries: [
+        { name: "אופיר", amount: 80, buyin: 100, chips: 360, tipsGiven: 15 },
+        { name: "קובי", amount: -80, buyin: 100, chips: 40, tipsGiven: 0 },
+      ],
+      tips: [],
+      startedAt: Date.parse("2026-08-23T20:00:00+03:00"),
+      endedAt: Date.parse("2026-08-23T23:30:00+03:00"),
+    };
+    const text = nightSummaryText(session);
+    expect(text).toContain("סיכום פוקר 23.8");
+    expect(text).toContain("💸 טיפים הערב");
+    expect(text).toContain("🥇");
+    expect(text).toContain("אופיר");
+    expect(text).toContain("15");
+    expect(text).toMatch(/קובי/);
+    /* טאב חלוקה ב־ShareSheet נשען על אותו ערב */
+    const split = settlementTextForSession(session);
+    expect(split).toContain("חלוקה");
+    expect(split).toMatch(/מעביר/);
+  });
+
+  it("still appends tip block when all tip totals are zero", () => {
+    const session = {
+      d: 23,
+      mo: 8,
+      entries: [
+        { name: "א", amount: 10 },
+        { name: "ב", amount: -10 },
+      ],
+    };
+    const text = nightSummaryText(session);
+    expect(text).toContain("💸 טיפים הערב");
+    expect(text).toContain("אף אחד לא שם טיפ הערב");
   });
 });
