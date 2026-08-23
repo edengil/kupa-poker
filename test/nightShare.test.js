@@ -247,6 +247,25 @@ describe("tipSummaryForSession", () => {
     expect(text).toMatch(/דן/);
   });
 
+  it("lists each no-tip player name exactly once (no wonNoTip duplicate)", () => {
+    const session = {
+      entries: [
+        { name: "אופיר", amount: 50, tipsGiven: 10 },
+        { name: "קובי", amount: 30 },
+        { name: "דן", amount: -80 },
+      ],
+    };
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
+    expect((text.match(/קובי/g) || []).length).toBe(1);
+    expect(text).not.toContain("הרווחתם ולא השארתם");
+    const tipLine = text.split("\n").find((l) => l.includes("נתנו טיפ"));
+    const noTipLine = text.split("\n").find((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
+    expect(tipLine).toContain("אופיר");
+    expect(tipLine).not.toContain("קובי");
+    expect(noTipLine).toContain("קובי");
+    expect(noTipLine).not.toContain("אופיר");
+  });
+
   it("first-place formatter genders by isFemaleName", () => {
     expect(formatFirstPlaceLine(["אורן"], isFemaleName, fixedNow)).toMatch(/מלכה|תותחית|נותנת|אחות/);
     expect(formatFirstPlaceLine(["איציק"], isFemaleName, fixedNow)).toMatch(/מלך|תותח|נותן|אח /);
