@@ -6,6 +6,12 @@ import {
   nightSummaryText,
   sessionHasBuyinChips,
 } from "../lib/nightShare.js";
+import {
+  NON_TIPPER_ROASTS,
+  tipRankPlaces,
+  formatFirstPlaceLine,
+} from "../lib/tipSummaryCopy.js";
+import { isFemaleName } from "../lib/settlement.js";
 
 describe("playersFromSession", () => {
   it("uses buyin/chips when present", () => {
@@ -50,7 +56,6 @@ describe("settlementTextForSession", () => {
   });
 
   it("builds transfer lines from buyin/chips with default cps", () => {
-    // cps=2: net = chips/2 - buyin → א +100, ב -100
     const session = {
       entries: [
         { name: "א", amount: 100, buyin: 100, chips: 400 },
@@ -67,8 +72,51 @@ describe("settlementTextForSession", () => {
   });
 });
 
+describe("tipRankPlaces", () => {
+  it("shares 2nd place on equal amounts and skips to 4th for next", () => {
+    const ranks = tipRankPlaces([
+      { name: "א", amount: 100 },
+      { name: "ב", amount: 50 },
+      { name: "ג", amount: 50 },
+      { name: "ד", amount: 10 },
+    ]);
+    expect(ranks).toEqual([
+      { place: 1, names: ["א"], amount: 100 },
+      { place: 2, names: ["ב", "ג"], amount: 50 },
+      /* מקום 4 — לא מוצג (רק עד 3) */
+    ]);
+  });
+
+  it("shows 3rd place when amounts differ", () => {
+    const ranks = tipRankPlaces([
+      { name: "א", amount: 100 },
+      { name: "ב", amount: 50 },
+      { name: "ג", amount: 20 },
+    ]);
+    expect(ranks.map((r) => r.place)).toEqual([1, 2, 3]);
+    expect(ranks[2].names).toEqual(["ג"]);
+  });
+});
+
+describe("NON_TIPPER_ROASTS bag", () => {
+  const flat = NON_TIPPER_ROASTS.map((e) =>
+    typeof e === "string" ? e : [e.m, e.f, e.multi].filter(Boolean).join(" | ")
+  ).join("\n");
+
+  it("includes soda line", () => {
+    expect(flat).toContain("סודה");
+  });
+
+  it("excludes all-in and סלע lines", () => {
+    expect(flat).not.toMatch(/all-in/i);
+    expect(flat).not.toContain("סלע");
+  });
+});
+
 describe("tipSummaryForSession", () => {
-  it("ranks tippers from tipsGiven on a saved session", () => {
+  const fixedNow = Date.parse("2026-08-23T12:00:00+03:00");
+
+  it("ranks tippers without amounts; honors all; roasts non-tippers", () => {
     const session = {
       entries: [
         { name: "אופיר", amount: 20, tipsGiven: 15 },
@@ -76,18 +124,68 @@ describe("tipSummaryForSession", () => {
         { name: "קובי", amount: -10 },
       ],
     };
-    const text = tipSummaryForSession(session);
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
     expect(text).toContain("💸 טיפים הערב");
     expect(text).toContain("🥇");
     expect(text).toContain("אופיר");
-    expect(text).toContain("15");
     expect(text).toContain("🥈");
     expect(text).toContain("דן");
+    expect(text).toContain("👏 נתנו טיפ:");
     expect(text).toMatch(/קובי/);
+    /* אין סכומים בפלט */
+    expect(text).not.toMatch(/\b15\b/);
+    expect(text).not.toMatch(/\b5\b/);
+    expect(text).toMatch(/שם הכי מעט/);
+  });
+
+  it("ties share 2nd place (two names on 🥈, no amounts)", () => {
+    const session = {
+      entries: [
+        { name: "איציק", amount: 40, tipsGiven: 100 },
+        { name: "דן", amount: 10, tipsGiven: 40 },
+        { name: "אופיר", amount: 10, tipsGiven: 40 },
+        { name: "נתנאל", amount: -60, tipsGiven: 10 },
+        { name: "קובי", amount: 0 },
+      ],
+    };
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
+    expect(text).toMatch(/🥈 מקום שני בטיפים: (דן, אופיר|אופיר, דן)/);
+    expect(text).not.toContain("🥉");
+    expect(text).not.toMatch(/\b100\b/);
+    expect(text).not.toMatch(/\b40\b/);
+    expect(text).toContain("נתנאל");
+    expect(text).toMatch(/שם הכי מעט/);
+  });
+
+  it("shows 🥉 third place when three distinct tip amounts", () => {
+    const session = {
+      entries: [
+        { name: "א", amount: 30, tipsGiven: 90 },
+        { name: "ב", amount: 0, tipsGiven: 50 },
+        { name: "ג", amount: -10, tipsGiven: 20 },
+        { name: "ד", amount: -20 },
+      ],
+    };
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
+    expect(text).toContain("🥇");
+    expect(text).toContain("🥈 מקום שני בטיפים: ב");
+    expect(text).toContain("🥉 מקום שלישי בטיפים: ג");
+    expect(text).not.toMatch(/\b90\b|\b50\b|\b20\b/);
+  });
+
+  it("uses feminine first-place praise for אורן", () => {
+    const session = {
+      entries: [
+        { name: "אורן", amount: 10, tipsGiven: 80 },
+        { name: "דן", amount: -10, tipsGiven: 10 },
+      ],
+    };
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
+    expect(text).toMatch(/מלכה|תותחית|נותנת|אחות|אגדה|מלכת/);
+    expect(text).not.toMatch(/יא מלך[^ה]|אתה נותן|תותח על הטיפ/);
   });
 
   it("uses tipsGiven on entries when tips array is empty (live save shape)", () => {
-    /* כמו saveNight: tipsGiven על entries, tips: [] / undefined */
     const session = {
       entries: [
         { name: "אופיר", amount: 50, buyin: 100, chips: 300, tipsGiven: 12 },
@@ -96,15 +194,15 @@ describe("tipSummaryForSession", () => {
       ],
       tips: [],
     };
-    const text = tipSummaryForSession(session);
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
     expect(text).toContain("💸 טיפים הערב");
     expect(text).toContain("🥇");
     expect(text).toContain("אופיר");
-    expect(text).toContain("12");
+    expect(text).not.toContain("12");
     expect(text).toMatch(/דן|קובי/);
   });
 
-  it("merges tips[] events with tipsGiven on entries", () => {
+  it("merges tips[] events with tipsGiven on entries (no amounts in summary)", () => {
     const session = {
       entries: [
         { name: "אופיר", amount: 10, tipsGiven: 20 },
@@ -112,12 +210,10 @@ describe("tipSummaryForSession", () => {
       ],
       tips: [{ name: "אופיר", amount: 8, at: 1 }],
     };
-    const text = tipSummaryForSession(session);
-    /* tipsGiven גבוה יותר מיומן — לוקחים את המקסימום */
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
     expect(text).toContain("אופיר");
-    expect(text).toContain("20");
     expect(text).toContain("דן");
-    expect(text).toContain("5");
+    expect(text).not.toMatch(/\b20\b|\b5\b|\b8\b/);
   });
 
   it("always shows tip block when nobody tipped", () => {
@@ -127,7 +223,7 @@ describe("tipSummaryForSession", () => {
         { name: "ב", amount: -40 },
       ],
     };
-    const text = tipSummaryForSession(session);
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
     expect(text).toContain("💸 טיפים הערב");
     expect(text).toContain("אף אחד לא שם טיפ הערב");
     expect(text).toMatch(/א|ב/);
@@ -145,10 +241,15 @@ describe("tipSummaryForSession", () => {
       { p: state.players[0], net: 50 },
       { p: state.players[1], net: -50 },
     ];
-    const text = tipSummaryForSession(state, withNet);
+    const text = tipSummaryForSession(state, withNet, { now: fixedNow });
     expect(text).toContain("אופיר");
-    expect(text).toContain("תותח");
+    expect(text).toMatch(/מלך|תותח|ציסר|אגדה/);
     expect(text).toMatch(/דן/);
+  });
+
+  it("first-place formatter genders by isFemaleName", () => {
+    expect(formatFirstPlaceLine(["אורן"], isFemaleName, fixedNow)).toMatch(/מלכה|תותחית|נותנת|אחות/);
+    expect(formatFirstPlaceLine(["איציק"], isFemaleName, fixedNow)).toMatch(/מלך|תותח|נותן|אח /);
   });
 });
 
@@ -186,9 +287,8 @@ describe("nightSummaryText", () => {
     expect(text).toContain("💸 טיפים הערב");
     expect(text).toContain("🥇");
     expect(text).toContain("אופיר");
-    expect(text).toContain("15");
+    expect(text).not.toContain("15");
     expect(text).toMatch(/קובי/);
-    /* טאב חלוקה ב־ShareSheet נשען על אותו ערב */
     const split = settlementTextForSession(session);
     expect(split).toContain("חלוקה");
     expect(split).toMatch(/מעביר/);

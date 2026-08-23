@@ -90,7 +90,9 @@ describe("tip backfill Eden → Oren 30 on 2026-08-23", () => {
     applyTipBackfill(db);
     const summary = tipSummaryForSession(session);
     expect(summary).toContain("עדן גיל");
-    expect(summary).toContain("30");
+    expect(summary).toContain("🥇");
+    /* סיכום בלי סכומים — הסכום נשמר ברשומה */
+    expect(session.entries[0].tipsGiven).toBe(30);
     expect(sessionTips(session).some((t) => t.name === "עדן גיל" && t.amount === 30)).toBe(true);
   });
 });
