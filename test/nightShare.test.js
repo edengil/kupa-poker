@@ -116,7 +116,7 @@ describe("NON_TIPPER_ROASTS bag", () => {
 describe("tipSummaryForSession", () => {
   const fixedNow = Date.parse("2026-08-23T12:00:00+03:00");
 
-  it("ranks tippers without amounts; honors all; roasts non-tippers", () => {
+  it("ranks tippers without amounts; omits honor when all on podium; roasts non-tippers", () => {
     const session = {
       entries: [
         { name: "אופיר", amount: 20, tipsGiven: 15 },
@@ -130,7 +130,7 @@ describe("tipSummaryForSession", () => {
     expect(text).toContain("אופיר");
     expect(text).toContain("🥈");
     expect(text).toContain("דן");
-    expect(text).toContain("👏 נתנו טיפ:");
+    expect(text).not.toContain("גם נתנו טיפ");
     expect(text).toMatch(/קובי/);
     /* אין סכומים בפלט */
     expect(text).not.toMatch(/\b15\b/);
@@ -138,7 +138,7 @@ describe("tipSummaryForSession", () => {
     expect(text).toMatch(/שם הכי מעט/);
   });
 
-  it("ties share 2nd place (two names on 🥈, no amounts)", () => {
+  it("ties share 2nd place; honor lists only tippers off podium", () => {
     const session = {
       entries: [
         { name: "איציק", amount: 40, tipsGiven: 100 },
@@ -153,11 +153,12 @@ describe("tipSummaryForSession", () => {
     expect(text).not.toContain("🥉");
     expect(text).not.toMatch(/\b100\b/);
     expect(text).not.toMatch(/\b40\b/);
-    expect(text).toContain("נתנאל");
+    expect(text).toContain("👏 גם נתנו טיפ: נתנאל");
+    expect(text).not.toMatch(/גם נתנו טיפ:.*(איציק|דן|אופיר)/);
     expect(text).toMatch(/שם הכי מעט/);
   });
 
-  it("shows 🥉 third place when three distinct tip amounts", () => {
+  it("shows 🥉 third place when three distinct tip amounts; no honor line", () => {
     const session = {
       entries: [
         { name: "א", amount: 30, tipsGiven: 90 },
@@ -170,6 +171,7 @@ describe("tipSummaryForSession", () => {
     expect(text).toContain("🥇");
     expect(text).toContain("🥈 מקום שני בטיפים: ב");
     expect(text).toContain("🥉 מקום שלישי בטיפים: ג");
+    expect(text).not.toContain("גם נתנו טיפ");
     expect(text).not.toMatch(/\b90\b|\b50\b|\b20\b/);
   });
 
@@ -258,12 +260,31 @@ describe("tipSummaryForSession", () => {
     const text = tipSummaryForSession(session, undefined, { now: fixedNow });
     expect((text.match(/קובי/g) || []).length).toBe(1);
     expect(text).not.toContain("הרווחתם ולא השארתם");
-    const tipLine = text.split("\n").find((l) => l.includes("נתנו טיפ"));
+    expect(text).not.toContain("גם נתנו טיפ");
     const noTipLine = text.split("\n").find((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
-    expect(tipLine).toContain("אופיר");
-    expect(tipLine).not.toContain("קובי");
     expect(noTipLine).toContain("קובי");
     expect(noTipLine).not.toContain("אופיר");
+  });
+
+  it("honor line excludes podium tippers and uses גם נתנו טיפ", () => {
+    const session = {
+      entries: [
+        { name: "אלון", amount: 10, tipsGiven: 100 },
+        { name: "בני", amount: 0, tipsGiven: 50 },
+        { name: "גיא", amount: 0, tipsGiven: 20 },
+        { name: "דוד", amount: 0, tipsGiven: 5 },
+        { name: "הלל", amount: -10 },
+      ],
+    };
+    const text = tipSummaryForSession(session, undefined, { now: fixedNow });
+    expect(text).toContain("👏 גם נתנו טיפ: דוד");
+    const honor = text.split("\n").find((l) => l.includes("גם נתנו טיפ"));
+    expect(honor).not.toContain("אלון");
+    expect(honor).not.toContain("בני");
+    expect(honor).not.toContain("גיא");
+    const noTipLine = text.split("\n").find((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
+    expect(noTipLine).toMatch(/: הלל —/);
+    expect(noTipLine).not.toMatch(/אלון|בני|גיא|דוד/);
   });
 
   it("first-place formatter genders by isFemaleName", () => {
