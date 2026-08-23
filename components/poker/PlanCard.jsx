@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { planLabel } from "../Rsvp";
 import { C } from "./colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./festive";
@@ -30,7 +30,18 @@ function splitPlanFields(plan) {
    snapshot — הם רואים את התאריך ועונים מגיע/לא בטבלת ה-RSVP. */
 export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const todayIso = new Date().toISOString().slice(0, 10);
-  const plan = db.plan && db.plan.iso >= todayIso ? db.plan : null;
+  // מציגים הזמנה רק אם עוד לא עבר התאריך ואין ערב שמור לאותו יום
+  const planStale =
+    !!db.plan &&
+    (db.plan.iso < todayIso || (db.sessions || []).some((s) => s.iso === db.plan.iso));
+  const plan = db.plan && !planStale ? db.plan : null;
+
+  // מנקים הזמנה שפג תוקפה / שכבר נשמר עליה ערב — שלא תישאר "מחכה"
+  useEffect(() => {
+    if (planStale && db.plan) commit({ ...db, plan: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planStale, db.plan?.iso]);
+
   const [editing, setEditing] = useState(false);
   const [iso, setIso] = useState("");
   const [time, setTime] = useState("21:00");

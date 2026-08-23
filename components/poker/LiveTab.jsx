@@ -188,6 +188,8 @@ export function LiveTab({
         // משחק נפתח — הבוט בקבוצה נדלק לבד, והצופים מקבלים התראה
         if (!getConfig().botOn) setConfig({ botOn: true });
         if (typeof onGameStart === "function") onGameStart();
+        // ההזמנה לערב כבר התממשה — מסירים כדי שלא יישאר "מחכה לערב"
+        if (db.plan) commit({ ...db, plan: null });
       }
       return [
         ...p,
@@ -316,6 +318,7 @@ export function LiveTab({
       ...db,
       sessions: [...db.sessions, rec].sort((a, b) => a.iso.localeCompare(b.iso)),
       roster,
+      plan: null, // הערב התקיים — ההזמנה כבר לא רלוונטית
     });
     store.set(LIVE_KEY, "");
     // החלוקה מחושבת כאן ונשמרת לתצוגה מקדימה. היא לא נשלחת לשום מקום

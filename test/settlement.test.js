@@ -114,6 +114,33 @@ describe("settle — couples cover each other first", () => {
     expect(transfers.every((t) => !t.pair)).toBe(true);
     expect(transfers).toHaveLength(2);
   });
+
+  it("joint-pays when both couple members still owe", () => {
+    const players = [
+      { name: "דור לירז", buyin: 100, cashout: "0" }, // -100
+      { name: "עדן לירז", buyin: 125, cashout: "0" }, // -125
+      { name: "עדן גיל", buyin: 0, cashout: "160" }, // +160
+      { name: "אופיר סנה", buyin: 0, cashout: "65" }, // +65
+    ];
+    const { transfers } = settle(players, 1);
+    const joint = transfers.filter((t) => t.joint);
+    expect(joint.length).toBeGreaterThan(0);
+    expect(joint[0].from).toContain("ו");
+    expect(transferVerb(joint[0].from)).toMatch(/מעביר/);
+  });
+});
+
+describe("settle — Netanel avoids PayBox recipients when possible", () => {
+  it("sends Netanel to Bit winners before Eden/Oren", () => {
+    const players = [
+      { name: "נתנאל כהן", buyin: 100, cashout: "0" }, // -100
+      { name: "דן ינקלויץ", buyin: 0, cashout: "50" }, // +50
+      { name: "עדן גיל", buyin: 0, cashout: "50" }, // +50 cash-only
+    ];
+    const { transfers } = settle(players, 1);
+    expect(transfers[0]).toMatchObject({ from: "נתנאל כהן", to: "דן ינקלויץ", amount: 50 });
+    expect(transfers[1]).toMatchObject({ from: "נתנאל כהן", to: "עדן גיל", amount: 50 });
+  });
 });
 
 describe("settle — unfinished players", () => {
@@ -142,5 +169,6 @@ describe("helpers", () => {
     expect(transferVerb("אורן גיל")).toBe("מעבירה");
     expect(transferVerb("עדן לירז")).toBe("מעבירה");
     expect(transferVerb("דן")).toBe("מעביר");
+    expect(transferVerb("דור לירז ועדן לירז")).toBe("מעבירים");
   });
 });

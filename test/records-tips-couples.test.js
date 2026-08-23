@@ -84,13 +84,21 @@ describe("tip compliment rotation", () => {
     let live = {};
     const seen = [];
     for (let i = 0; i < TIP_COMPLIMENTS.length; i++) {
-      const { template, bag, last } = nextTipCompliment(live);
+      const { template, bag, last, bagKey, lastKey } = nextTipCompliment(live, { female: false });
       seen.push(template);
-      live = { tipComplimentBag: bag, tipComplimentLast: last };
+      live = { ...live, [bagKey]: bag, [lastKey]: last };
     }
     expect(new Set(seen).size).toBe(TIP_COMPLIMENTS.length);
-    const next = nextTipCompliment(live);
+    const next = nextTipCompliment(live, { female: false });
     expect(TIP_COMPLIMENTS).toContain(next.template);
+  });
+
+  it("uses feminine templates for women (not תותח/גבר)", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { template } = nextTipCompliment({}, { female: true });
+    expect(template).toMatch(/תותחית|מלכה|אלופה|עלייך|נותנות|תותחית על|מלכת|אישה|מדהימה|נשמה|כבוד|אש|חבל|מגיע|פרגנה|סטנדרט|חותם/);
+    expect(template).not.toMatch(/\{name\} גבר!/);
+    expect(template).not.toMatch(/\{name\} תותח!/);
   });
 
   it("formats tip line with name and amount, without ג'", () => {
