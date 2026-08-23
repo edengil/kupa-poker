@@ -20,6 +20,7 @@ import {
 } from "../components/poker/totals.js";
 import { parseEntries, parseDate } from "../components/poker/parse.js";
 import { normalize } from "../components/poker/db.js";
+import { BOT_MARK } from "../lib/botMark.js";
 
 describe("helpers — numeric", () => {
   it("r2 rounds to 2 decimals", () => {
@@ -79,7 +80,7 @@ describe("helpers — aliases", () => {
 });
 
 describe("helpers — toWhatsApp", () => {
-  it("groups debtors, zeros, creditors with gendered verbs", () => {
+  it("groups winners then zeros then debtors with gendered verbs and BOT_MARK", () => {
     const text = toWhatsApp(
       [
         { name: "עדן גיל", amount: 50 },
@@ -91,10 +92,42 @@ describe("helpers — toWhatsApp", () => {
       {},
       true
     );
-    expect(text.startsWith("סיכום פוקר 1.8")).toBe(true);
+    expect(text.startsWith(`${BOT_MARK} סיכום פוקר 1.8`)).toBe(true);
     expect(text).toContain("אורן גיל חייבת 50");
     expect(text).toContain("דן ינקלויץ סגר באפס");
     expect(text).toContain("עדן גיל מגיע 50");
+    const idxWin = text.indexOf("עדן גיל מגיע");
+    const idxZero = text.indexOf("דן ינקלויץ סגר");
+    const idxDebt = text.indexOf("אורן גיל חייבת");
+    expect(idxWin).toBeGreaterThan(-1);
+    expect(idxZero).toBeGreaterThan(idxWin);
+    expect(idxDebt).toBeGreaterThan(idxZero);
+  });
+
+  it("orders winners desc with podium medals; debtors least-debt first", () => {
+    const text = toWhatsApp(
+      [
+        { name: "א", amount: 200 },
+        { name: "ב", amount: 100 },
+        { name: "ג", amount: 50 },
+        { name: "ד", amount: 10 },
+        { name: "ה", amount: -50 },
+        { name: "ו", amount: -150 },
+      ],
+      { d: 2, mo: 8 },
+      null,
+      {},
+      true
+    );
+    const lines = text.split("\n").filter(Boolean);
+    const netLines = lines.filter((l) => /מגיע|חייב/.test(l));
+    expect(netLines[0]).toMatch(/^🥇 א מגיע 200/);
+    expect(netLines[1]).toMatch(/^🥈 ב מגיע 100/);
+    expect(netLines[2]).toMatch(/^🥉 ג מגיע 50/);
+    expect(netLines[3]).toMatch(/^ד מגיע 10/);
+    expect(netLines[4]).toMatch(/^ה חייב 50/);
+    expect(netLines[5]).toMatch(/^ו חייב 150/);
+    expect(text.indexOf("ה חייב 50")).toBeLessThan(text.indexOf("ו חייב 150"));
   });
 
   it("appends duration when startedAt/endedAt exist", () => {

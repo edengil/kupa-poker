@@ -160,10 +160,11 @@ const wa = toWhatsApp(
   {},
   true
 );
-ok("wa head", wa.startsWith("סיכום פוקר 1.8"));
+ok("wa head", wa.startsWith("🤖 סיכום פוקר 1.8"));
 ok("wa female debtor", wa.includes("אורן גיל חייבת 50"));
 ok("wa male creditor", wa.includes("עדן גיל מגיע 50"));
 ok("wa zero", wa.includes("דן ינקלויץ סגר באפס"));
+ok("wa winners before debtors", wa.indexOf("עדן גיל מגיע") < wa.indexOf("אורן גיל חייבת"));
 
 const t0 = Date.UTC(2026, 0, 1, 20, 5, 0);
 ok("hhmm", hhmm(t0).includes(":"));

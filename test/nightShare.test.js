@@ -10,6 +10,7 @@ import {
   NON_TIPPER_ROASTS,
   tipRankPlaces,
   formatFirstPlaceLine,
+  formatNonTipperLine,
 } from "../lib/tipSummaryCopy.js";
 import { isFemaleName } from "../lib/settlement.js";
 import { BOT_MARK, withBotMark } from "../lib/botMark.js";
@@ -277,7 +278,7 @@ describe("tipSummaryForSession", () => {
     expect(noTipIdx).toBeGreaterThan(0);
     expect(parts[noTipIdx - 1]).toBe("");
     const noTipLine = parts[noTipIdx];
-    expect(noTipLine).toMatch(/\*קובי, דן\*/);
+    expect(noTipLine).toMatch(/^\*.*קובי, דן.*\*$/);
     expect(noTipLine).not.toContain("אופיר");
   });
 
@@ -301,13 +302,22 @@ describe("tipSummaryForSession", () => {
     const noTipIdx = parts.findIndex((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
     expect(parts[noTipIdx - 1]).toBe("");
     const noTipLine = parts[noTipIdx];
-    expect(noTipLine).toMatch(/: \*הלל\* —/);
+    expect(noTipLine).toMatch(/^\*.*הלל.*\*$/);
     expect(noTipLine).not.toMatch(/אלון|בני|גיא|דוד/);
   });
 
   it("first-place formatter genders by isFemaleName", () => {
     expect(formatFirstPlaceLine(["אורן"], isFemaleName, fixedNow)).toMatch(/מלכה|תותחית|נותנת|אחות/);
     expect(formatFirstPlaceLine(["איציק"], isFemaleName, fixedNow)).toMatch(/מלך|תותח|נותן|אח /);
+  });
+
+  it("bolds the entire no-tip line in WhatsApp markup", () => {
+    const line = formatNonTipperLine(["דור", "אורן"], isFemaleName, fixedNow);
+    expect(line.startsWith("*")).toBe(true);
+    expect(line.endsWith("*")).toBe(true);
+    expect(line).toMatch(/^\*(🙊 (?:נעלמו בלי טיפ|בלי טיפ הערב)): דור, אורן — .+\*$/);
+    /* לא רק השמות מודגשים */
+    expect(line).not.toMatch(/: \*[^*]+\* —/);
   });
 });
 
@@ -329,6 +339,32 @@ describe("nightSummaryText", () => {
     /* בלוק טיפים כבר מסומן — בלי כפילות בתחילת ההודעה */
     expect(text.indexOf(BOT_MARK)).toBe(0);
     expect(text.lastIndexOf(BOT_MARK)).toBeGreaterThan(0);
+    expect(text.indexOf("אופיר מגיע")).toBeLessThan(text.indexOf("קובי חייב"));
+  });
+
+  it("orders winners before debtors; single BOT_MARK at start of סיכום פוקר block", () => {
+    const session = {
+      d: 23,
+      mo: 8,
+      entries: [
+        { name: "גדול", amount: 150 },
+        { name: "קטן", amount: 40 },
+        { name: "חוב קטן", amount: -40 },
+        { name: "חוב גדול", amount: -150 },
+      ],
+    };
+    const text = nightSummaryText(session);
+    expect(text.startsWith(BOT_MARK)).toBe(true);
+    expect(text).toMatch(new RegExp(`^${BOT_MARK} סיכום פוקר`));
+    /* בלי כפילות צמודות בתחילה */
+    expect(text).not.toMatch(new RegExp(`${BOT_MARK}\\s*${BOT_MARK}`));
+    expect(text).toMatch(/🥇 גדול מגיע 150/);
+    expect(text).toMatch(/🥈 קטן מגיע 40/);
+    const iWin = text.indexOf("גדול מגיע");
+    const iDebtSmall = text.indexOf("חוב קטן חייב");
+    const iDebtBig = text.indexOf("חוב גדול חייב");
+    expect(iWin).toBeLessThan(iDebtSmall);
+    expect(iDebtSmall).toBeLessThan(iDebtBig);
   });
 
   it("appends tip summary for tipsGiven-only night (no tips array) like Sessions share", () => {

@@ -63,6 +63,28 @@ describe("tip commands", () => {
     expect(reply).toContain("דן");
     // דן הפסיד — לא אמור לקבל נזיפת מנצחים
     expect(reply).not.toMatch(/הרווחתם/);
+    /* זוכים לפני חייבים; שורת בלי-טיפ כולה מודגשת */
+    expect(reply.indexOf("אופיר מגיע")).toBeLessThan(reply.indexOf("דן חייב"));
+    expect(reply).toMatch(/\*[^*]*בלי טיפ[^*]*\*/);
+  });
+
+  it("settleSummary: winners desc with medals, debtors least-first", () => {
+    const live = {
+      players: [
+        { name: "א", buyin: 50, cashout: "500" }, // +200 @ cps=2
+        { name: "ב", buyin: 50, cashout: "300" }, // +100
+        { name: "ג", buyin: 50, cashout: "200" }, // +50
+        { name: "ד", buyin: 100, cashout: "100" }, // -50
+        { name: "ה", buyin: 200, cashout: "100" }, // -150
+      ],
+      tips: [],
+    };
+    const { reply } = applyCommands(live, [{ kind: "settle" }], null, 2);
+    expect(reply).toMatch(/🥇 א מגיע/);
+    expect(reply).toMatch(/🥈 ב מגיע/);
+    expect(reply).toMatch(/🥉 ג מגיע/);
+    expect(reply.indexOf("א מגיע")).toBeLessThan(reply.indexOf("ד חייב"));
+    expect(reply.indexOf("ד חייב")).toBeLessThan(reply.indexOf("ה חייב"));
   });
 
   it("shames a winning non-tipper", () => {

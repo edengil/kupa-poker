@@ -1,5 +1,8 @@
 /* עזרי DB/פורמט/וואטסאפ — חולצו מ-PokerApp.jsx לשימוש חוזר ברכיבים. */
 
+import { withBotMark } from "../../lib/botMark.js";
+import { assignPodiumMedals } from "../../lib/podiumMedals.js";
+
 export const r2 = (v) => Math.round(v * 100) / 100;
 
 export const DEFAULT_ALIASES = {
@@ -89,23 +92,26 @@ export function toWhatsApp(entries, dateObj, title, aliases, alreadyCanon) {
     name: alreadyCanon ? e.name : canon(e.name, aliases || {}),
     amount: e.amount,
   }));
-  const l = norm
-    .filter((e) => e.amount < 0)
-    .sort((a, b) => a.amount - b.amount)
-    .map((e) => `${e.name} ${FEMALE.has(e.name) ? "חייבת" : "חייב"} ${Math.abs(e.amount)}`);
+  /* זוכים קודם (יורד) + מדליות 1–3; שורה ריקה; חייבים מהקטן לגדול בחוב */
+  const winners = norm.filter((e) => e.amount > 0).sort((a, b) => b.amount - a.amount);
+  const w = assignPodiumMedals(winners, (e) => e.amount).map(({ item: e, medal }) => {
+    const verb = FEMALE.has(e.name) ? "מגיעה" : "מגיע";
+    const line = `${e.name} ${verb} ${e.amount}`;
+    return medal ? `${medal} ${line}` : line;
+  });
   const z = norm
     .filter((e) => e.amount === 0)
     .map((e) => `${e.name} ${FEMALE.has(e.name) ? "סגרה" : "סגר"} באפס`);
-  const w = norm
-    .filter((e) => e.amount > 0)
+  const l = norm
+    .filter((e) => e.amount < 0)
     .sort((a, b) => b.amount - a.amount)
-    .map((e) => `${e.name} ${FEMALE.has(e.name) ? "מגיעה" : "מגיע"} ${e.amount}`);
-  const out = [head, ...[l, z, w].filter((g) => g.length).flatMap((g) => ["", ...g])];
+    .map((e) => `${e.name} ${FEMALE.has(e.name) ? "חייבת" : "חייב"} ${Math.abs(e.amount)}`);
+  const out = [head, ...[w, z, l].filter((g) => g.length).flatMap((g) => ["", ...g])];
   const sa = dateObj && dateObj.startedAt,
     ea = dateObj && dateObj.endedAt;
   if (sa && ea) out.push("", `🕐 ${hhmm(sa)} — ${hhmm(ea)} · ${durWords(ea - sa)}`);
   else if (sa) out.push("", `🕐 התחלנו ${hhmm(sa)}`);
-  return out.join("\n").trim();
+  return withBotMark(out.join("\n").trim());
 }
 
 export function waOpen(text) {

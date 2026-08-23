@@ -7,11 +7,11 @@ const KW = new RegExp(
 export function parseEntries(text) {
   const out = [];
   for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
+    const line = raw.trim().replace(/^[🥇🥈🥉]\s*/, "");
     if (!line) continue;
     const m = line.match(KW);
     if (!m) continue;
-    const name = m[1].trim();
+    const name = m[1].trim().replace(/^[🥇🥈🥉]\s*/, "");
     if (!name || ["כניסות", "סיכום", "בנתיים", "בינתיים"].includes(name)) continue;
     const amt = parseInt(m[3], 10);
     if (!Number.isFinite(amt)) continue;
