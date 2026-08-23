@@ -70,7 +70,9 @@ describe("tip commands", () => {
     };
     const { reply } = applyCommands(live, [{ kind: "settle" }], null, 2);
     expect(reply).toContain("מנצח");
-    expect(reply).toMatch(/בושה|הרווחתם/);
+    expect(reply).toContain(BOT_MARK);
+    expect(reply).toContain("💸 טיפים הערב");
+    expect(reply).toMatch(/בלי טיפ|נעלמו בלי טיפ/);
   });
 });
 

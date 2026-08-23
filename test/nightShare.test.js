@@ -12,6 +12,15 @@ import {
   formatFirstPlaceLine,
 } from "../lib/tipSummaryCopy.js";
 import { isFemaleName } from "../lib/settlement.js";
+import { BOT_MARK, withBotMark } from "../lib/botMark.js";
+
+describe("withBotMark", () => {
+  it("prefixes BOT_MARK once", () => {
+    expect(withBotMark("שלום")).toBe(`${BOT_MARK} שלום`);
+    expect(withBotMark(`${BOT_MARK} שלום`)).toBe(`${BOT_MARK} שלום`);
+    expect(withBotMark(`  ${BOT_MARK} שלום`)).toBe(`  ${BOT_MARK} שלום`);
+  });
+});
 
 describe("playersFromSession", () => {
   it("uses buyin/chips when present", () => {
@@ -51,6 +60,7 @@ describe("settlementTextForSession", () => {
       endedAt: Date.parse("2026-08-20T22:00:00+03:00"),
     };
     const text = settlementTextForSession(session);
+    expect(text.startsWith(BOT_MARK)).toBe(true);
     expect(text).toContain("חלוקה");
     expect(text).toMatch(/קובי מעביר 100 לשגיא/);
   });
@@ -125,6 +135,7 @@ describe("tipSummaryForSession", () => {
       ],
     };
     const text = tipSummaryForSession(session, undefined, { now: fixedNow });
+    expect(text.startsWith(BOT_MARK)).toBe(true);
     expect(text).toContain("💸 טיפים הערב");
     expect(text).toContain("🥇");
     expect(text).toContain("אופיר");
@@ -311,9 +322,13 @@ describe("nightSummaryText", () => {
       ],
     };
     const text = nightSummaryText(session);
+    expect(text.startsWith(BOT_MARK)).toBe(true);
     expect(text).toContain("סיכום פוקר 20.8");
     expect(text).toContain("אופיר");
     expect(text).toContain("💸 טיפים הערב");
+    /* בלוק טיפים כבר מסומן — בלי כפילות בתחילת ההודעה */
+    expect(text.indexOf(BOT_MARK)).toBe(0);
+    expect(text.lastIndexOf(BOT_MARK)).toBeGreaterThan(0);
   });
 
   it("appends tip summary for tipsGiven-only night (no tips array) like Sessions share", () => {
@@ -351,6 +366,7 @@ describe("nightSummaryText", () => {
       ],
     };
     const text = nightSummaryText(session);
+    expect(text.startsWith(BOT_MARK)).toBe(true);
     expect(text).toContain("💸 טיפים הערב");
     expect(text).toContain("אף אחד לא שם טיפ הערב");
   });
