@@ -261,8 +261,12 @@ describe("tipSummaryForSession", () => {
     expect((text.match(/קובי/g) || []).length).toBe(1);
     expect(text).not.toContain("הרווחתם ולא השארתם");
     expect(text).not.toContain("גם נתנו טיפ");
-    const noTipLine = text.split("\n").find((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
-    expect(noTipLine).toContain("קובי");
+    const parts = text.split("\n");
+    const noTipIdx = parts.findIndex((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
+    expect(noTipIdx).toBeGreaterThan(0);
+    expect(parts[noTipIdx - 1]).toBe("");
+    const noTipLine = parts[noTipIdx];
+    expect(noTipLine).toMatch(/\*קובי, דן\*/);
     expect(noTipLine).not.toContain("אופיר");
   });
 
@@ -282,8 +286,11 @@ describe("tipSummaryForSession", () => {
     expect(honor).not.toContain("אלון");
     expect(honor).not.toContain("בני");
     expect(honor).not.toContain("גיא");
-    const noTipLine = text.split("\n").find((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
-    expect(noTipLine).toMatch(/: הלל —/);
+    const parts = text.split("\n");
+    const noTipIdx = parts.findIndex((l) => /בלי טיפ|נעלמו בלי טיפ/.test(l));
+    expect(parts[noTipIdx - 1]).toBe("");
+    const noTipLine = parts[noTipIdx];
+    expect(noTipLine).toMatch(/: \*הלל\* —/);
     expect(noTipLine).not.toMatch(/אלון|בני|גיא|דוד/);
   });
 
