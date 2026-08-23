@@ -4,6 +4,11 @@ import { nextTipCompliment, formatTipCompliment, TIP_COMPLIMENTS } from "../lib/
 import { computeChipRecords, bestChipCashout } from "../components/poker/chipRecords.js";
 import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS, FILL_COUPLES } from "../components/poker/coupleFills.js";
 import { computeTipRecords } from "../components/poker/tipRecords.js";
+import {
+  sessionDurationMs,
+  timedSessions,
+  computeDurationRecords,
+} from "../components/poker/durationRecords.js";
 
 describe("tip commands", () => {
   it("parses אופיר טיפ 10", () => {
@@ -273,5 +278,90 @@ describe("tip records", () => {
     expect(recs.biggestTip.amount).toBe(20);
     expect(recs.mostTipsNight.count).toBe(2);
     expect(recs.allKing.chips).toBe(25);
+  });
+});
+
+describe("duration records", () => {
+  const longStart = Date.parse("2026-08-01T20:00:00+03:00");
+  const longEnd = Date.parse("2026-08-02T01:00:00+03:00"); // 5h
+  const shortStart = Date.parse("2026-08-10T21:00:00+03:00");
+  const shortEnd = Date.parse("2026-08-10T22:30:00+03:00"); // 1.5h
+  const midStart = Date.parse("2026-08-15T20:40:00+03:00");
+  const midEnd = Date.parse("2026-08-16T00:52:00+03:00"); // ~4h12m
+
+  const db = {
+    sessions: [
+      {
+        iso: "2026-08-01",
+        d: 1,
+        mo: 8,
+        y: 2026,
+        startedAt: longStart,
+        endedAt: longEnd,
+        entries: [{ name: "א", amount: 0 }],
+      },
+      {
+        iso: "2026-08-10",
+        d: 10,
+        mo: 8,
+        y: 2026,
+        startedAt: shortStart,
+        endedAt: shortEnd,
+        entries: [{ name: "ב", amount: 0 }],
+      },
+      {
+        iso: "2026-08-15",
+        d: 15,
+        mo: 8,
+        y: 2026,
+        startedAt: midStart,
+        endedAt: midEnd,
+        entries: [{ name: "ג", amount: 0 }],
+      },
+      // בלי זמנים — מדלגים
+      {
+        iso: "2026-08-20",
+        d: 20,
+        mo: 8,
+        y: 2026,
+        entries: [{ name: "ד", amount: 0 }],
+      },
+      // endedAt לפני startedAt — מדלגים
+      {
+        iso: "2026-08-21",
+        d: 21,
+        mo: 8,
+        y: 2026,
+        startedAt: longEnd,
+        endedAt: longStart,
+        entries: [{ name: "ה", amount: 0 }],
+      },
+    ],
+  };
+
+  it("returns null ms when times are missing or invalid", () => {
+    expect(sessionDurationMs({})).toBeNull();
+    expect(sessionDurationMs({ startedAt: 1 })).toBeNull();
+    expect(sessionDurationMs({ startedAt: 100, endedAt: 50 })).toBeNull();
+    expect(sessionDurationMs({ startedAt: longStart, endedAt: longEnd })).toBe(longEnd - longStart);
+  });
+
+  it("picks longest and shortest sessions by duration", () => {
+    const timed = timedSessions(db.sessions);
+    expect(timed).toHaveLength(3);
+    expect(timed[0].d).toBe(1);
+    expect(timed[0].ms).toBe(5 * 60 * 60 * 1000);
+
+    const recs = computeDurationRecords(db);
+    expect(recs.nightsWithTimes).toBe(3);
+    expect(recs.longest).toMatchObject({ d: 1, mo: 8, y: 2026, ms: 5 * 60 * 60 * 1000 });
+    expect(recs.longest.label).toContain("שעות");
+    expect(recs.shortest).toMatchObject({ d: 10, mo: 8, y: 2026, ms: 90 * 60 * 1000 });
+    expect(recs.shortest2.d).toBe(15);
+    expect(recs.longest2.d).toBe(15);
+  });
+
+  it("returns null when no session has usable times", () => {
+    expect(computeDurationRecords({ sessions: [{ iso: "2026-01-01", d: 1, mo: 1, y: 2026, entries: [] }] })).toBeNull();
   });
 });

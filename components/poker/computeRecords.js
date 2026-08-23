@@ -8,6 +8,7 @@ import { brokenRecords } from "./brokenRecords.js";
 import { computeChipRecords } from "./chipRecords.js";
 import { computeTipRecords } from "./tipRecords.js";
 import { computeCoupleFillRecords } from "./coupleFills.js";
+import { computeDurationRecords } from "./durationRecords.js";
 
 /** @returns {null | object} */
 export function computeRecords(db) {
@@ -224,5 +225,6 @@ export function computeRecords(db) {
     chips: computeChipRecords(db),
     tips: computeTipRecords(db),
     coupleFills: computeCoupleFillRecords(db),
+    duration: computeDurationRecords(db),
   };
 }

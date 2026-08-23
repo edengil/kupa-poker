@@ -132,6 +132,59 @@ export function RecordsTab({ db, viewerName = null, showMine = false }) {
             runner={recs.allKing2 && `${recs.allKing2.name} · ${fmt(recs.allKing2.amount)}`}
             third={recs.allKing3 && `${recs.allKing3.name} · ${fmt(recs.allKing3.amount)}`} />
         )}
+
+        {/* שיאי טיפים גבוה ברשימה — אחרי מלכי החודש/שנה/כל הזמנים — כדי לעודד טיפים */}
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
+          💸 שיאי טיפים
+        </div>
+        {!recs.tips ? (
+          <div style={{
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            עדיין אין טיפים. בקבוצה: <b style={{ color: C.cream }}>אופיר טיפ 10</b>
+            {" "}או <b style={{ color: C.cream }}>אופיר 10 טיפ</b>
+            {" "}(ג&apos;יטונים מהערימה שלו). אחרי שמירת הערב השיאים יופיעו כאן.
+          </div>
+        ) : (
+          <>
+            {recs.tips.biggestTip && (
+              <Card icon="💎" title="הטיפ הגדול ביותר" holder={recs.tips.biggestTip.name}
+                value={`${recs.tips.biggestTip.amount} ג'`} tone={C.win}
+                sub={dt(recs.tips.biggestTip)} />
+            )}
+            {recs.tips.mostTipsNight && (
+              <Card icon="🔁" title="הכי הרבה טיפים בערב אחד" holder={recs.tips.mostTipsNight.name}
+                value={`${recs.tips.mostTipsNight.count} טיפים`}
+                sub={dt(recs.tips.mostTipsNight)} />
+            )}
+            {recs.tips.mostTipChipsNight && (
+              <Card icon="🪙" title="הכי הרבה ג'יטוני טיפ בערב" holder={recs.tips.mostTipChipsNight.name}
+                value={`${recs.tips.mostTipChipsNight.chips} ג'`}
+                sub={dt(recs.tips.mostTipChipsNight)} />
+            )}
+            {recs.tips.monthKing && (
+              <Card icon="🏅" title={`מלך הטיפים · ${recs.tips.monthLabel}`}
+                holder={recs.tips.monthKing.name}
+                value={`${recs.tips.monthKing.chips} ג'`} tone={C.win}
+                runner={recs.tips.monthKing2 &&
+                  `${recs.tips.monthKing2.name} · ${recs.tips.monthKing2.chips} ג'`}
+                third={recs.tips.monthKing3 &&
+                  `${recs.tips.monthKing3.name} · ${recs.tips.monthKing3.chips} ג'`} />
+            )}
+            {recs.tips.allKing && (
+              <Card icon="🐐" title="מלך הטיפים · כל הזמנים" holder={recs.tips.allKing.name}
+                value={`${recs.tips.allKing.chips} ג'`} tone={C.win}
+                runner={recs.tips.allKing2 &&
+                  `${recs.tips.allKing2.name} · ${recs.tips.allKing2.chips} ג'`}
+                third={recs.tips.allKing3 &&
+                  `${recs.tips.allKing3.name} · ${recs.tips.allKing3.chips} ג'`} />
+            )}
+          </>
+        )}
+
         {recs.crownKing && (
           <Card icon="🥇" title="מלך המלכים — הכי הרבה חודשים במקום הראשון" holder={recs.crownKing.name}
             value={`${recs.crownKing.count} כתרים`}
@@ -214,6 +267,22 @@ export function RecordsTab({ db, viewerName = null, showMine = false }) {
           <Card icon="💸" title="הערב הסוער — הכי הרבה כסף החליף ידיים" holder={dt(recs.stormyNight)}
             value={fmt(recs.stormyNight.moved)} />
         )}
+        {recs.duration?.longest && (
+          <Card icon="⏳" title="המשחק הכי ארוך" holder={dt(recs.duration.longest)}
+            value={recs.duration.longest.label}
+            runner={recs.duration.longest2 &&
+              `${dt(recs.duration.longest2)} · ${recs.duration.longest2.label}`}
+            third={recs.duration.longest3 &&
+              `${dt(recs.duration.longest3)} · ${recs.duration.longest3.label}`} />
+        )}
+        {recs.duration?.shortest && (
+          <Card icon="🏁" title="המשחק הכי קצר" holder={dt(recs.duration.shortest)}
+            value={recs.duration.shortest.label}
+            runner={recs.duration.shortest2 &&
+              `${dt(recs.duration.shortest2)} · ${recs.duration.shortest2.label}`}
+            third={recs.duration.shortest3 &&
+              `${dt(recs.duration.shortest3)} · ${recs.duration.shortest3.label}`} />
+        )}
         {recs.attendTop && (
           <Card icon="🪑" title="לא מפספס — הכי הרבה ערבים ברצף" holder={recs.attendTop.name}
             value={`${recs.attendTop.attendMax} ערבים`}
@@ -277,57 +346,6 @@ export function RecordsTab({ db, viewerName = null, showMine = false }) {
                   `${recs.chips.bestCashout2.name} · ${recs.chips.bestCashout2.chips} ג' · ${dt(recs.chips.bestCashout2)}`}
                 third={recs.chips.bestCashout3 &&
                   `${recs.chips.bestCashout3.name} · ${recs.chips.bestCashout3.chips} ג' · ${dt(recs.chips.bestCashout3)}`} />
-            )}
-          </>
-        )}
-
-        <div style={sectionTitle({ margin: "12px 2px 0" })}>
-          💸 שיאי טיפים
-        </div>
-        {!recs.tips ? (
-          <div style={{
-            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
-            border: `1px dashed ${C.brass}55`,
-            borderRadius: 14,
-            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
-          }}>
-            עדיין אין טיפים. בקבוצה: <b style={{ color: C.cream }}>אופיר טיפ 10</b>
-            {" "}או <b style={{ color: C.cream }}>אופיר 10 טיפ</b>
-            {" "}(ג&apos;יטונים מהערימה שלו). אחרי שמירת הערב השיאים יופיעו כאן.
-          </div>
-        ) : (
-          <>
-            {recs.tips.biggestTip && (
-              <Card icon="💎" title="הטיפ הגדול ביותר" holder={recs.tips.biggestTip.name}
-                value={`${recs.tips.biggestTip.amount} ג'`} tone={C.win}
-                sub={dt(recs.tips.biggestTip)} />
-            )}
-            {recs.tips.mostTipsNight && (
-              <Card icon="🔁" title="הכי הרבה טיפים בערב אחד" holder={recs.tips.mostTipsNight.name}
-                value={`${recs.tips.mostTipsNight.count} טיפים`}
-                sub={dt(recs.tips.mostTipsNight)} />
-            )}
-            {recs.tips.mostTipChipsNight && (
-              <Card icon="🪙" title="הכי הרבה ג'יטוני טיפ בערב" holder={recs.tips.mostTipChipsNight.name}
-                value={`${recs.tips.mostTipChipsNight.chips} ג'`}
-                sub={dt(recs.tips.mostTipChipsNight)} />
-            )}
-            {recs.tips.monthKing && (
-              <Card icon="🏅" title={`מלך הטיפים · ${recs.tips.monthLabel}`}
-                holder={recs.tips.monthKing.name}
-                value={`${recs.tips.monthKing.chips} ג'`} tone={C.win}
-                runner={recs.tips.monthKing2 &&
-                  `${recs.tips.monthKing2.name} · ${recs.tips.monthKing2.chips} ג'`}
-                third={recs.tips.monthKing3 &&
-                  `${recs.tips.monthKing3.name} · ${recs.tips.monthKing3.chips} ג'`} />
-            )}
-            {recs.tips.allKing && (
-              <Card icon="🐐" title="מלך הטיפים · כל הזמנים" holder={recs.tips.allKing.name}
-                value={`${recs.tips.allKing.chips} ג'`} tone={C.win}
-                runner={recs.tips.allKing2 &&
-                  `${recs.tips.allKing2.name} · ${recs.tips.allKing2.chips} ג'`}
-                third={recs.tips.allKing3 &&
-                  `${recs.tips.allKing3.name} · ${recs.tips.allKing3.chips} ג'`} />
             )}
           </>
         )}
