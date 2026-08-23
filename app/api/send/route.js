@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabaseServer";
 import { sendToGroup } from "@/lib/whatsapp";
 import { reportError } from "@/lib/monitor";
+import {
+  isNightShareText,
+  nightIsoFromText,
+  pinAfterSend,
+  normalizePins,
+} from "@/lib/waPins";
 
 /* ============================================================================
    שליחת הודעה לקבוצה מתוך האפליקציה.
@@ -30,7 +36,7 @@ export async function POST(request) {
   // RLS כבר מגביל לשורה שלו, אבל בדיקה מפורשת עדיפה על הסתמכות
   const { data: group } = await supabase
     .from("groups")
-    .select("id")
+    .select("id, config")
     .eq("owner_id", user.id)
     .limit(1)
     .maybeSingle();
@@ -58,7 +64,25 @@ export async function POST(request) {
   }
 
   try {
-    await sendToGroup(text.trim(), { token, groupId });
+    const body = text.trim();
+    const sent = await sendToGroup(body, { token, groupId });
+    if (isNightShareText(body)) {
+      await pinAfterSend(
+        "night",
+        sent,
+        { iso: nightIsoFromText(body) },
+        {
+          token,
+          pins: normalizePins(group.config?.pins),
+          savePins: async (pins) => {
+            await supabase
+              .from("groups")
+              .update({ config: { ...(group.config || {}), pins } })
+              .eq("id", group.id);
+          },
+        }
+      );
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     await reportError(e, "send");

@@ -3,6 +3,11 @@ import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { sendToGroup } from "@/lib/whatsapp";
 import { dueReports, buildPeriodReport } from "@/lib/summary";
 import { reportError } from "@/lib/monitor";
+import {
+  normalizePins,
+  pinAfterSend,
+  pinTypeForReportKind,
+} from "@/lib/waPins";
 
 /* ============================================================================
    הדוחות התקופתיים לקבוצה.
@@ -48,7 +53,9 @@ export async function GET(request) {
   const groupId = process.env.WHAPI_GROUP_ID;
   if (!groupId) return NextResponse.json({ error: "WHAPI_GROUP_ID missing" }, { status: 500 });
 
+  const token = process.env.WHAPI_TOKEN;
   const sent = { ...(row.config?.sentReports || {}) };
+  let pins = normalizePins(row.config?.pins);
   const results = [];
 
   for (const rep of due) {
@@ -62,8 +69,18 @@ export async function GET(request) {
       continue;
     }
     try {
-      await sendToGroup(text, { token: process.env.WHAPI_TOKEN, groupId });
+      const out = await sendToGroup(text, { token, groupId });
       sent[rep.key] = true;
+      const pinType = pinTypeForReportKind(rep.kind);
+      if (pinType) {
+        await pinAfterSend(pinType, out, { key: rep.key }, {
+          token,
+          pins,
+          savePins: async (next) => {
+            pins = next;
+          },
+        });
+      }
       results.push({ key: rep.key, sent: true });
     } catch (e) {
       await reportError(e, `reports/send ${rep.key}`);
@@ -73,7 +90,7 @@ export async function GET(request) {
 
   await supabase
     .from("groups")
-    .update({ config: { ...(row.config || {}), sentReports: sent } })
+    .update({ config: { ...(row.config || {}), sentReports: sent, pins } })
     .eq("id", row.id);
 
   return NextResponse.json({ ok: true, results });

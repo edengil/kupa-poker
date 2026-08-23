@@ -6,6 +6,13 @@ import {
   parseCommands, applyCommands, extractMessage, isAllowed,
   sendToGroup, listGroups, BOT_MARK, setPresenceOffline,
 } from "@/lib/whatsapp";
+import {
+  isNightShareText,
+  nightIsoFromText,
+  jerusalemIso,
+  pinAfterSend,
+  normalizePins,
+} from "@/lib/waPins";
 
 /* ============================================================================
    נקודת הקצה שמקבלת הודעות מקבוצת הוואטסאפ.
@@ -191,10 +198,32 @@ export async function POST(request) {
   }
 
   try {
-    await sendToGroup(reply, {
-      token: process.env.WHAPI_TOKEN,
+    const token = process.env.WHAPI_TOKEN;
+    const sent = await sendToGroup(reply, {
+      token,
       groupId: msg.chatId,
     });
+    if (isNightShareText(reply)) {
+      const iso = nextLive?.startedAt
+        ? jerusalemIso(new Date(nextLive.startedAt))
+        : nightIsoFromText(reply);
+      await pinAfterSend("night", sent, { iso }, {
+        token,
+        pins: normalizePins(row.config?.pins),
+        savePins: async (pins) => {
+          // קוראים מחדש config כדי לא לדרוס botOn/sentReports אם השתנו במקביל
+          const { data: fresh } = await supabase
+            .from("groups")
+            .select("config")
+            .eq("id", row.id)
+            .maybeSingle();
+          await supabase
+            .from("groups")
+            .update({ config: { ...(fresh?.config || row.config || {}), pins } })
+            .eq("id", row.id);
+        },
+      });
+    }
   } catch (e) {
     console.error(e.message); // הנתונים כבר נשמרו — התשובה היא בונוס
   }
