@@ -141,6 +141,72 @@ describe("settle — Netanel avoids PayBox recipients when possible", () => {
     expect(transfers[0]).toMatchObject({ from: "נתנאל כהן", to: "דן ינקלויץ", amount: 50 });
     expect(transfers[1]).toMatchObject({ from: "נתנאל כהן", to: "עדן גיל", amount: 50 });
   });
+
+  it("prefers Bit for Netanel even when other debtors could take Dan first", () => {
+    const players = [
+      { name: "נתנאל כהן", buyin: 50, cashout: "0" }, // -50
+      { name: "איציק", buyin: 50, cashout: "0" }, // -50
+      { name: "דן", buyin: 0, cashout: "50" }, // +50 Bit
+      { name: "עדן גיל", buyin: 0, cashout: "50" }, // +50 cash-only
+    ];
+    const { transfers } = settle(players, 1);
+    const netanel = transfers.filter((t) => t.from === "נתנאל כהן");
+    expect(netanel).toEqual([{ from: "נתנאל כהן", to: "דן", amount: 50 }]);
+    expect(transfers.some((t) => t.from === "איציק" && t.to === "עדן גיל")).toBe(true);
+  });
+});
+
+describe("settle — real-night shaped split (Eden preferred)", () => {
+  /* נגזר מהעברות בפועל:
+       אורן→עדן 80, נתנאל→דן 50, איציק→דן 100,
+       דור+עדן לירז→עדן 160 / אופיר 35 / דן 30
+     נטו: עדן +240, דן +180, אופיר +35, אורן -80, נתנאל -50, איציק -100, לירז -225 */
+  const nightPlayers = [
+    { name: "עדן גיל", buyin: 0, cashout: "240" },
+    { name: "דן", buyin: 0, cashout: "180" },
+    { name: "אופיר", buyin: 0, cashout: "35" },
+    { name: "אורן גיל", buyin: 80, cashout: "0" },
+    { name: "נתנאל כהן", buyin: 50, cashout: "0" },
+    { name: "איציק", buyin: 100, cashout: "0" },
+    { name: "דור לירז", buyin: 112, cashout: "0" },
+    { name: "עדן לירז", buyin: 113, cashout: "0" },
+  ];
+
+  it("keeps Netanel off Eden/Oren when Dan (Bit) can absorb", () => {
+    const { transfers } = settle(nightPlayers, 1);
+    const netanel = transfers.filter((t) => String(t.from).includes("נתנאל"));
+    expect(netanel.length).toBeGreaterThan(0);
+    for (const t of netanel) {
+      expect(isCashOnly(t.to)).toBe(false);
+    }
+    expect(netanel.some((t) => t.to === "דן" && t.amount === 50)).toBe(true);
+  });
+
+  it("allows Oren→Eden cash/PayBox path", () => {
+    const { transfers } = settle(nightPlayers, 1);
+    expect(
+      transfers.some(
+        (t) =>
+          (t.from === "אורן גיל" || t.from === "אורן") &&
+          (t.to === "עדן גיל" || t.to === "עדן") &&
+          t.amount === 80,
+      ),
+    ).toBe(true);
+  });
+
+  it("shows Liraz as joint payer to multiple winners like that night", () => {
+    const { transfers } = settle(nightPlayers, 1);
+    const joint = transfers.filter((t) => t.joint);
+    expect(joint.length).toBeGreaterThanOrEqual(2);
+    for (const t of joint) {
+      expect(t.from).toMatch(/דור לירז\s*ו.*עדן לירז|עדן לירז\s*ו.*דור לירז/);
+      expect(transferVerb(t.from)).toMatch(/מעביר/);
+    }
+    const byTo = Object.fromEntries(joint.map((t) => [t.to, t.amount]));
+    expect(byTo["עדן גיל"]).toBe(160);
+    expect(byTo["אופיר"]).toBe(35);
+    expect(byTo["דן"]).toBe(30);
+  });
 });
 
 describe("settle — unfinished players", () => {
@@ -159,6 +225,7 @@ describe("helpers", () => {
   it("isCashOnly matches exact names only", () => {
     expect(isCashOnly("עדן")).toBe(true);
     expect(isCashOnly("אורן")).toBe(true);
+    expect(isCashOnly("אורן גיל")).toBe(true);
     expect(isCashOnly("עדן גיל")).toBe(true);
     expect(isCashOnly("עדן לירז")).toBe(false);
     expect(isCashOnly("קובי")).toBe(false);
