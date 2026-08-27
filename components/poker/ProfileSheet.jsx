@@ -4,11 +4,12 @@ import React, { useMemo } from "react";
 import { C } from "./colors";
 import { fmt } from "./format";
 import { AL, canon, r2 } from "./helpers";
-import { allTimeTotals } from "./totals";
+import { playerBalanceBreakdown } from "./totals";
 import { IconBtn, Stat } from "./ui";
 import { TrendingUp, X } from "./icons";
 import { CumChart } from "./CumChart";
 import { PersonalStatsCard } from "./PersonalStatsCard";
+import { BalanceBreakdown } from "./BalanceBreakdown";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ProfileSheet({ db, name, onClose }) {
@@ -39,8 +40,8 @@ export function ProfileSheet({ db, name, onClose }) {
     return out;
   }, [db, cn, A]);
 
-  const official = allTimeTotals(db).find((t) => t.name === cn);
-  const total = official ? official.amount : rows.length ? rows[rows.length - 1].cum : 0;
+  const balance = useMemo(() => playerBalanceBreakdown(db, cn), [db, cn]);
+  const total = balance.tableNet;
   const best = rows.reduce((m, r) => (r.night > (m?.night ?? -1e9) ? r : m), null);
   const worst = rows.reduce((m, r) => (r.night < (m?.night ?? 1e9) ? r : m), null);
 
@@ -86,11 +87,12 @@ export function ProfileSheet({ db, name, onClose }) {
           </IconBtn>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <Stat label="נטו כולל" value={fmt(total)} color={total >= 0 ? C.win : C.loss} />
+          <Stat label="נטו בטבלה" value={fmt(total)} color={total >= 0 ? C.win : C.loss} />
           <Stat label="ערבים" value={rows.length} />
           <Stat label="ערב שיא" value={best ? fmt(best.night) : "—"} color={C.win} />
           <Stat label="ערב גרוע" value={worst ? fmt(worst.night) : "—"} color={C.loss} />
         </div>
+        <BalanceBreakdown db={db} playerName={cn} />
         <PersonalStatsCard db={db} playerName={cn} />
         {rows.length > 1 ? (
           <div
@@ -112,7 +114,7 @@ export function ProfileSheet({ db, name, onClose }) {
               }}
             >
               <TrendingUp size={14} />
-              רווח מצטבר לפי ערבים
+              רווח מצטבר לפי ערבים בלבד
             </div>
             <CumChart rows={rows} />
           </div>
@@ -122,7 +124,7 @@ export function ProfileSheet({ db, name, onClose }) {
           </div>
         )}
         <p style={{ fontSize: 11.5, color: C.dim, marginTop: 8 }}>
-          הגרף מסכם ערבים בלבד; &quot;נטו כולל&quot; מתיישר למאזן השנתי הרשמי (2025).
+          הגרף והרשימה למטה הם סכום ערבים בלבד. הנטו בטבלה כולל התאמה מסיכום שנתי רשמי כשיש.
         </p>
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 5 }}>
           <div style={{ fontSize: 12.5, color: C.dim, padding: "0 2px 2px" }}>לפי ערב</div>

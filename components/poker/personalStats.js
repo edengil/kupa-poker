@@ -16,6 +16,7 @@ import {
   firstEntryTs,
   fmtPct,
 } from "./extraRecords.js";
+import { playerBalanceBreakdown } from "./totals.js";
 
 function dt(n) {
   if (!n || n.d == null) return "";
@@ -310,6 +311,8 @@ export function computePersonalStats(db, playerName, opts = {}) {
     }
   }
 
+  const balance = playerBalanceBreakdown(db, name);
+
   return {
     name,
     nights: nights.length,
@@ -317,7 +320,10 @@ export function computePersonalStats(db, playerName, opts = {}) {
     losses,
     even,
     winRate: Math.round((wins / nights.length) * 100),
-    totalNet,
+    totalNet: balance.tableNet,
+    sessionsNet: balance.sessionsNet,
+    yearlyGap: balance.gap,
+    yearlyAdjustments: balance.adjustments,
     avgNet,
     sd,
     bestNight,
@@ -389,13 +395,30 @@ export function personalStatRows(stats, { compact = false } = {}) {
     title: "ממוצע לערב",
     detail: fmt(stats.avgNet),
     tone: stats.avgNet >= 0 ? "win" : "loss",
+    note: "מחושב מסכום הערבים שנשמרו (בלי התאמה שנתית)",
   });
   push({
     icon: "🏦",
-    title: "נטו כולל",
+    title: "נטו בטבלה",
     detail: fmt(stats.totalNet),
     tone: stats.totalNet >= 0 ? "win" : "loss",
+    note:
+      Math.abs(stats.yearlyGap || 0) >= 0.005
+        ? `ערבים ${fmt(stats.sessionsNet)} · התאמה שנתית ${stats.yearlyGap > 0 ? "+" : ""}${fmt(stats.yearlyGap)}`
+        : "זהה לסכום הערבים",
   });
+  if (Math.abs(stats.yearlyGap || 0) >= 0.005) {
+    for (const a of stats.yearlyAdjustments || []) {
+      if (Math.abs(a.gap) < 0.005) continue;
+      push({
+        icon: "🧾",
+        title: `התאמה מסיכום ${a.y}`,
+        detail: `${a.gap > 0 ? "+" : ""}${fmt(a.gap)}`,
+        tone: a.gap >= 0 ? "win" : "loss",
+        note: `סיכום שנתי ${fmt(a.tableNet)} במקום סכום ערבים ${fmt(a.sessionsNet)}`,
+      });
+    }
+  }
 
   if (stats.avgEntries != null) {
     push({

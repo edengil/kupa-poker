@@ -231,6 +231,46 @@ describe("totals — period aggregation", () => {
     expect(t.find((x) => x.name === "עדן גיל").amount).toBe(150);
   });
 
+  it("playerBalanceBreakdown explains official yearly gap", async () => {
+    const { playerBalanceBreakdown } = await import("../components/poker/totals.js");
+    const withOfficial = {
+      aliases: {},
+      sessions: [
+        {
+          id: "a",
+          iso: "2025-03-01",
+          y: 2025,
+          mo: 3,
+          d: 1,
+          entries: [{ name: "עדן", amount: 100 }],
+        },
+        {
+          id: "b",
+          iso: "2026-01-01",
+          y: 2026,
+          mo: 1,
+          d: 1,
+          entries: [{ name: "עדן", amount: 50 }],
+        },
+      ],
+      yearly: [
+        {
+          id: "y25",
+          y: 2025,
+          official: true,
+          entries: [{ name: "עדן", amount: 300 }],
+        },
+      ],
+    };
+    const b = playerBalanceBreakdown(withOfficial, "עדן");
+    expect(b.sessionsNet).toBe(150);
+    expect(b.tableNet).toBe(350); // 300 official 2025 + 50 from 2026 sessions
+    expect(b.gap).toBe(200);
+    expect(b.adjustments).toEqual([
+      { y: 2025, sessionsNet: 100, tableNet: 300, gap: 200 },
+    ]);
+  });
+
   it("periodTotals all is not the selected year when other years exist", () => {
     const multi = {
       aliases: {},
