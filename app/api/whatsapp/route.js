@@ -5,7 +5,7 @@ import { reportError } from "@/lib/monitor";
 import {
   parseCommands, applyCommands, extractMessage, isAllowed,
   sendToGroup, listGroups, BOT_MARK, setPresenceOffline,
-  maybeRemindPending,
+  maybeRemindPending, maybeRemindBitIdle,
 } from "@/lib/whatsapp";
 import { knownPlayerNames } from "@/components/poker/personalHighlights";
 import { AL, canon } from "@/components/poker/helpers";
@@ -170,14 +170,19 @@ export async function POST(request) {
   const cmds = parseCommands(msg.text, live?.addAmt || 50, gameActive);
 
   const remindIfDue = async () => {
-    const reminded = maybeRemindPending(live, Date.now(), { groupNudge: false });
+    const now = Date.now();
+    /* ממתינים לאישור קודמים לתזכורת ביט שקט — דחוף יותר, בלי ספאם כפול. */
+    const reminded =
+      maybeRemindPending(live, now, { groupNudge: false }) ||
+      maybeRemindBitIdle(live, now, { groupNudge: true });
     if (!reminded) return null;
+    const kind = reminded.live?.bitIdleRemindedAt === now ? "bit-idle" : "pending";
     const { error: writeError } = await supabase
       .from("groups")
       .update({ live: reminded.live })
       .eq("id", row.id);
     if (writeError) {
-      await reportError(writeError, "whatsapp/pending-remind");
+      await reportError(writeError, `whatsapp/${kind}-remind`);
       return "write-failed";
     }
     try {
@@ -187,8 +192,15 @@ export async function POST(request) {
           groupId: ownerPhone,
         });
       }
+      /* נדנוד קצר לקבוצה — רק כשהפונקציה החזירה reply (ביט שקט). */
+      if (reminded.reply && groupId) {
+        await sendToGroup(reminded.reply, {
+          token: process.env.WHAPI_TOKEN,
+          groupId,
+        });
+      }
     } catch (e) {
-      console.warn("pending remind failed:", e.message);
+      console.warn(`${kind} remind failed:`, e.message);
     }
     return "sent";
   };
@@ -200,10 +212,10 @@ export async function POST(request) {
     return ok({ skipped: "not a command" });
   }
 
-  /* צ'אט פרטי עם עדן — רק אישור/דחייה של שחקן חדש, לא פקודות משחק. */
+  /* צ'אט פרטי עם עדן — אישור/דחייה של שחקן חדש + תיקון שם בלייב. */
   if (isOwnerDm) {
     const kinds = new Set(cmds.map((c) => c.kind));
-    if (![...kinds].every((k) => k === "approve" || k === "reject")) {
+    if (![...kinds].every((k) => k === "approve" || k === "reject" || k === "rename")) {
       const r = await remindIfDue();
       if (r === "sent") return ok({ reminded: true });
       return ok({ skipped: "owner dm not approval" });

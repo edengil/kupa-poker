@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseCommands, applyCommands, findPlayer, isAllowed, BOT_MARK, maybeRemindPending, PENDING_REMIND_MS } from "../lib/whatsapp.js";
+import { parseCommands, applyCommands, findPlayer, isAllowed, BOT_MARK, maybeRemindPending, PENDING_REMIND_MS, maybeRemindBitIdle, BIT_IDLE_REMIND_MS, lastBitActivityAt } from "../lib/whatsapp.js";
 
 describe("parseCommands", () => {
   it("parses a buy-in command", () => {
@@ -293,6 +293,76 @@ describe("new player approval", () => {
   });
 });
 
+describe("bit idle reminder", () => {
+  const t0 = 1_000_000;
+  const activeLive = {
+    startedAt: t0,
+    players: [
+      {
+        name: "עדן",
+        buyin: 100,
+        cashout: "",
+        buyinEvents: [{ amount: 50, at: t0 }, { amount: 50, at: t0 + 30_000 }],
+      },
+    ],
+  };
+
+  it("lastBitActivityAt prefers latest buyin event", () => {
+    expect(lastBitActivityAt(activeLive)).toBe(t0 + 30_000);
+    expect(lastBitActivityAt({ startedAt: t0, players: [{ name: "א", buyin: 50 }] })).toBe(t0);
+    expect(lastBitActivityAt({ players: [] })).toBeNull();
+  });
+
+  it("stays quiet before idle window", () => {
+    expect(maybeRemindBitIdle(activeLive, t0 + 30_000 + 60_000)).toBeNull();
+    expect(
+      maybeRemindBitIdle(activeLive, t0 + 30_000 + BIT_IDLE_REMIND_MS - 1)
+    ).toBeNull();
+  });
+
+  it("DMs Eden after ~2h without bit, optional group nudge", () => {
+    const due = maybeRemindBitIdle(
+      activeLive,
+      t0 + 30_000 + BIT_IDLE_REMIND_MS,
+      { groupNudge: true }
+    );
+    expect(due).not.toBeNull();
+    expect(due.ownerDm).toContain("אין עדכון ביט");
+    expect(due.ownerDm).toContain("משחק פעיל");
+    expect(due.reply).toContain("לא נרשם ביט");
+    expect(due.live.bitIdleRemindedAt).toBe(t0 + 30_000 + BIT_IDLE_REMIND_MS);
+  });
+
+  it("respects cooldown after a reminder", () => {
+    const remindedAt = t0 + 30_000 + BIT_IDLE_REMIND_MS;
+    const live = { ...activeLive, bitIdleRemindedAt: remindedAt };
+    expect(maybeRemindBitIdle(live, remindedAt + 60_000)).toBeNull();
+    const again = maybeRemindBitIdle(live, remindedAt + BIT_IDLE_REMIND_MS);
+    expect(again.ownerDm).toContain("תזכורת");
+  });
+
+  it("clears idle reminder stamp when a new bit is recorded", () => {
+    const idle = {
+      ...activeLive,
+      bitIdleRemindedAt: t0 + BIT_IDLE_REMIND_MS,
+      approvedNames: ["עדן"],
+    };
+    const { live } = applyCommands(
+      idle,
+      [{ kind: "add", name: "עדן", amount: 50 }],
+      "m-bit",
+      2,
+      { now: t0 + BIT_IDLE_REMIND_MS + 1000 }
+    );
+    expect(live.bitIdleRemindedAt).toBeUndefined();
+    expect(lastBitActivityAt(live)).toBe(t0 + BIT_IDLE_REMIND_MS + 1000);
+  });
+
+  it("skips empty table", () => {
+    expect(maybeRemindBitIdle({ players: [], startedAt: t0 }, t0 + BIT_IDLE_REMIND_MS * 2)).toBeNull();
+  });
+});
+
 describe("closing list sort", () => {
   it("lists closed players winners then losers by net, open last", () => {
     const live = {
@@ -313,5 +383,81 @@ describe("closing list sort", () => {
     expect(kobi).toBeLessThan(eden);
     expect(eden).toBeLessThan(dor);
     expect(dor).toBeLessThan(open);
+  });
+});
+
+describe("rename (תקן)", () => {
+  it("parses arrow and ל- variants", () => {
+    expect(parseCommands("תקן אופיר → אופיר סנה", 50, true)[0]).toMatchObject({
+      kind: "rename",
+      from: "אופיר",
+      to: "אופיר סנה",
+    });
+    expect(parseCommands("תקן אופיר -> אופיר סנה", 50, true)[0]).toMatchObject({
+      kind: "rename",
+      from: "אופיר",
+      to: "אופיר סנה",
+    });
+    expect(parseCommands("תקן אופיר ל-אופיר סנה", 50, true)[0]).toMatchObject({
+      kind: "rename",
+      from: "אופיר",
+      to: "אופיר סנה",
+    });
+    expect(parseCommands("תקן אופיר ל אופיר סנה", 50, true)[0]).toMatchObject({
+      kind: "rename",
+      from: "אופיר",
+      to: "אופיר סנה",
+    });
+  });
+
+  it("renames a seated player without clearing the night", () => {
+    const start = applyCommands(null, [{ kind: "add", name: "אופיר", amount: 100 }], "m1").live;
+    const other = applyCommands(start, [{ kind: "add", name: "קובי", amount: 50 }], "m2").live;
+    const { live, reply, ownerDm } = applyCommands(
+      other,
+      [{ kind: "rename", from: "אופיר", to: "אופיר סנה" }],
+      "m3"
+    );
+    expect(live.players).toHaveLength(2);
+    expect(live.players.find((p) => p.name === "אופיר סנה")?.buyin).toBe(100);
+    expect(live.players.some((p) => p.name === "אופיר")).toBe(false);
+    expect(reply).toMatch(/תוקן: אופיר → אופיר סנה/);
+    expect(ownerDm).toMatch(/תיקון שם/);
+    expect(ownerDm).toMatch(/אופיר → אופיר סנה/);
+  });
+
+  it("also renames a matching pending new-player", () => {
+    const start = {
+      players: [{ name: "קובי", buyin: 50, cashout: "" }],
+      pendingApprovals: [{ name: "אופיר", amount: 100, at: 1 }],
+      approvedNames: [],
+      tips: [],
+    };
+    const { live, reply } = applyCommands(
+      start,
+      [{ kind: "rename", from: "אופיר", to: "אופיר סנה" }],
+      "m1"
+    );
+    expect(live.pendingApprovals[0].name).toBe("אופיר סנה");
+    expect(live.players[0].name).toBe("קובי");
+    expect(reply).toMatch(/ממתינים/);
+  });
+
+  it("renames both seated and pending when the same name appears", () => {
+    const start = {
+      players: [{ name: "אופיר", buyin: 50, cashout: "" }],
+      pendingApprovals: [{ name: "אופיר", amount: 100, at: 1 }],
+      approvedNames: ["אופיר"],
+      tips: [{ id: "t1", name: "אופיר", amount: 5 }],
+    };
+    const { live } = applyCommands(
+      start,
+      [{ kind: "rename", from: "אופיר", to: "אופיר סנה" }],
+      "m1"
+    );
+    expect(live.players[0].name).toBe("אופיר סנה");
+    expect(live.pendingApprovals[0].name).toBe("אופיר סנה");
+    expect(live.approvedNames).toEqual(["אופיר סנה"]);
+    expect(live.tips[0].name).toBe("אופיר סנה");
   });
 });
