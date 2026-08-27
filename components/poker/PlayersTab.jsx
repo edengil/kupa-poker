@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { C } from "./colors";
 import { fmt, MONTHS } from "./format";
 import { AL, canon, r2 } from "./helpers";
-import { allTimeTotals, monthTotals, yearTotals } from "./totals";
+import { periodTotals, yearNum } from "./totals";
 import { Empty } from "./ui";
 import { ChevronLeft, Crown } from "./icons";
 
@@ -17,20 +17,31 @@ export function PlayersTab({ db, onPlayer }) {
   const [mo, setMo] = useState(nowD.getMonth() + 1);
 
   const years = useMemo(() => {
-    const set = new Set([...db.sessions.map((x) => x.y), ...db.yearly.map((x) => x.y)]);
+    const set = new Set();
+    for (const x of db.sessions) {
+      const n = yearNum(x.y);
+      if (n != null) set.add(n);
+    }
+    for (const x of db.yearly) {
+      const n = yearNum(x.y);
+      if (n != null) set.add(n);
+    }
     return [...set].sort((a, b) => b - a);
   }, [db]);
 
-  const totals = useMemo(() => {
-    if (scope === "year") return yearTotals(db, y).totals;
-    if (scope === "month") return monthTotals(db, y, mo);
-    return allTimeTotals(db);
-  }, [db, scope, y, mo]);
+  const totals = useMemo(
+    () => periodTotals(db, scope, y, mo).totals,
+    [db, scope, y, mo]
+  );
 
   // ספירת הערבים חייבת להיות באותו חתך כמו הסכומים, אחרת הממוצע לא מייצג
   const counts = useMemo(() => {
     const inScope = db.sessions.filter((x) =>
-      scope === "all" ? true : scope === "year" ? x.y === y : x.y === y && x.mo === mo
+      scope === "all"
+        ? true
+        : scope === "year"
+          ? yearNum(x.y) === yearNum(y)
+          : yearNum(x.y) === yearNum(y) && Number(x.mo) === Number(mo)
     );
     const c = {};
     for (const x of inScope) {
@@ -88,7 +99,7 @@ export function PlayersTab({ db, onPlayer }) {
         }}
       >
         {["all", "year", "month"].map((k) => (
-          <button key={k} onClick={() => setScope(k)} style={pill(scope === k)}>
+          <button key={k} type="button" onClick={() => setScope(k)} style={pill(scope === k)}>
             {k === "all" ? "הכל" : k === "year" ? "שנה" : "חודש"}
           </button>
         ))}

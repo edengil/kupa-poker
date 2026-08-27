@@ -1,33 +1,31 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { C } from "./colors";
 import { fmt, MONTHS } from "./format";
-import { allTimeTotals, monthTotals, yearTotals } from "./totals";
+import { periodTotals, yearNum } from "./totals";
 import { NavBtn } from "./ui";
 import { Award, ChevronLeft, ChevronRight, Crown } from "./icons";
 import { festiveCardSoft } from "./festive";
 
 /* באנר דירוג עליון — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function Banner({ db, onPlayer }) {
+export function Banner({ db, onPlayer, scope, setScope, y, setY, mo, setMo }) {
   const periods = useMemo(() => {
     const s = new Set();
-    db.sessions.forEach((x) => s.add(x.y * 100 + x.mo));
+    db.sessions.forEach((x) => {
+      const yy = yearNum(x.y);
+      const mm = Number(x.mo);
+      if (yy != null && Number.isFinite(mm)) s.add(yy * 100 + mm);
+    });
     return [...s].sort((a, b) => a - b);
   }, [db]);
-  const [scope, setScope] = useState("month");
-  const [idx, setIdx] = useState(Math.max(0, periods.length - 1));
-  useEffect(() => {
-    setIdx(Math.max(0, periods.length - 1));
-  }, [periods.length]);
-  const pk = periods[idx];
-  const y = pk ? Math.floor(pk / 100) : new Date().getFullYear();
-  const mo = pk ? pk % 100 : 1;
-  const { totals, official } = useMemo(() => {
-    if (scope === "all") return { totals: allTimeTotals(db), official: false };
-    if (scope === "year") return yearTotals(db, y);
-    return { totals: monthTotals(db, y, mo), official: false };
-  }, [db, scope, y, mo]);
+  const pkWanted = (yearNum(y) ?? 0) * 100 + Number(mo);
+  let idx = periods.indexOf(pkWanted);
+  if (idx < 0) idx = Math.max(0, periods.length - 1);
+  const { totals, official } = useMemo(
+    () => periodTotals(db, scope, y, mo),
+    [db, scope, y, mo]
+  );
   const label =
     scope === "all" ? "כל הזמן" : scope === "year" ? `${y}` : `${MONTHS[mo - 1]} ${y}`;
 
@@ -83,6 +81,7 @@ export function Banner({ db, onPlayer }) {
           ].map(([v, l]) => (
             <button
               key={v}
+              type="button"
               onClick={() => setScope(v)}
               style={{
                 border: "none",
@@ -101,14 +100,29 @@ export function Banner({ db, onPlayer }) {
         </div>
         {scope === "month" && periods.length > 0 ? (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <NavBtn onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx <= 0}>
+            <NavBtn
+              onClick={() => {
+                const i = Math.max(0, idx - 1);
+                const p = periods[i];
+                if (p == null) return;
+                setY(Math.floor(p / 100));
+                setMo(p % 100);
+              }}
+              disabled={idx <= 0}
+            >
               <ChevronRight size={16} />
             </NavBtn>
             <span style={{ fontSize: 13, fontWeight: 600, minWidth: 74, textAlign: "center" }}>
               {label}
             </span>
             <NavBtn
-              onClick={() => setIdx((i) => Math.min(periods.length - 1, i + 1))}
+              onClick={() => {
+                const i = Math.min(periods.length - 1, idx + 1);
+                const p = periods[i];
+                if (p == null) return;
+                setY(Math.floor(p / 100));
+                setMo(p % 100);
+              }}
               disabled={idx >= periods.length - 1}
             >
               <ChevronLeft size={16} />

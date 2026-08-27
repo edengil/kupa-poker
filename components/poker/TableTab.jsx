@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { C } from "./colors";
 import { fmt, fmtGap, MONTHS } from "./format";
 import { AL, r2, toWhatsApp } from "./helpers";
-import { allTimeTotals, monthTotals, yearTotals } from "./totals";
+import { periodTotals, yearNum } from "./totals";
 import { Empty, GroupLabel, IconBtn, SegBar, Select } from "./ui";
 import { Award, Crown, Share2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
@@ -121,36 +121,14 @@ function Ledger({ totals, official, readOnly = false }) {
 }
 
 /* טאב טבלה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function TableTab({ db, years, readOnly = false }) {
-  // צופה מהלינק מתחיל בחודש הנוכחי; המנהל מתחיל בתמונה השנתית
-  const [scope, setScope] = useState(readOnly ? "month" : "year");
-  const [y, setY] = useState(years[0] || new Date().getFullYear());
-  const [mo, setMo] = useState(() => {
-    const s = [...db.sessions].sort((a, b) => b.iso.localeCompare(a.iso))[0];
-    return s ? s.mo : new Date().getMonth() + 1;
-  });
+export function TableTab({ db, years, readOnly = false, scope, setScope, y, setY, mo, setMo }) {
   const [share, setShare] = useState(false);
-  const { totals, official, recCount } = useMemo(() => {
-    if (scope === "all")
-      return {
-        totals: allTimeTotals(db),
-        official: false,
-        recCount: db.sessions.length,
-      };
-    if (scope === "year") {
-      const r = yearTotals(db, y);
-      return {
-        ...r,
-        recCount: db.sessions.filter((s) => s.y === y).length,
-      };
-    }
-    return {
-      totals: monthTotals(db, y, mo),
-      official: false,
-      recCount: db.sessions.filter((s) => s.y === y && s.mo === mo).length,
-    };
-  }, [db, scope, y, mo]);
-  const yearHasOfficial = scope === "month" && db.yearly.some((x) => x.y === y && x.official);
+  const { totals, official, recCount } = useMemo(
+    () => periodTotals(db, scope, y, mo),
+    [db, scope, y, mo]
+  );
+  const yearHasOfficial =
+    scope === "month" && db.yearly.some((x) => yearNum(x.y) === yearNum(y) && x.official);
   const title =
     scope === "all" ? "כל הזמן" : scope === "year" ? `${y}` : `${MONTHS[mo - 1]} ${y}`;
 
@@ -163,7 +141,7 @@ export function TableTab({ db, years, readOnly = false }) {
         options={[
           ["month", "חודשי"],
           ["year", "שנתי"],
-          ["all", "כל הזמן"],
+          ["all", "הכל"],
         ]}
       />
       {scope !== "all" && (

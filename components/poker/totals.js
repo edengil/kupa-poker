@@ -1,6 +1,12 @@
 /* סיכומי תקופות — חולצו מ-PokerApp.jsx לשימוש חוזר בבאנר ובטבלה. */
 import { AL, canon, r2 } from "./helpers.js";
 
+/** שנה מנורמלת (json לפעמים שומר y כמחרוזת). */
+export function yearNum(y) {
+  const n = Number(y);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function aggregate(recs, aliases) {
   const acc = {};
   for (const r of recs)
@@ -16,7 +22,8 @@ export function aggregate(recs, aliases) {
 /** כלל סמכותי: מאזן שנתי רשמי גובר על סכום הערבים. */
 export function yearTotals(db, y) {
   const A = AL(db);
-  const yi = db.yearly.find((x) => x.y === y);
+  const yy = yearNum(y);
+  const yi = (db.yearly || []).find((x) => yearNum(x.y) === yy);
   if (yi)
     return {
       totals: aggregate([yi], A),
@@ -24,7 +31,7 @@ export function yearTotals(db, y) {
     };
   return {
     totals: aggregate(
-      db.sessions.filter((s) => s.y === y),
+      (db.sessions || []).filter((s) => yearNum(s.y) === yy),
       A
     ),
     official: false,
@@ -32,18 +39,57 @@ export function yearTotals(db, y) {
 }
 
 export function monthTotals(db, y, mo) {
+  const yy = yearNum(y);
+  const mm = Number(mo);
   return aggregate(
-    db.sessions.filter((s) => s.y === y && s.mo === mo),
+    (db.sessions || []).filter((s) => yearNum(s.y) === yy && Number(s.mo) === mm),
     AL(db)
   );
 }
 
 export function allTimeTotals(db) {
-  const ys = new Set([...db.sessions.map((s) => s.y), ...db.yearly.map((y) => y.y)]);
+  const ys = new Set();
+  for (const s of db.sessions || []) {
+    const y = yearNum(s.y);
+    if (y != null) ys.add(y);
+  }
+  for (const row of db.yearly || []) {
+    const y = yearNum(row.y);
+    if (y != null) ys.add(y);
+  }
   const acc = {};
   for (const y of ys)
     for (const t of yearTotals(db, y).totals) acc[t.name] = r2((acc[t.name] || 0) + t.amount);
   return Object.entries(acc)
     .map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * בחירת סיכום לפי טאב תקופה: month | year | all (הכל).
+ * מחזיר { totals, official, recCount }.
+ */
+export function periodTotals(db, scope, y, mo) {
+  if (scope === "all") {
+    return {
+      totals: allTimeTotals(db),
+      official: false,
+      recCount: (db.sessions || []).length,
+    };
+  }
+  if (scope === "year") {
+    const r = yearTotals(db, y);
+    const yy = yearNum(y);
+    return {
+      ...r,
+      recCount: (db.sessions || []).filter((s) => yearNum(s.y) === yy).length,
+    };
+  }
+  const yy = yearNum(y);
+  const mm = Number(mo);
+  return {
+    totals: monthTotals(db, y, mo),
+    official: false,
+    recCount: (db.sessions || []).filter((s) => yearNum(s.y) === yy && Number(s.mo) === mm).length,
+  };
 }

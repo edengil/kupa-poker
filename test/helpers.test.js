@@ -17,6 +17,7 @@ import {
   yearTotals,
   monthTotals,
   allTimeTotals,
+  periodTotals,
 } from "../components/poker/totals.js";
 import { parseEntries, parseDate } from "../components/poker/parse.js";
 import { normalize } from "../components/poker/db.js";
@@ -228,6 +229,56 @@ describe("totals — period aggregation", () => {
   it("allTimeTotals sums across years", () => {
     const t = allTimeTotals(db);
     expect(t.find((x) => x.name === "עדן גיל").amount).toBe(150);
+  });
+
+  it("periodTotals all is not the selected year when other years exist", () => {
+    const multi = {
+      aliases: {},
+      sessions: [
+        {
+          id: "a",
+          iso: "2025-03-01",
+          y: "2025",
+          mo: "3",
+          d: 1,
+          entries: [
+            { name: "עדן", amount: 80 },
+            { name: "דן", amount: -80 },
+          ],
+        },
+        {
+          id: "b",
+          iso: "2026-06-01",
+          y: 2026,
+          mo: 6,
+          d: 1,
+          entries: [
+            { name: "עדן", amount: 40 },
+            { name: "דן", amount: -40 },
+          ],
+        },
+      ],
+      yearly: [
+        {
+          id: "y25",
+          y: "2025",
+          official: true,
+          entries: [
+            { name: "עדן גיל", amount: 500 },
+            { name: "דן ינקלויץ", amount: -500 },
+          ],
+        },
+      ],
+    };
+    const all = periodTotals(multi, "all", 2026, 6);
+    const year = periodTotals(multi, "year", 2026, 6);
+    const month = periodTotals(multi, "month", 2026, 6);
+    expect(month.totals.find((x) => x.name === "עדן גיל").amount).toBe(40);
+    expect(year.totals.find((x) => x.name === "עדן גיל").amount).toBe(40);
+    expect(all.totals.find((x) => x.name === "עדן גיל").amount).toBe(540);
+    expect(all.totals.find((x) => x.name === "עדן גיל").amount).not.toBe(
+      year.totals.find((x) => x.name === "עדן גיל").amount
+    );
   });
 
   it("aggregate sorts by amount desc", () => {

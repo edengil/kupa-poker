@@ -87,6 +87,7 @@ export function SegBar({ value, onChange, options }) {
       {options.map(([v, l]) => (
         <button
           key={v}
+          type="button"
           onClick={() => onChange(v)}
           style={{
             flex: 1,

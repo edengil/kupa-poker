@@ -96,10 +96,28 @@ function App({
   const years = useMemo(() => {
     if (!db) return [];
     const s = new Set([new Date().getFullYear()]);
-    db.sessions.forEach((x) => s.add(x.y));
-    db.yearly.forEach((x) => s.add(x.y));
+    db.sessions.forEach((x) => {
+      const n = Number(x.y);
+      if (Number.isFinite(n)) s.add(n);
+    });
+    db.yearly.forEach((x) => {
+      const n = Number(x.y);
+      if (Number.isFinite(n)) s.add(n);
+    });
     return [...s].sort((a, b) => b - a);
   }, [db]);
+
+  // תקופה משותפת לבאנר ולטבלה — לחיצה על «הכל» מעדכנת את שניהם
+  const [scope, setScope] = useState(readOnly ? "month" : "year");
+  const [periodY, setPeriodY] = useState(null);
+  const [periodMo, setPeriodMo] = useState(null);
+  const y = periodY ?? (years[0] || new Date().getFullYear());
+  const mo = useMemo(() => {
+    if (periodMo != null) return periodMo;
+    if (!db?.sessions?.length) return new Date().getMonth() + 1;
+    const s = [...db.sessions].sort((a, b) => b.iso.localeCompare(a.iso))[0];
+    return s ? s.mo : new Date().getMonth() + 1;
+  }, [periodMo, db]);
 
   const viewerName = useMemo(
     () => (db && viewerAuth ? matchViewerToPlayer(db, viewerAuth) : null),
@@ -145,7 +163,16 @@ function App({
         }}
       >
         <Header />
-        <Banner db={db} onPlayer={setProfile} />
+        <Banner
+          db={db}
+          onPlayer={setProfile}
+          scope={scope}
+          setScope={setScope}
+          y={y}
+          setY={setPeriodY}
+          mo={mo}
+          setMo={setPeriodMo}
+        />
         {showPersonal && tab === "table" && (
           <>
             <PersonalStatsCard db={db} playerName={viewerName} compact />
@@ -173,7 +200,17 @@ function App({
             }}
           />
         ) : tab === "table" ? (
-          <TableTab db={db} years={years} readOnly={readOnly} />
+          <TableTab
+            db={db}
+            years={years}
+            readOnly={readOnly}
+            scope={scope}
+            setScope={setScope}
+            y={y}
+            setY={setPeriodY}
+            mo={mo}
+            setMo={setPeriodMo}
+          />
         ) : tab === "stats" && statsPanel ? (
           statsPanel
         ) : tab === "records" ? (
