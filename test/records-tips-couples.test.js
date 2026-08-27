@@ -303,6 +303,56 @@ describe("tip records", () => {
     expect(recs.mostTipsNight.count).toBe(2);
     expect(recs.allKing.chips).toBe(25);
   });
+
+  it("shows a 1-2-3 podium for tip size / tip chips, and 1-2 for tip count", () => {
+    const db = {
+      aliases: {},
+      sessions: [
+        {
+          iso: "2026-08-01",
+          d: 1,
+          mo: 8,
+          y: 2026,
+          entries: [{ name: "אופיר", amount: 10 }],
+          tips: [
+            { name: "אופיר", amount: 30, at: 1 },
+            { name: "אופיר", amount: 10, at: 2 },
+            { name: "דן", amount: 20, at: 3 },
+          ],
+        },
+        {
+          iso: "2026-08-08",
+          d: 8,
+          mo: 8,
+          y: 2026,
+          entries: [{ name: "נתנאל", amount: 0 }],
+          tips: [
+            { name: "נתנאל", amount: 8, at: 1 },
+            { name: "נתנאל", amount: 8, at: 2 },
+            { name: "נתנאל", amount: 8, at: 3 },
+          ],
+        },
+        {
+          iso: "2026-08-15",
+          d: 15,
+          mo: 8,
+          y: 2026,
+          entries: [{ name: "אורן", amount: 0 }],
+          tips: [{ name: "אורן", amount: 15, at: 1 }],
+        },
+      ],
+    };
+    const recs = computeTipRecords(db);
+    expect(recs.biggestTip).toMatchObject({ name: "אופיר סנה", amount: 30 });
+    expect(recs.biggestTip2).toMatchObject({ name: "דן ינקלויץ", amount: 20 });
+    expect(recs.biggestTip3).toMatchObject({ name: "אורן גיל", amount: 15 });
+    expect(recs.mostTipsNight).toMatchObject({ name: "נתנאל כהן", count: 3 });
+    expect(recs.mostTipsNight2).toMatchObject({ name: "אופיר סנה", count: 2 });
+    expect(recs.mostTipsNight3).toBeUndefined();
+    expect(recs.mostTipChipsNight).toMatchObject({ name: "אופיר סנה", chips: 40 });
+    expect(recs.mostTipChipsNight2).toMatchObject({ name: "נתנאל כהן", chips: 24 });
+    expect(recs.mostTipChipsNight3).toMatchObject({ name: "דן ינקלויץ", chips: 20 });
+  });
 });
 
 describe("duration records", () => {
@@ -371,12 +421,12 @@ describe("duration records", () => {
   });
 
   it("picks longest and shortest sessions by duration", () => {
-    const timed = timedSessions(db.sessions);
+    const timed = timedSessions(db.sessions, { spans: {} });
     expect(timed).toHaveLength(3);
     expect(timed[0].d).toBe(1);
     expect(timed[0].ms).toBe(5 * 60 * 60 * 1000);
 
-    const recs = computeDurationRecords(db);
+    const recs = computeDurationRecords(db, { spans: {} });
     expect(recs.nightsWithTimes).toBe(3);
     expect(recs.longest).toMatchObject({ d: 1, mo: 8, y: 2026, ms: 5 * 60 * 60 * 1000 });
     expect(recs.longest.label).toContain("שעות");
@@ -386,6 +436,39 @@ describe("duration records", () => {
   });
 
   it("returns null when no session has usable times", () => {
-    expect(computeDurationRecords({ sessions: [{ iso: "2026-01-01", d: 1, mo: 1, y: 2026, entries: [] }] })).toBeNull();
+    expect(computeDurationRecords({ sessions: [{ iso: "2026-01-01", d: 1, mo: 1, y: 2026, entries: [] }] }, { spans: {} })).toBeNull();
+  });
+
+  it("uses chat start/end as gold standard even when in-app times exist", () => {
+    const chatStart = Date.parse("2024-06-04T21:00:00+03:00");
+    const chatEnd = Date.parse("2024-06-05T02:00:00+03:00");
+    const spans = { "2024-06-04": { s: chatStart, e: chatEnd } };
+    const chatOnly = {
+      iso: "2024-06-04",
+      d: 4,
+      mo: 6,
+      y: 2024,
+      entries: [{ name: "א", amount: 0 }],
+    };
+    expect(sessionDurationMs(chatOnly, spans)).toBe(5 * 3600 * 1000);
+
+    const inApp = {
+      ...chatOnly,
+      startedAt: Date.parse("2024-06-04T20:00:00+03:00"),
+      endedAt: Date.parse("2024-06-04T22:00:00+03:00"),
+    };
+    expect(sessionDurationMs(inApp, spans)).toBe(5 * 3600 * 1000);
+
+    expect(sessionDurationMs(chatOnly, {})).toBeNull();
+    expect(sessionDurationMs({ ...chatOnly, iso: "2024-06-05" }, spans)).toBe(5 * 3600 * 1000);
+  });
+
+  it("does not invent an end when the chat night has no סיכום", () => {
+    const spans = { "2024-06-10": { s: Date.parse("2024-06-10T21:00:00+03:00"), lb: Date.parse("2024-06-10T23:00:00+03:00") } };
+    expect(sessionDurationMs({
+      iso: "2024-06-10",
+      startedAt: 1,
+      endedAt: 9e12,
+    }, spans)).toBeNull();
   });
 });

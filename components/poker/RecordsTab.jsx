@@ -9,6 +9,8 @@ import { festiveCardSoft, sectionTitle } from "./festive";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
 import { PersonalStatsCard } from "./PersonalStatsCard";
 import { knownPlayerNames } from "./personalHighlights";
+import { formatNightClock, fmtPct } from "./extraRecords";
+import { durWords } from "./helpers";
 
 /* טאב שיאים — חולץ מ-PokerApp.jsx. */
 export function RecordsTab({ db, viewerName = null, showMine = false, allowPick = false }) {
@@ -189,17 +191,27 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
             {recs.tips.biggestTip && (
               <Card icon="💎" title="הטיפ הגדול ביותר" holder={recs.tips.biggestTip.name}
                 value={`${recs.tips.biggestTip.amount} ג'`} tone={C.win}
-                sub={dt(recs.tips.biggestTip)} />
+                sub={dt(recs.tips.biggestTip)}
+                runner={recs.tips.biggestTip2 &&
+                  `${recs.tips.biggestTip2.name} · ${recs.tips.biggestTip2.amount} ג' · ${dt(recs.tips.biggestTip2)}`}
+                third={recs.tips.biggestTip3 &&
+                  `${recs.tips.biggestTip3.name} · ${recs.tips.biggestTip3.amount} ג' · ${dt(recs.tips.biggestTip3)}`} />
             )}
             {recs.tips.mostTipsNight && (
               <Card icon="🔁" title="הכי הרבה טיפים בערב אחד" holder={recs.tips.mostTipsNight.name}
                 value={`${recs.tips.mostTipsNight.count} טיפים`}
-                sub={dt(recs.tips.mostTipsNight)} />
+                sub={dt(recs.tips.mostTipsNight)}
+                runner={recs.tips.mostTipsNight2 &&
+                  `${recs.tips.mostTipsNight2.name} · ${recs.tips.mostTipsNight2.count} טיפים · ${dt(recs.tips.mostTipsNight2)}`} />
             )}
             {recs.tips.mostTipChipsNight && (
               <Card icon="🪙" title="הכי הרבה ג'יטוני טיפ בערב" holder={recs.tips.mostTipChipsNight.name}
                 value={`${recs.tips.mostTipChipsNight.chips} ג'`}
-                sub={dt(recs.tips.mostTipChipsNight)} />
+                sub={dt(recs.tips.mostTipChipsNight)}
+                runner={recs.tips.mostTipChipsNight2 &&
+                  `${recs.tips.mostTipChipsNight2.name} · ${recs.tips.mostTipChipsNight2.chips} ג' · ${dt(recs.tips.mostTipChipsNight2)}`}
+                third={recs.tips.mostTipChipsNight3 &&
+                  `${recs.tips.mostTipChipsNight3.name} · ${recs.tips.mostTipChipsNight3.chips} ג' · ${dt(recs.tips.mostTipChipsNight3)}`} />
             )}
             {recs.tips.monthKing && (
               <Card icon="🏅" title={`מלך הטיפים · ${recs.tips.monthLabel}`}
@@ -306,6 +318,9 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
         {recs.duration?.longest && (
           <Card icon="⏳" title="המשחק הכי ארוך" holder={dt(recs.duration.longest)}
             value={recs.duration.longest.label}
+            sub={recs.duration.nightsWithTimes
+              ? `מ־${recs.duration.nightsWithTimes} ערבים עם התחלה וסיום`
+              : undefined}
             runner={recs.duration.longest2 &&
               `${dt(recs.duration.longest2)} · ${recs.duration.longest2.label}`}
             third={recs.duration.longest3 &&
@@ -318,6 +333,108 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
               `${dt(recs.duration.shortest2)} · ${recs.duration.shortest2.label}`}
             third={recs.duration.shortest3 &&
               `${dt(recs.duration.shortest3)} · ${recs.duration.shortest3.label}`} />
+        )}
+
+        {recs.extra && (
+          <>
+            <div style={sectionTitle({ margin: "12px 2px 0" })}>
+              📊 קצב, קנייה ואירוח
+            </div>
+            {recs.extra.hourly && (
+              <Card icon="⏳" title="ממוצע לשעה"
+                holder={recs.extra.hourly.name}
+                value={`${fmt(recs.extra.hourly.avgHourly)} לשעה`}
+                tone={recs.extra.hourly.avgHourly >= 0 ? C.win : C.loss}
+                sub={`מ־${recs.extra.hourly.hourlyNights} ערבים עם התחלה וסיום`}
+                runner={recs.extra.hourly2 &&
+                  `${recs.extra.hourly2.name} · ${fmt(recs.extra.hourly2.avgHourly)} לשעה`}
+                third={recs.extra.hourly3 &&
+                  `${recs.extra.hourly3.name} · ${fmt(recs.extra.hourly3.avgHourly)} לשעה`} />
+            )}
+            {recs.extra.latest && (
+              <Card icon="🌙" title="מגיע הכי מאוחר"
+                holder={recs.extra.latest.name}
+                value={formatNightClock(recs.extra.latest.avgFirstMins)}
+                sub={`שעת כניסה ראשונה ממוצעת · ${recs.extra.latest.arrivalNights} ערבים`}
+                runner={recs.extra.latest2 &&
+                  `${recs.extra.latest2.name} · ${formatNightClock(recs.extra.latest2.avgFirstMins)}`}
+                third={recs.extra.latest3 &&
+                  `${recs.extra.latest3.name} · ${formatNightClock(recs.extra.latest3.avgFirstMins)}`} />
+            )}
+            {recs.extra.earliest && recs.extra.earliest.name !== recs.extra.latest?.name && (
+              <Card icon="🌅" title="מגיע הכי מוקדם"
+                holder={recs.extra.earliest.name}
+                value={formatNightClock(recs.extra.earliest.avgFirstMins)}
+                sub={`שעת כניסה ראשונה ממוצעת · ${recs.extra.earliest.arrivalNights} ערבים`} />
+            )}
+            {recs.extra.roi && (
+              <Card icon="📊" title="רווח ביחס לקנייה"
+                holder={recs.extra.roi.name}
+                value={fmtPct(recs.extra.roi.lifetimeRoi)}
+                tone={recs.extra.roi.lifetimeRoi >= 0 ? C.win : C.loss}
+                sub="נטו חלקי הקנייה על כל ההיסטוריה. קנייה 150₪ וסיום +100₪ = +67%."
+                runner={recs.extra.roi2 &&
+                  `${recs.extra.roi2.name} · ${fmtPct(recs.extra.roi2.lifetimeRoi)}`}
+                third={recs.extra.roi3 &&
+                  `${recs.extra.roi3.name} · ${fmtPct(recs.extra.roi3.lifetimeRoi)}`} />
+            )}
+            {recs.extra.pot && (
+              <Card icon="🏦" title="שיא קופה בערב — סך הקניות"
+                holder={dt(recs.extra.pot)}
+                value={`${fmt(recs.extra.pot.buyin).replace(/^[+−]/, "")}₪`}
+                sub={`${recs.extra.pot.players} שחקנים עם סכום קנייה`}
+                runner={recs.extra.pot2 &&
+                  `${dt(recs.extra.pot2)} · ${fmt(recs.extra.pot2.buyin).replace(/^[+−]/, "")}₪`}
+                third={recs.extra.pot3 &&
+                  `${dt(recs.extra.pot3)} · ${fmt(recs.extra.pot3.buyin).replace(/^[+−]/, "")}₪`} />
+            )}
+            {recs.extra.hostTop && (
+              <Card icon="🏠" title="הכי הרבה פעמים אירח"
+                holder={recs.extra.hostTop.name}
+                value={`${recs.extra.hostTop.n} ערבים`}
+                sub={`נטו אצלו ${fmt(recs.extra.hostTop.net)}`}
+                runner={recs.extra.hostTop2 &&
+                  `${recs.extra.hostTop2.name} · ${recs.extra.hostTop2.n} ערבים · נטו ${fmt(recs.extra.hostTop2.net)}`}
+                third={recs.extra.hostTop3 &&
+                  `${recs.extra.hostTop3.name} · ${recs.extra.hostTop3.n} ערבים · נטו ${fmt(recs.extra.hostTop3.net)}`} />
+            )}
+            {recs.extra.highBuyLoser && (
+              <Card icon="🛒" title="קונה הרבה ומפסיד"
+                holder={recs.extra.highBuyLoser.name}
+                value={`${fmt(recs.extra.highBuyLoser.avgBuyin).replace(/^[+−]/, "")}₪ קנייה ממוצעת`}
+                tone={C.loss}
+                sub={`נטו כולל ${fmt(recs.extra.highBuyLoser.net)} · ${recs.extra.highBuyLoser.buyinNights} ערבים`} />
+            )}
+            {recs.extra.lowBuyWinner && (
+              <Card icon="🍀" title="קונה מעט ומרוויח"
+                holder={recs.extra.lowBuyWinner.name}
+                value={`${fmt(recs.extra.lowBuyWinner.avgBuyin).replace(/^[+−]/, "")}₪ קנייה ממוצעת`}
+                tone={C.win}
+                sub={`נטו כולל ${fmt(recs.extra.lowBuyWinner.net)} · ${recs.extra.lowBuyWinner.buyinNights} ערבים`} />
+            )}
+            {recs.extra.longestDay && (
+              <Card icon="📆" title="היום בשבוע הכי ארוך לקבוצה"
+                holder={`יום ${recs.extra.longestDay.day}`}
+                value={durWords(recs.extra.longestDay.avgMs)}
+                sub={`ממוצע משך · ${recs.extra.longestDay.n} ערבים`} />
+            )}
+            {recs.extra.richestDay && (
+              <Card icon="💰" title="היום בשבוע הכי פעיל לקבוצה"
+                holder={`יום ${recs.extra.richestDay.day}`}
+                value={fmt(recs.extra.richestDay.avgMoved)}
+                sub={`ממוצע כסף שהחליף ידיים · ${recs.extra.richestDay.n} ערבים`} />
+            )}
+            {recs.extra.hero && (
+              <Card icon="🌟" title="הכי הרבה פעמים גיבור הערב"
+                holder={recs.extra.hero.name}
+                value={`${recs.extra.hero.hero} פעמים`}
+                sub="הנטו הגבוה בערב"
+                runner={recs.extra.hero2 &&
+                  `${recs.extra.hero2.name} · ${recs.extra.hero2.hero} פעמים`}
+                third={recs.extra.hero3 &&
+                  `${recs.extra.hero3.name} · ${recs.extra.hero3.hero} פעמים`} />
+            )}
+          </>
         )}
         {recs.attendTop && (
           <Card icon="🪑" title="לא מפספס — הכי הרבה ערבים ברצף" holder={recs.attendTop.name}
@@ -345,8 +462,8 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
             borderRadius: 14,
             padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
           }}>
-            עדיין אין ערבים עם יציאת ג&apos;יטונים שמורה.
-            מהערב הבא שתשמור מהלייב (או מהבוט עם סגירה) — יופיעו כאן שיאי יציאה לחודש, לשנה ולכל הזמנים.
+            עדיין אין ערבים עם יציאת ג&apos;יטונים (שמורה או משוחזרת מקנייה+נטו).
+            מהערב הבא שתשמור מהלייב — יישמרו ג&apos;יטונים אמיתיים. לערבים ישנים: (קנייה אחרונה בצ&apos;אט + נטו) × 2.
           </div>
         ) : (
           <>

@@ -75,11 +75,11 @@ export function brokenRecords(db, rec) {
     lines.push(`🐐 חילופי שלטון! ${after.name} עקף את ${before.name} והוא מלך כל הזמנים עם ${fmt(after.amount)}`);
   }
 
-  /* שיא ג'יטונים ביציאה — רק מול ערבים עם נתוני chips אמיתיים */
-  if (sessionHasChips(rec)) {
+  /* שיא ג'יטונים ביציאה — שמורים או משוחזרים מקנייה+נטו */
+  if (sessionHasChips(rec, A)) {
     const prevHigh = bestChipCashout(old, A);
     for (const e of rec.entries) {
-      const c = entryChips(e);
+      const c = entryChips(e, { iso: rec.iso, aliases: A });
       if (c == null) continue;
       const nm = canon(e.name, A);
       if (!prevHigh || c > prevHigh.chips) {

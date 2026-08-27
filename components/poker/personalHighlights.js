@@ -3,6 +3,7 @@
 import { AL, canon, FEMALE } from "./helpers.js";
 import { fmt } from "./format.js";
 import { computeRecords } from "./computeRecords.js";
+import { fmtPct } from "./extraRecords.js";
 
 /** שמות פרטיים לטיניים נפוצים בקבוצה → עברית (רק להתאמה זהירה). */
 const LATIN_FIRST = {
@@ -372,6 +373,55 @@ export function computePersonalHighlights(db, playerName) {
     50
   );
 
+  const extra = recs.extra;
+  if (extra) {
+    addPodium(
+      items,
+      playerName,
+      [extra.hourly, extra.hourly2, extra.hourly3],
+      (p, w) => `מקום ${w} בממוצע לשעה`,
+      (h) => `${fmt(h.avgHourly)} לשעה`,
+      "⏳",
+      69
+    );
+    addPodium(
+      items,
+      playerName,
+      [extra.roi, extra.roi2, extra.roi3],
+      (p, w) => `מקום ${w} ברווח ביחס לקנייה`,
+      (h) => fmtPct(h.lifetimeRoi),
+      "📊",
+      67
+    );
+    addPodium(
+      items,
+      playerName,
+      [extra.hero, extra.hero2, extra.hero3],
+      (p, w) => `מקום ${w} בגיבורי ערב`,
+      (h) => `${h.hero} פעמים`,
+      "🌟",
+      66
+    );
+    addPodium(
+      items,
+      playerName,
+      [extra.latest, extra.latest2, extra.latest3],
+      (p, w) => `מקום ${w} בהגעה מאוחרת`,
+      (h) => `כניסה ראשונה ממוצעת`,
+      "🌙",
+      48
+    );
+    addPodium(
+      items,
+      playerName,
+      [extra.hostTop, extra.hostTop2, extra.hostTop3],
+      (p, w) => `מקום ${w} באירוח`,
+      (h) => `${h.n} ערבים`,
+      "🏠",
+      47
+    );
+  }
+
   if (recs.comeback?.name === playerName) {
     items.push({
       place: 1,
@@ -406,15 +456,33 @@ export function computePersonalHighlights(db, playerName) {
 
   const tips = recs.tips;
   if (tips) {
-    if (tips.biggestTip?.name === playerName) {
-      items.push({
-        place: 1,
-        title: "הטיפ הגדול ביותר",
-        detail: `${tips.biggestTip.amount} ג' · ${dt(tips.biggestTip)}`,
-        icon: "💎",
-        weight: 74,
-      });
-    }
+    addPodium(
+      items,
+      playerName,
+      [tips.biggestTip, tips.biggestTip2, tips.biggestTip3],
+      (p, w) => `מקום ${w} בטיפ הגדול ביותר`,
+      (h) => `${h.amount} ג' · ${dt(h)}`,
+      "💎",
+      74
+    );
+    addPodium(
+      items,
+      playerName,
+      [tips.mostTipsNight, tips.mostTipsNight2],
+      (p, w) => `מקום ${w} בהכי הרבה טיפים בערב`,
+      (h) => `${h.count} טיפים · ${dt(h)}`,
+      "🔁",
+      73.5
+    );
+    addPodium(
+      items,
+      playerName,
+      [tips.mostTipChipsNight, tips.mostTipChipsNight2, tips.mostTipChipsNight3],
+      (p, w) => `מקום ${w} בג'יטוני טיפ בערב`,
+      (h) => `${h.chips} ג' · ${dt(h)}`,
+      "🪙",
+      73.2
+    );
     addPodium(
       items,
       playerName,

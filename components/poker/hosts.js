@@ -11,6 +11,38 @@ export const HOSTS = [
   { label: "עדן שפאק", text: "אצל עדן שפאק · קרל פופר 6, נתניה · קומה 5, דירה 20" },
 ];
 
+/** תווית כפתור ב-PlanCard → שחקן קנוני שמארח. */
+export const HOST_LABEL_PLAYER = {
+  "אצלי": "עדן גיל",
+  "אופיר סנה": "אופיר סנה",
+  "דור ועדן לירז": "דור לירז",
+  "שגיא גיל": "שגיא גיל",
+  "איציק": "איציק תפילין",
+  "נתנאל כהן": "נתנאל כהן",
+  "עדן שפאק": "עדן שפאק",
+};
+
+/** מארח קנוני מתוך שורת מיקום (PlanCard / הודעת בוט). */
+export function hostPlayerFromLocation(location) {
+  const raw = String(location || "").trim();
+  if (!raw) return null;
+  for (const h of HOSTS) {
+    const head = h.text.split(" · ")[0];
+    if (raw === h.text || raw.startsWith(head)) return HOST_LABEL_PLAYER[h.label] || null;
+  }
+  const m = raw.match(/אצל\s+([^·\n,]+)/);
+  if (!m) return null;
+  const who = m[1].trim();
+  if (/שפאק/.test(who)) return "עדן שפאק";
+  if (/לירז|דור ועדן/.test(who)) return "דור לירז";
+  if (/נתנאל/.test(who)) return "נתנאל כהן";
+  if (/איציק/.test(who)) return "איציק תפילין";
+  if (/אופיר/.test(who)) return "אופיר סנה";
+  if (/שגיא/.test(who)) return "שגיא גיל";
+  if (/^עדן/.test(who)) return "עדן גיל";
+  return null;
+}
+
 const SKIP_SEGMENT = /^(?:אצל\s|קומה|דירה|קוד)/;
 
 /** חלק הכתובת שמתאים לניווט — רחוב ומספר, בלי קומה/קוד. */

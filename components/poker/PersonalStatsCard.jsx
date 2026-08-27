@@ -23,7 +23,7 @@ export function PersonalStatsCard({ db, playerName, compact = false, title }) {
   if (!playerName) return null;
   if (!rows.length) return null;
 
-  const shown = compact ? rows.slice(0, 8) : rows;
+  const shown = compact ? rows.slice(0, 10) : rows;
 
   return (
     <section

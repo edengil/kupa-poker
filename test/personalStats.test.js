@@ -114,6 +114,9 @@ describe("computePersonalStats", () => {
     expect(rows.some((r) => r.title === "הרווח הכי גדול")).toBe(true);
     expect(rows.some((r) => r.title === "ממוצע כניסות")).toBe(true);
     expect(rows.some((r) => r.title === "כל כמה זמן כניסה נוספת")).toBe(true);
+    expect(rows.some((r) => r.title === "היום הכי טוב")).toBe(false);
+    expect(rows.some((r) => r.title === "רווח ביחס לקנייה")).toBe(true);
+    expect(rows.some((r) => /טיפ/.test(r.title) && /רצף/.test(r.title))).toBe(false);
   });
 
   it("fills rebuy gaps from chat timestamps when live has none", () => {

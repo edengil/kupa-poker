@@ -7,6 +7,15 @@ import { fmt } from "./format.js";
 import { ENTRY } from "../../lib/report.js";
 import { sessionDurationMs } from "./durationRecords.js";
 import { chatNightsFor } from "./entryTimings.js";
+import { resolveEntryChips, resolveEntryBuyin } from "./reconstructChips.js";
+import {
+  computePartnerEdges,
+  hostForSession,
+  formatNightClock,
+  nightMinutes,
+  firstEntryTs,
+  fmtPct,
+} from "./extraRecords.js";
 
 function dt(n) {
   if (!n || n.d == null) return "";
@@ -44,13 +53,6 @@ export function formatGapMs(ms) {
   if (h === 1 && m) return `שעה ו-${m} דק׳`;
   if (h === 1) return "שעה";
   return m ? `${h} שעות ו-${m} דק׳` : `${h} שעות`;
-}
-
-function weekdayHe(iso) {
-  if (!iso) return null;
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(+d)) return null;
-  return ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"][d.getDay()] || null;
 }
 
 function isoParts(iso) {
@@ -102,16 +104,19 @@ export function computePersonalStats(db, playerName, opts = {}) {
     let chips = 0;
     let hasChips = false;
     let events = [];
+    const nightsMap = opts.chat === false ? {} : undefined;
     for (const e of s.entries || []) {
       if (canon(e.name, A) !== name) continue;
       has = true;
       amount = r2(amount + (+e.amount || 0));
-      if (e.buyin != null && e.buyin !== "") {
-        buyin = r2(buyin + (+e.buyin || 0));
+      const buy = resolveEntryBuyin(e, { iso: s.iso, aliases: A, nightsMap });
+      if (buy.buyin != null) {
+        buyin = r2(buyin + buy.buyin);
         hasBuyin = true;
       }
-      if (e.chips != null && e.chips !== "") {
-        chips = r2(chips + (+e.chips || 0));
+      const resolved = resolveEntryChips(e, { iso: s.iso, aliases: A, nightsMap });
+      if (resolved.chips != null) {
+        chips = r2(chips + resolved.chips);
         hasChips = true;
       }
       if (Array.isArray(e.buyinEvents) && e.buyinEvents.length) {
@@ -143,7 +148,6 @@ export function computePersonalStats(db, playerName, opts = {}) {
       events,
       tips,
       durationMs: sessionDurationMs(s),
-      weekday: weekdayHe(s.iso),
     });
   }
 
@@ -265,11 +269,9 @@ export function computePersonalStats(db, playerName, opts = {}) {
   }
 
   const withBuyin = nights.filter((n) => n.buyin != null && n.buyin > 0);
-  const avgRoi = withBuyin.length
-    ? r2(
-        (withBuyin.reduce((s, n) => s + n.amount / n.buyin, 0) / withBuyin.length) * 100
-      )
-    : null;
+  const totalBuyin = r2(withBuyin.reduce((s, n) => s + n.buyin, 0));
+  const netOnBuyin = r2(withBuyin.reduce((s, n) => s + n.amount, 0));
+  const lifetimeRoi = totalBuyin > 0 ? r2((netOnBuyin / totalBuyin) * 100) : null;
 
   const timed = nights.filter((n) => n.durationMs);
   const avgHourly = timed.length
@@ -278,21 +280,6 @@ export function computePersonalStats(db, playerName, opts = {}) {
       )
     : null;
 
-  const byDay = {};
-  for (const n of nights) {
-    if (!n.weekday) continue;
-    const cur = byDay[n.weekday] || { sum: 0, n: 0 };
-    cur.sum = r2(cur.sum + n.amount);
-    cur.n += 1;
-    byDay[n.weekday] = cur;
-  }
-  let bestWeekday = null;
-  for (const [day, v] of Object.entries(byDay)) {
-    if (v.n < 2) continue;
-    const avg = r2(v.sum / v.n);
-    if (!bestWeekday || avg > bestWeekday.avg) bestWeekday = { day, avg, n: v.n };
-  }
-
   const withChips = nights.filter((n) => n.chips != null);
   let bestChips = null;
   for (const n of withChips) {
@@ -300,6 +287,28 @@ export function computePersonalStats(db, playerName, opts = {}) {
   }
 
   const last = nights[nights.length - 1];
+  const firstMins = [];
+  for (const n of nights) {
+    const row = chatMap?.[n.iso];
+    const ts = firstEntryTs(n.events, row);
+    const mins = nightMinutes(ts);
+    if (mins != null) firstMins.push(mins);
+  }
+  const avgFirstMins = firstMins.length
+    ? firstMins.reduce((s, v) => s + v, 0) / firstMins.length
+    : null;
+
+  const partners = opts.chat === false ? null : computePartnerEdges(db, name);
+  const hostedNights = [];
+  let hostedNet = 0;
+  if (opts.chat !== false) {
+    for (const s of sessions) {
+      if (hostForSession(s, A) !== name) continue;
+      const mine = nights.find((n) => n.iso === s.iso);
+      hostedNights.push(s.iso);
+      if (mine) hostedNet = r2(hostedNet + mine.amount);
+    }
+  }
 
   return {
     name,
@@ -329,13 +338,18 @@ export function computePersonalStats(db, playerName, opts = {}) {
     rebuyGapNights,
     totalTips,
     biggestTip,
-    avgRoi,
+    lifetimeRoi,
     roiNights: withBuyin.length,
+    totalBuyin,
     avgHourly,
     hourlyNights: timed.length,
-    bestWeekday,
     bestChips,
     lastNight: last,
+    avgFirstMins,
+    arrivalNights: firstMins.length,
+    partners,
+    hostedCount: hostedNights.length,
+    hostedNet: hostedNights.length ? hostedNet : null,
   };
 }
 
@@ -424,6 +438,32 @@ export function personalStatRows(stats, { compact = false } = {}) {
     });
   }
 
+  if (stats.lifetimeRoi != null) {
+    push({
+      icon: "📊",
+      title: "רווח ביחס לקנייה",
+      detail: fmtPct(stats.lifetimeRoi),
+      note: "נטו חלקי הקנייה, על כל ההיסטוריה עם סכום קנייה. קנייה 150₪ וסיום +100₪ = +67%. קנייה 200₪ והפסד 50₪ = −25%. בלי סכום קנייה לא מוצג.",
+    });
+  }
+  if (stats.avgHourly != null) {
+    push({
+      icon: "⏳",
+      title: "ממוצע לשעה",
+      detail: `${fmt(stats.avgHourly)} לשעה`,
+      note: `מ־${stats.hourlyNights} ערבים עם שעת התחלה/סיום`,
+    });
+  }
+  if (stats.partners?.best) {
+    push({
+      icon: "🤝",
+      title: "עם מי אתה מרוויח יותר",
+      detail: `${stats.partners.best.name} · ממוצע ${fmt(stats.partners.best.avg)}`,
+      note: `כשאתם באותו שולחן · ${stats.partners.best.n} ערבים משותפים`,
+      tone: stats.partners.best.avg >= 0 ? "win" : "loss",
+    });
+  }
+
   if (compact) return rows;
 
   if (stats.mostEntries) {
@@ -478,27 +518,19 @@ export function personalStatRows(stats, { compact = false } = {}) {
       tone: "loss",
     });
   }
-  if (stats.avgRoi != null) {
+  if (stats.avgFirstMins != null) {
     push({
-      icon: "📊",
-      title: "תשואה מול הקנייה",
-      detail: `${stats.avgRoi}%`,
-      note: `מ־${stats.roiNights} ערבים עם סכום קנייה`,
+      icon: "🕐",
+      title: "שעת כניסה ראשונה ממוצעת",
+      detail: formatNightClock(stats.avgFirstMins),
+      note: stats.arrivalNights ? `מ־${stats.arrivalNights} ערבים עם חותמת כניסה בצ'אט` : null,
     });
   }
-  if (stats.avgHourly != null) {
+  if (stats.hostedCount > 0) {
     push({
-      icon: "⏳",
-      title: "ממוצע לשעה",
-      detail: `${fmt(stats.avgHourly)} לשעה`,
-      note: `מ־${stats.hourlyNights} ערבים עם שעת התחלה/סיום`,
-    });
-  }
-  if (stats.bestWeekday) {
-    push({
-      icon: "📆",
-      title: "היום הכי טוב",
-      detail: `${stats.bestWeekday.day} · ממוצע ${fmt(stats.bestWeekday.avg)} (${stats.bestWeekday.n} ערבים)`,
+      icon: "🏠",
+      title: "אירוח אצלך",
+      detail: `${stats.hostedCount} ערבים · נטו ${fmt(stats.hostedNet)}`,
     });
   }
   if (stats.totalTips > 0) {

@@ -329,6 +329,7 @@ export function LiveTab({
       coupleFills: coupleFills.length ? coupleFills : undefined,
       startedAt: startedAt || null,
       endedAt,
+      location: db.plan?.location || undefined,
     };
     const roster = [...new Set([...(db.roster || []), ...players.map((p) => p.name)])];
     // שבירת שיאים נבדקת מול ה-db שלפני ההוספה — ואם נשבר משהו, הבוט מכריז בקבוצה

@@ -27,7 +27,7 @@ function tipNights(sessions, aliases) {
     const byName = {};
     let count = 0;
     let chips = 0;
-    let biggest = null;
+    const singles = [];
     for (const t of sessionTips(s)) {
       const nm = canon(t.name, aliases);
       const amt = +t.amount || 0;
@@ -36,10 +36,15 @@ function tipNights(sessions, aliases) {
       byName[`${nm}__count`] = (byName[`${nm}__count`] || 0) + 1;
       count += 1;
       chips += amt;
-      if (!biggest || amt > biggest.amount) biggest = { name: nm, amount: amt };
+      singles.push({ name: nm, amount: amt, d: s.d, mo: s.mo, y: s.y });
     }
-    return { s, byName, count, chips, biggest };
+    return { s, byName, count, chips, singles };
   });
+}
+
+function rank(list, key) {
+  const sorted = [...list].sort((a, b) => key(b) - key(a));
+  return [sorted[0] || null, sorted[1] || null, sorted[2] || null];
 }
 
 /**
@@ -54,36 +59,34 @@ export function computeTipRecords(db) {
   const last = sessions[sessions.length - 1];
   const monthNights = nights.filter((n) => n.s.y === last.y && n.s.mo === last.mo);
 
-  // שיא טיפ בודד
-  let biggestTip = null;
-  for (const n of nights) {
-    if (n.biggest && (!biggestTip || n.biggest.amount > biggestTip.amount)) {
-      biggestTip = {
-        ...n.biggest,
-        d: n.s.d,
-        mo: n.s.mo,
-        y: n.s.y,
-      };
-    }
-  }
+  const singles = nights.flatMap((n) => n.singles);
+  const [biggestTip, biggestTip2, biggestTip3] = rank(singles, (x) => x.amount);
 
-  // הכי הרבה טיפים בערב (מספר) + סך ג'יטונים בערב
-  let mostTipsNight = null; // by count
-  let mostTipChipsNight = null; // by chips from one person in one night
+  const countRows = [];
+  const chipRows = [];
   for (const n of nights) {
     for (const [key, val] of Object.entries(n.byName)) {
       if (key.endsWith("__count")) {
-        const nm = key.slice(0, -"__count".length);
-        if (!mostTipsNight || val > mostTipsNight.count) {
-          mostTipsNight = { name: nm, count: val, d: n.s.d, mo: n.s.mo, y: n.s.y };
-        }
+        countRows.push({
+          name: key.slice(0, -"__count".length),
+          count: val,
+          d: n.s.d,
+          mo: n.s.mo,
+          y: n.s.y,
+        });
       } else if (!key.includes("__")) {
-        if (!mostTipChipsNight || val > mostTipChipsNight.chips) {
-          mostTipChipsNight = { name: key, chips: val, d: n.s.d, mo: n.s.mo, y: n.s.y };
-        }
+        chipRows.push({
+          name: key,
+          chips: val,
+          d: n.s.d,
+          mo: n.s.mo,
+          y: n.s.y,
+        });
       }
     }
   }
+  const [mostTipsNight, mostTipsNight2] = rank(countRows, (x) => x.count);
+  const [mostTipChipsNight, mostTipChipsNight2, mostTipChipsNight3] = rank(chipRows, (x) => x.chips);
 
   const sumBy = (list) => {
     const acc = {};
@@ -104,8 +107,13 @@ export function computeTipRecords(db) {
   return {
     monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
     biggestTip,
+    biggestTip2,
+    biggestTip3,
     mostTipsNight,
+    mostTipsNight2,
     mostTipChipsNight,
+    mostTipChipsNight2,
+    mostTipChipsNight3,
     monthKing: monthTotals[0] || null,
     monthKing2: monthTotals[1] || null,
     monthKing3: monthTotals[2] || null,
