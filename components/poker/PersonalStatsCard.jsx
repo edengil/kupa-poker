@@ -9,11 +9,15 @@ const TONE = { win: C.win, loss: C.loss, dim: C.dim };
 
 /**
  * שיאים אישיים לכל שחקן (הרווח הכי גדול, ממוצע כניסות וכו').
+ * year — אופציונלי: פילטר שנה בתיק האישי.
  */
-export function PersonalStatsCard({ db, playerName, compact = false, title }) {
+export function PersonalStatsCard({ db, playerName, compact = false, title, year = null }) {
   const stats = useMemo(
-    () => (playerName ? computePersonalStats(db, playerName) : null),
-    [db, playerName]
+    () =>
+      playerName
+        ? computePersonalStats(db, playerName, year != null ? { year } : {})
+        : null,
+    [db, playerName, year]
   );
   const rows = useMemo(
     () => (stats ? personalStatRows(stats, { compact }) : []),
@@ -24,6 +28,7 @@ export function PersonalStatsCard({ db, playerName, compact = false, title }) {
   if (!rows.length) return null;
 
   const shown = compact ? rows.slice(0, 10) : rows;
+  const yearSuffix = year != null ? ` · ${year}` : "";
 
   return (
     <section
@@ -35,7 +40,7 @@ export function PersonalStatsCard({ db, playerName, compact = false, title }) {
     >
       <div style={{ ...sectionEyebrow, marginBottom: 8 }}>
         <span>♠</span>
-        {title || `שיאים אישיים · ${playerName}`}
+        {title || `שיאים אישיים · ${playerName}${yearSuffix}`}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {shown.map((row) => (

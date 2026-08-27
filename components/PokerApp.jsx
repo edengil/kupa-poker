@@ -5,7 +5,7 @@
    שינויים: שכבת האחסון הוחלפה ב-lib/store, ונוסף מצב readOnly.
    המודולים חולצו ל-components/poker/*; כאן נשארת רק מעטפת ה-App.
    ============================================================================ */
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { store } from "../lib/store";
 import { C } from "./poker/colors";
 import { Header, TabBar, Style } from "./poker/chrome";
@@ -16,6 +16,8 @@ import { normalize } from "./poker/db";
 import { InputTab } from "./poker/InputTab";
 import { brokenRecords } from "./poker/brokenRecords";
 import { RecordsTab } from "./poker/RecordsTab";
+import { RecordsAlert } from "./poker/RecordsAlert";
+import { normalizeRecordAlertLines } from "./poker/recordsAlert";
 import { PlayersTab } from "./poker/PlayersTab";
 import { ProfileSheet } from "./poker/ProfileSheet";
 import { LiveTab } from "./poker/LiveTab";
@@ -26,6 +28,7 @@ import { applyChipBackfill } from "./poker/chipBackfill";
 import { applyTipBackfill } from "./poker/tipBackfill";
 import { PersonalHighlightsCard } from "./poker/PersonalHighlightsCard";
 import { PersonalStatsCard } from "./poker/PersonalStatsCard";
+import { MonthHeroesCard } from "./poker/MonthHeroesCard";
 import { matchViewerToPlayer } from "./poker/personalHighlights";
 import { EGFooter } from "./Logo";
 
@@ -46,6 +49,7 @@ function App({
 }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
+  const [recordAlert, setRecordAlert] = useState(null);
   // initialTab מאפשר לרענון מבחוץ (remount אחרי פינג מהבוט) לא לזרוק
   // את המשתמש בחזרה לטבלה
   const [tab, setTabState] = useState(initialTab);
@@ -125,6 +129,16 @@ function App({
   );
   const showPersonal = !!viewerAuth;
 
+  const dismissRecordAlert = useCallback(() => setRecordAlert(null), []);
+  const handleRecords = useCallback(
+    (lines) => {
+      const cleaned = normalizeRecordAlertLines(lines);
+      if (cleaned) setRecordAlert(cleaned);
+      if (typeof onRecords === "function") onRecords(lines);
+    },
+    [onRecords]
+  );
+
   if (!ready || !db) {
   return (
       <div
@@ -155,6 +169,7 @@ function App({
       }}
     >
       <Style />
+      <RecordsAlert lines={recordAlert} onDismiss={dismissRecordAlert} />
       <div
                 style={{
           maxWidth: 640,
@@ -173,6 +188,7 @@ function App({
           mo={mo}
           setMo={setPeriodMo}
         />
+        {tab === "table" && <MonthHeroesCard db={db} onPlayer={setProfile} />}
         {showPersonal && tab === "table" && (
           <>
             <PersonalStatsCard db={db} playerName={viewerName} compact />
@@ -187,7 +203,7 @@ function App({
             commit={commit}
             onGameStart={onGameStart}
             renderRsvps={renderRsvps}
-            onRecords={onRecords}
+            onRecords={handleRecords}
             onPlanShared={onPlanShared}
           />
         ) : tab === "sessions" ? (

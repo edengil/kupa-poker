@@ -3,9 +3,27 @@
 import React, { useRef } from "react";
 import { C } from "./colors";
 import { exportDb, normalize } from "./db";
+import { exportSessionsCsv } from "./csvExport";
 import { Download, Upload } from "./icons";
 
-/* גיבוי וייצוא/ייבוא JSON — חולץ מ-PokerApp.jsx כ-JSX נקי. */
+const btn = {
+  flex: 1,
+  padding: 11,
+  borderRadius: 10,
+  border: `1px solid ${C.line}`,
+  background: C.feltDeep,
+  color: C.cream,
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+  fontFamily: "inherit",
+};
+
+/* גיבוי JSON + ייצוא CSV לאקסל — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function BackupCard({ db, commit }) {
   const fileRef = useRef();
 
@@ -45,52 +63,21 @@ export function BackupCard({ db, commit }) {
         }}
       >
         <Download size={16} />
-        גיבוי וייבוא
+        גיבוי וייצוא
       </div>
       <p style={{ fontSize: 12, color: C.dim, marginTop: 0, lineHeight: 1.6 }}>
-        ייצא קובץ לגיבוי או להעברה בין הארטיפקט לאתר ה-Netlify. הייבוא הוא הדרך האמינה לטעון
-        נתונים קיימים.
+        גיבוי מלא ב־JSON, ייבוא חזרה, או ייצוא ערבים ושחקנים לקובץ שאפשר לפתוח באקסל.
       </p>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={() => exportDb(db)}
-          style={{
-            flex: 1,
-            padding: 11,
-            borderRadius: 10,
-            border: `1px solid ${C.line}`,
-            background: C.feltDeep,
-            color: C.cream,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 7,
-          }}
-        >
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" onClick={() => exportSessionsCsv(db)} style={btn}>
           <Download size={16} />
           ייצוא
         </button>
-        <button
-          onClick={() => fileRef.current?.click()}
-          style={{
-            flex: 1,
-            padding: 11,
-            borderRadius: 10,
-            border: `1px solid ${C.line}`,
-            background: C.feltDeep,
-            color: C.cream,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 7,
-          }}
-        >
+        <button type="button" onClick={() => exportDb(db)} style={btn}>
+          <Download size={16} />
+          גיבוי JSON
+        </button>
+        <button type="button" onClick={() => fileRef.current?.click()} style={btn}>
           <Upload size={16} />
           ייבוא
         </button>

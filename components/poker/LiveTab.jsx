@@ -29,6 +29,7 @@ import {
   AlertTriangle, CheckCircle2, Plus, Minus, Send, UserPlus, Coins, X,
 } from "./icons";
 import { brassCta, brassCtaMuted, sectionEyebrow, sectionTitle } from "./festive";
+import { checkNightBalance, confirmSaveIfUnbalanced } from "./nightBalance";
 
 /* טאב לייב — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function LiveTab({
@@ -313,6 +314,14 @@ export function LiveTab({
       })
       .filter((e) => e.amount !== 0 || e.chips > 0 || e.tipsGiven > 0);
     if (!entries.length) return;
+    /* אזהרה רכה לפני שמירה לא־מאוזנת — לא חוסם קניות/ישיבה באמצע המשחק */
+    const balCheck = checkNightBalance({
+      entries,
+      cashSumChips,
+      potChips,
+      cps,
+    });
+    if (!confirmSaveIfUnbalanced(balCheck)) return;
     const d = now.getDate(),
       mo = now.getMonth() + 1,
       y = now.getFullYear();

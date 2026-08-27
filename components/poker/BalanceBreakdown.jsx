@@ -13,15 +13,20 @@ function signed(n) {
 /**
  * מסביר למה הנטו בטבלה שונה מסכום הערבים:
  * סכום ערבים + התאמה מסיכום שנתי = נטו בטבלה.
+ * year — אופציונלי: רק שנה אחת (פילטר בתיק האישי).
  */
-export function BalanceBreakdown({ db, playerName }) {
+export function BalanceBreakdown({ db, playerName, year = null }) {
   const b = useMemo(
-    () => (playerName ? playerBalanceBreakdown(db, playerName) : null),
-    [db, playerName]
+    () =>
+      playerName
+        ? playerBalanceBreakdown(db, playerName, year != null ? { year } : {})
+        : null,
+    [db, playerName, year]
   );
   if (!b) return null;
 
   const hasAdj = b.adjustments.some((a) => Math.abs(a.gap) >= 0.005);
+  const yearHint = year != null ? ` · ${year}` : "";
 
   return (
     <div
@@ -34,7 +39,7 @@ export function BalanceBreakdown({ db, playerName }) {
       }}
     >
       <div style={{ fontSize: 12.5, color: C.dim, marginBottom: 8, fontWeight: 600 }}>
-        איך מגיעים לנטו בטבלה
+        איך מגיעים לנטו בטבלה{yearHint}
       </div>
 
       <Row label="סכום הערבים שנשמרו" value={fmt(b.sessionsNet)} color={C.cream} />

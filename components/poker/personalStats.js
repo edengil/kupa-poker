@@ -94,7 +94,12 @@ export function computePersonalStats(db, playerName, opts = {}) {
   if (!db || !playerName) return null;
   const A = AL(db);
   const name = canon(playerName, A);
-  const sessions = [...(db.sessions || [])].sort((a, b) => a.iso.localeCompare(b.iso));
+  const onlyY = opts.year != null ? Number(opts.year) : null;
+  const allSessions = [...(db.sessions || [])].sort((a, b) => a.iso.localeCompare(b.iso));
+  const sessions =
+    onlyY != null && Number.isFinite(onlyY)
+      ? allSessions.filter((s) => Number(s.y) === onlyY)
+      : allSessions;
 
   const nights = [];
   for (const s of sessions) {
@@ -311,10 +316,11 @@ export function computePersonalStats(db, playerName, opts = {}) {
     }
   }
 
-  const balance = playerBalanceBreakdown(db, name);
+  const balance = playerBalanceBreakdown(db, name, onlyY != null ? { year: onlyY } : {});
 
   return {
     name,
+    year: onlyY,
     nights: nights.length,
     wins,
     losses,
@@ -477,13 +483,46 @@ export function personalStatRows(stats, { compact = false } = {}) {
       note: `מ־${stats.hourlyNights} ערבים עם שעת התחלה/סיום`,
     });
   }
+  if (stats.avgFirstMins != null) {
+    push({
+      icon: "🕐",
+      title: "שעת כניסה ראשונה ממוצעת",
+      detail: formatNightClock(stats.avgFirstMins),
+      note: stats.arrivalNights
+        ? `מ־${stats.arrivalNights} ערבים עם חותמת כניסה (לייב / צ'אט)`
+        : null,
+    });
+  }
+
   if (stats.partners?.best) {
+    const p = stats.partners;
+    const runners = [];
+    if (p.best2) runners.push(`${p.best2.name} ${fmt(p.best2.avg)}`);
+    if (p.worst && p.worst.name !== p.best.name) {
+      runners.push(`פחות עם ${p.worst.name} ${fmt(p.worst.avg)}`);
+    }
     push({
       icon: "🤝",
-      title: "עם מי אתה מרוויח יותר",
-      detail: `${stats.partners.best.name} · ממוצע ${fmt(stats.partners.best.avg)}`,
-      note: `כשאתם באותו שולחן · ${stats.partners.best.n} ערבים משותפים`,
-      tone: stats.partners.best.avg >= 0 ? "win" : "loss",
+      title: "עם מי מרוויחים יותר באותו שולחן",
+      detail: `${p.best.name} · ממוצע ${fmt(p.best.avg)}`,
+      note: [
+        `כשאתם באותו שולחן · ${p.best.n} ערבים משותפים`,
+        runners.length ? runners.join(" · ") : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      tone: p.best.avg >= 0 ? "win" : "loss",
+    });
+  }
+
+  /* בולט גם במצב קומפקטי — נטו כשמארחים אצלך */
+  if (stats.hostedCount > 0) {
+    push({
+      icon: "🏠",
+      title: "נטו כשמארחים אצלך",
+      detail: `${stats.hostedCount} פעמים · נטו ${fmt(stats.hostedNet)}`,
+      tone: (stats.hostedNet ?? 0) >= 0 ? "win" : "loss",
+      note: "סכום הנטו בערבים שאירחת אצלך",
     });
   }
 
@@ -539,21 +578,6 @@ export function personalStatRows(stats, { compact = false } = {}) {
       title: "הירידה מהשיא",
       detail: fmt(-stats.maxDrawdown),
       tone: "loss",
-    });
-  }
-  if (stats.avgFirstMins != null) {
-    push({
-      icon: "🕐",
-      title: "שעת כניסה ראשונה ממוצעת",
-      detail: formatNightClock(stats.avgFirstMins),
-      note: stats.arrivalNights ? `מ־${stats.arrivalNights} ערבים עם חותמת כניסה בצ'אט` : null,
-    });
-  }
-  if (stats.hostedCount > 0) {
-    push({
-      icon: "🏠",
-      title: "אירוח אצלך",
-      detail: `${stats.hostedCount} ערבים · נטו ${fmt(stats.hostedNet)}`,
     });
   }
   if (stats.totalTips > 0) {

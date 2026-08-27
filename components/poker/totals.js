@@ -68,10 +68,12 @@ export function allTimeTotals(db) {
 /**
  * פירוט נטו לשחקן: סכום ערבים מול מה שמופיע בטבלה (סיכום שנתי רשמי גובר).
  * gap = tableNet − sessionsNet — כמה צריך להוסיף/להחסיר כדי להגיע לטבלה.
+ * opts.year — רק שנה אחת (לפילטר בתיק האישי).
  */
-export function playerBalanceBreakdown(db, playerName) {
+export function playerBalanceBreakdown(db, playerName, opts = {}) {
   const A = AL(db);
   const name = canon(playerName, A);
+  const onlyY = opts.year != null ? yearNum(opts.year) : null;
   const ys = new Set();
   for (const s of db.sessions || []) {
     const y = yearNum(s.y);
@@ -81,7 +83,8 @@ export function playerBalanceBreakdown(db, playerName) {
     const y = yearNum(row.y);
     if (y != null) ys.add(y);
   }
-  const years = [...ys].sort((a, b) => a - b);
+  let years = [...ys].sort((a, b) => a - b);
+  if (onlyY != null) years = years.filter((y) => y === onlyY);
   const adjustments = [];
   let sessionsNet = 0;
   let tableNet = 0;
@@ -107,11 +110,26 @@ export function playerBalanceBreakdown(db, playerName) {
   }
   return {
     name,
+    year: onlyY,
     sessionsNet,
     tableNet,
     gap: r2(tableNet - sessionsNet),
     adjustments,
   };
+}
+
+/** שנים שמופיעות בערבים / סיכומים שנתיים (יורד). */
+export function availableYears(db) {
+  const ys = new Set();
+  for (const s of db?.sessions || []) {
+    const y = yearNum(s.y);
+    if (y != null) ys.add(y);
+  }
+  for (const row of db?.yearly || []) {
+    const y = yearNum(row.y);
+    if (y != null) ys.add(y);
+  }
+  return [...ys].sort((a, b) => b - a);
 }
 
 /**

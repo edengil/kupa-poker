@@ -379,24 +379,25 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
                   `${recs.extra.roi3.name} · ${fmtPct(recs.extra.roi3.lifetimeRoi)}`} />
             )}
             {recs.extra.pot && (
-              <Card icon="🏦" title="שיא קופה בערב — סך הקניות"
+              <Card icon="🏦" title="שיא קופה"
                 holder={dt(recs.extra.pot)}
                 value={`${fmt(recs.extra.pot.buyin).replace(/^[+−]/, "")}₪`}
-                sub={`${recs.extra.pot.players} שחקנים עם סכום קנייה`}
+                sub={`סך הקניות בערב · ${recs.extra.pot.players} שחקנים`}
                 runner={recs.extra.pot2 &&
                   `${dt(recs.extra.pot2)} · ${fmt(recs.extra.pot2.buyin).replace(/^[+−]/, "")}₪`}
                 third={recs.extra.pot3 &&
                   `${dt(recs.extra.pot3)} · ${fmt(recs.extra.pot3.buyin).replace(/^[+−]/, "")}₪`} />
             )}
             {recs.extra.hostTop && (
-              <Card icon="🏠" title="הכי הרבה פעמים אירח"
+              <Card icon="🏠" title="נטו כשמארחים אצלך"
                 holder={recs.extra.hostTop.name}
-                value={`${recs.extra.hostTop.n} ערבים`}
-                sub={`נטו אצלו ${fmt(recs.extra.hostTop.net)}`}
+                value={`${recs.extra.hostTop.n} פעמים · ${fmt(recs.extra.hostTop.net)}`}
+                tone={recs.extra.hostTop.net >= 0 ? C.win : C.loss}
+                sub="מי שאירח הכי הרבה · נטו בערבים אצלו"
                 runner={recs.extra.hostTop2 &&
-                  `${recs.extra.hostTop2.name} · ${recs.extra.hostTop2.n} ערבים · נטו ${fmt(recs.extra.hostTop2.net)}`}
+                  `${recs.extra.hostTop2.name} · ${recs.extra.hostTop2.n} פעמים · נטו ${fmt(recs.extra.hostTop2.net)}`}
                 third={recs.extra.hostTop3 &&
-                  `${recs.extra.hostTop3.name} · ${recs.extra.hostTop3.n} ערבים · נטו ${fmt(recs.extra.hostTop3.net)}`} />
+                  `${recs.extra.hostTop3.name} · ${recs.extra.hostTop3.n} פעמים · נטו ${fmt(recs.extra.hostTop3.net)}`} />
             )}
             {recs.extra.highBuyLoser && (
               <Card icon="🛒" title="קונה הרבה ומפסיד"

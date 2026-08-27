@@ -13,6 +13,8 @@ import { CalendarDays, CheckCircle2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { AliasCard } from "./AliasCard";
 import { BackupCard } from "./BackupCard";
+import { GapsBoard } from "./GapsBoard";
+import { checkNightBalance, confirmSaveIfUnbalanced } from "./nightBalance";
 
 /* טאב הזנה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function InputTab({ db, commit, years }) {
@@ -56,6 +58,11 @@ export function InputTab({ db, commit, years }) {
 
   function save() {
     if (!canSave) return;
+    /* אזהרה רכה לפני שמירה לא־מאוזנת — לא חוסם הזנה באמצע, רק דורש אישור */
+    if (kind === "session" || kind === "month") {
+      const check = checkNightBalance({ entries });
+      if (!confirmSaveIfUnbalanced(check)) return;
+    }
     const rec = {
       id: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
       raw: text.trim(),
@@ -259,6 +266,7 @@ export function InputTab({ db, commit, years }) {
           {toast}
         </div>
       )}
+      <GapsBoard db={db} />
       <AliasCard db={db} commit={commit} />
       <BackupCard db={db} commit={commit} />
     </div>
