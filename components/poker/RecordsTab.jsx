@@ -7,11 +7,16 @@ import { computeRecords } from "./computeRecords";
 import { Empty } from "./ui";
 import { festiveCardSoft, sectionTitle } from "./festive";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
+import { PersonalStatsCard } from "./PersonalStatsCard";
+import { knownPlayerNames } from "./personalHighlights";
 
 /* טאב שיאים — חולץ מ-PokerApp.jsx. */
-export function RecordsTab({ db, viewerName = null, showMine = false }) {
+export function RecordsTab({ db, viewerName = null, showMine = false, allowPick = false }) {
   const [mineOnly, setMineOnly] = useState(false);
+  const [picked, setPicked] = useState("");
   const recs = useMemo(() => computeRecords(db), [db]);
+  const names = useMemo(() => knownPlayerNames(db).sort((a, b) => a.localeCompare(b, "he")), [db]);
+  const personalOf = allowPick && picked ? picked : mineOnly ? viewerName : null;
 
   if (!recs) return <Empty text="עוד אין ערבים — אין שיאים." />;
 
@@ -25,6 +30,7 @@ export function RecordsTab({ db, viewerName = null, showMine = false }) {
           <ScopeChip active={false} onClick={() => setMineOnly(false)}>הכל</ScopeChip>
           <ScopeChip active onClick={() => setMineOnly(true)}>שלי</ScopeChip>
         </div>
+        <PersonalStatsCard db={db} playerName={viewerName} />
         <PersonalHighlightsCard db={db} playerName={viewerName} />
       </div>
     );
@@ -76,6 +82,36 @@ export function RecordsTab({ db, viewerName = null, showMine = false }) {
           <ScopeChip active={!mineOnly} onClick={() => setMineOnly(false)}>הכל</ScopeChip>
           <ScopeChip active={mineOnly} onClick={() => setMineOnly(true)}>שלי</ScopeChip>
         </div>
+      )}
+      {allowPick && names.length > 0 && (
+        <label style={{ display: "block", margin: "0 2px 12px" }}>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 5 }}>שיאים אישיים של שחקן</div>
+          <select
+            value={picked}
+            onChange={(e) => setPicked(e.target.value)}
+            style={{
+              width: "100%",
+              background: C.card,
+              color: C.cream,
+              border: `1px solid ${C.line}`,
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 14,
+              fontFamily: "inherit",
+            }}
+          >
+            <option value="">כל השיאים — בחר שחקן</option>
+            {names.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {personalOf && (
+        <>
+          <PersonalStatsCard db={db} playerName={personalOf} />
+          <PersonalHighlightsCard db={db} playerName={personalOf} />
+        </>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {recs.lastNight && (

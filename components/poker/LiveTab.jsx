@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store } from "../../lib/store";
-import { buildReport, buildSettlement } from "../../lib/report";
+import { buildReport, buildSettlement, partitionByNet } from "../../lib/report";
 import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "./colors";
@@ -80,22 +80,40 @@ export function LiveTab({
   useEffect(() => onConfig(setCfg), []);
   const cps = cfg.chipsPerShekel || 2;
   const [players, setPlayers] = useState([]); // {name, buyin(₪), cashout(chips string), tipsGiven?}
-  /** שורות לייב ממוינות לפי פעילות בחודשים האחרונים (אינדקס מקורי ל-bump/rm) */
+  const anyCash = players.some((p) => p.cashout !== "");
+  /** במשחק: לפי פעילות. בסגירה: זוכים → שורה → חייבים → פתוחים למטה. */
   const playersView = useMemo(() => {
     const aliases = AL(db);
     const { recent, allc } = activity;
-    return players
-      .map((p, index) => ({ p, index }))
-      .sort((a, b) => {
-        const na = canon(a.p.name, aliases);
-        const nb = canon(b.p.name, aliases);
-        return (
-          (recent[nb] || 0) - (recent[na] || 0) ||
-          (allc[nb] || 0) - (allc[na] || 0) ||
-          a.index - b.index
-        );
-      });
-  }, [players, activity, db]);
+    const activityRank = (a, b) => {
+      const na = canon(a.p.name, aliases);
+      const nb = canon(b.p.name, aliases);
+      return (
+        (recent[nb] || 0) - (recent[na] || 0) ||
+        (allc[nb] || 0) - (allc[na] || 0) ||
+        a.index - b.index
+      );
+    };
+    if (!anyCash) {
+      return players
+        .map((p, index) => ({ p, index, group: "play" }))
+        .sort(activityRank);
+    }
+    const { winners, even, losers, open } = partitionByNet(players, cps);
+    const row = (item, group) => {
+      const p = item.p || item;
+      return { p, index: players.indexOf(p), group };
+    };
+    const openRows = open
+      .map((p) => ({ p, index: players.indexOf(p), group: "open" }))
+      .sort(activityRank);
+    return [
+      ...winners.map((x) => row(x, "win")),
+      ...even.map((x) => row(x, "even")),
+      ...losers.map((x) => row(x, "lose")),
+      ...openRows,
+    ];
+  }, [players, activity, db, anyCash, cps]);
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
@@ -130,6 +148,8 @@ export function LiveTab({
             applied: d.applied,
             pending: d.pending,
             closing: d.closing,
+            pendingApprovals: d.pendingApprovals,
+            approvedNames: d.approvedNames,
             tipComplimentBag: d.tipComplimentBag,
             tipComplimentLast: d.tipComplimentLast,
             // שומרים ts קיים — לא לכתוב Date.now() בכל שמירה (גורם להבדל מול השרת)
@@ -198,6 +218,7 @@ export function LiveTab({
           name: nm,
           buyin: addAmt,
           cashout: "",
+          buyinEvents: [{ amount: addAmt, at: Date.now(), total: addAmt }],
         },
       ];
     });
@@ -205,15 +226,19 @@ export function LiveTab({
   };
   const GRACE_MS = 10 * 60 * 1000; // 10 דק' חסד בתחילת המשחק — לא מציעים לשלוח
   const bump = (i, amt) => {
+    const at = Date.now();
     setPlayers((p) =>
-      p.map((x, j) =>
-        j === i
-          ? {
-              ...x,
-              buyin: Math.max(0, r2((+x.buyin || 0) + amt)),
-            }
-          : x
-      )
+      p.map((x, j) => {
+        if (j !== i) return x;
+        const buyin = Math.max(0, r2((+x.buyin || 0) + amt));
+        const next = { ...x, buyin };
+        if (amt > 0) {
+          const events = [...(x.buyinEvents || [])];
+          events.push({ amount: amt, at, total: buyin });
+          next.buyinEvents = events;
+        }
+        return next;
+      })
     );
     if (amt > 0 && startedAt && Date.now() - startedAt > GRACE_MS) {
       const nm = players[i] && players[i].name;
@@ -238,7 +263,6 @@ export function LiveTab({
   const rm = (i) => setPlayers((p) => p.filter((_, j) => j !== i));
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
   const potChips = pot * cps;
-  const anyCash = players.some((p) => p.cashout !== "");
   const nets = players.map((p) => ({
     name: p.name,
     net: p.cashout === "" ? null : r2((+p.cashout || 0) / cps - (+p.buyin || 0)),
@@ -284,6 +308,7 @@ export function LiveTab({
           chips,
           buyin,
           tipsGiven: +p.tipsGiven || 0,
+          buyinEvents: Array.isArray(p.buyinEvents) && p.buyinEvents.length ? p.buyinEvents : undefined,
         };
       })
       .filter((e) => e.amount !== 0 || e.chips > 0 || e.tipsGiven > 0);
@@ -537,7 +562,13 @@ export function LiveTab({
           />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {playersView.map(({ p, index: i }) => {
+            {playersView.map(({ p, index: i, group }, rowIdx) => {
+              const prev = rowIdx > 0 ? playersView[rowIdx - 1] : null;
+              const showGap =
+                prev &&
+                ((prev.group === "win" && (group === "even" || group === "lose" || group === "open")) ||
+                  (prev.group === "even" && (group === "lose" || group === "open")) ||
+                  (prev.group === "lose" && group === "open"));
               const net =
                 p.cashout === "" ? null : r2((+p.cashout || 0) / cps - (+p.buyin || 0));
               const partnerName = partnerOf(p.name);
@@ -549,8 +580,14 @@ export function LiveTab({
               const partnerShort = partnerName ? shortCoupleName(partnerName) : "";
               const meShort = shortCoupleName(p.name);
               return (
+                <React.Fragment key={p.name + ":" + i}>
+                {showGap && (
+                  <div
+                    aria-hidden
+                    style={{ height: 8, borderTop: `1px dashed ${C.line}`, margin: "2px 8px 0" }}
+                  />
+                )}
                 <div
-                  key={p.name + ":" + i}
                   style={{
                     background: C.card,
                     border: `1px solid ${C.line}`,
@@ -740,6 +777,7 @@ export function LiveTab({
                     </div>
                   </div>
                 </div>
+                </React.Fragment>
               );
             })}
           </div>

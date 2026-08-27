@@ -12,6 +12,7 @@ import { RsvpList, planLabel } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "./poker/festive";
 import { C as festiveC } from "./poker/colors";
+import { planShareLocationLines } from "./poker/hosts";
 
 const C = {
   feltDeep: festiveC.feltDeep,
@@ -388,7 +389,7 @@ export default function OwnerApp() {
       const text = [
         `🤖 ${head}`,
         planLabel(plan),
-        ...(location ? [`📍 ${location}`] : []),
+        ...planShareLocationLines(location),
         ...(note ? [`📝 הערות: ${note}`] : []),
         "",
         "מגיעים? מאשרים הגעה כאן:",

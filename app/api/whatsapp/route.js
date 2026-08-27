@@ -5,7 +5,11 @@ import { reportError } from "@/lib/monitor";
 import {
   parseCommands, applyCommands, extractMessage, isAllowed,
   sendToGroup, listGroups, BOT_MARK, setPresenceOffline,
+  maybeRemindPending,
 } from "@/lib/whatsapp";
+import { knownPlayerNames } from "@/components/poker/personalHighlights";
+import { AL, canon } from "@/components/poker/helpers";
+import { normalize } from "@/components/poker/db";
 import {
   isNightShareText,
   nightIsoFromText,
@@ -96,7 +100,12 @@ export async function POST(request) {
   }
 
   const groupId = process.env.WHAPI_GROUP_ID;
-  if (groupId && msg.chatId !== groupId) return ok({ skipped: "other chat" });
+  const ownerPhone = process.env.WHATSAPP_OWNER;
+  const isOwnerDm =
+    groupId &&
+    msg.chatId !== groupId &&
+    isAllowed(msg, ownerPhone, "");
+  if (groupId && msg.chatId !== groupId && !isOwnerDm) return ok({ skipped: "other chat" });
 
   /* הודעה שעדן שלח מהטלפון = הוא היה "מחובר", ווואטסאפ יעצור את ההתראות
      שלו עד שהנוכחות תתאפס. מאפסים אחרי שימוש בטלפון — ההמלצה הרשמית של
@@ -113,7 +122,7 @@ export async function POST(request) {
   const supabase = getAdminSupabase();
   const { data: row, error } = await supabase
     .from("groups")
-    .select("id, slug, live, config")
+    .select("id, slug, live, config, data")
     .eq("slug", process.env.KUPA_GROUP_SLUG)
     .single();
 
@@ -157,9 +166,49 @@ export async function POST(request) {
   if (!row.config?.botOn) return ok({ skipped: "bot off" });
 
   const live = row.live || null;
-  const gameActive = (live?.players?.length || 0) > 0;
+  const gameActive = (live?.players?.length || 0) > 0 || (live?.pendingApprovals?.length || 0) > 0;
   const cmds = parseCommands(msg.text, live?.addAmt || 50, gameActive);
-  if (!cmds.length) return ok({ skipped: "not a command" });
+
+  const remindIfDue = async () => {
+    const reminded = maybeRemindPending(live, Date.now(), { groupNudge: false });
+    if (!reminded) return null;
+    const { error: writeError } = await supabase
+      .from("groups")
+      .update({ live: reminded.live })
+      .eq("id", row.id);
+    if (writeError) {
+      await reportError(writeError, "whatsapp/pending-remind");
+      return "write-failed";
+    }
+    try {
+      if (reminded.ownerDm && ownerPhone) {
+        await sendToGroup(reminded.ownerDm, {
+          token: process.env.WHAPI_TOKEN,
+          groupId: ownerPhone,
+        });
+      }
+    } catch (e) {
+      console.warn("pending remind failed:", e.message);
+    }
+    return "sent";
+  };
+
+  if (!cmds.length) {
+    const r = await remindIfDue();
+    if (r === "sent") return ok({ reminded: true });
+    if (r === "write-failed") return ok({ skipped: "write failed" });
+    return ok({ skipped: "not a command" });
+  }
+
+  /* צ'אט פרטי עם עדן — רק אישור/דחייה של שחקן חדש, לא פקודות משחק. */
+  if (isOwnerDm) {
+    const kinds = new Set(cmds.map((c) => c.kind));
+    if (![...kinds].every((k) => k === "approve" || k === "reject")) {
+      const r = await remindIfDue();
+      if (r === "sent") return ok({ reminded: true });
+      return ok({ skipped: "owner dm not approval" });
+    }
+  }
 
   /* כתובת האפליקציה + slug — לפקודת "לינק" ול־CTA בסוף ערב (חלוקה באפליקציה).
      ידועים רק כאן, לא בפרסר. */
@@ -171,8 +220,16 @@ export async function POST(request) {
     c.slug = row.slug;
   }
 
+  const db = normalize(row.data || {});
+  const aliases = AL(db);
+  const knownNames = [
+    ...knownPlayerNames(db),
+    ...(live?.players || []).map((p) => canon(p.name, aliases)),
+    ...(live?.approvedNames || []),
+  ];
+
   // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה
-  const { live: nextLive, reply } = applyCommands(live, cmds, msg.id);
+  const { live: nextLive, reply, ownerDm } = applyCommands(live, cmds, msg.id, undefined, { knownNames });
   if (!reply) return ok({ skipped: "nothing to do" });
 
   const changed = nextLive !== live;
@@ -199,11 +256,26 @@ export async function POST(request) {
 
   try {
     const token = process.env.WHAPI_TOKEN;
-    const sent = await sendToGroup(reply, {
-      token,
-      groupId: msg.chatId,
-    });
-    if (isNightShareText(reply)) {
+    if (ownerDm && ownerPhone) {
+      try {
+        await sendToGroup(ownerDm, { token, groupId: ownerPhone });
+      } catch (e) {
+        console.warn("owner dm failed:", e.message);
+      }
+    }
+    let sent = null;
+    if (reply) {
+      sent = await sendToGroup(reply, { token, groupId: msg.chatId });
+      /* אישור מצ'אט פרטי — מעדכנים גם את הקבוצה */
+      if (isOwnerDm && groupId && groupId !== msg.chatId) {
+        try {
+          await sendToGroup(reply, { token, groupId });
+        } catch (e) {
+          console.warn("group echo of approval failed:", e.message);
+        }
+      }
+    }
+    if (sent && isNightShareText(reply)) {
       const iso = nextLive?.startedAt
         ? jerusalemIso(new Date(nextLive.startedAt))
         : nightIsoFromText(reply);

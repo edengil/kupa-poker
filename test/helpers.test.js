@@ -55,6 +55,7 @@ describe("helpers — aliases", () => {
     expect(DEFAULT_ALIASES["דן"]).toBe("דן ינקלויץ");
     expect(DEFAULT_ALIASES["עדן"]).toBe("עדן גיל");
     expect(DEFAULT_ALIASES["דוד בני"]).toBe("דוד בני גיל");
+    expect(DEFAULT_ALIASES["דור בני"]).toBe("דוד בני גיל");
     expect(DEFAULT_ALIASES["בני"]).toBe("דוד בני גיל");
     expect(DEFAULT_ALIASES["בני גיל"]).toBe("דוד בני גיל");
     expect(Object.keys(DEFAULT_ALIASES).length).toBeGreaterThanOrEqual(30);
@@ -70,6 +71,7 @@ describe("helpers — aliases", () => {
 
   it("canon resolves through aliases", () => {
     expect(canon("דן", DEFAULT_ALIASES)).toBe("דן ינקלויץ");
+    expect(canon("דור בני", DEFAULT_ALIASES)).toBe("דוד בני גיל");
     expect(canon("מישהו", DEFAULT_ALIASES)).toBe("מישהו");
   });
 

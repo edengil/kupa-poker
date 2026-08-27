@@ -39,6 +39,8 @@ describe("tip commands", () => {
     expect(live.tips[0]).toMatchObject({ name: "אופיר", amount: 10 });
     expect(reply).toContain("טיפ 10");
     expect(reply.startsWith(BOT_MARK)).toBe(true);
+    expect(reply).not.toContain("ביט");
+    expect(reply).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
   });
 
   it("subtracts tip from cashout when already closed", () => {

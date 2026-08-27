@@ -25,6 +25,7 @@ import { buildSeedDb } from "./poker/seed";
 import { applyChipBackfill } from "./poker/chipBackfill";
 import { applyTipBackfill } from "./poker/tipBackfill";
 import { PersonalHighlightsCard } from "./poker/PersonalHighlightsCard";
+import { PersonalStatsCard } from "./poker/PersonalStatsCard";
 import { matchViewerToPlayer } from "./poker/personalHighlights";
 import { EGFooter } from "./Logo";
 
@@ -107,7 +108,7 @@ function App({
   const showPersonal = !!viewerAuth;
 
   if (!ready || !db) {
-    return (
+  return (
       <div
         dir="rtl"
         style={{
@@ -137,7 +138,7 @@ function App({
     >
       <Style />
       <div
-        style={{
+                style={{
           maxWidth: 640,
           margin: "0 auto",
           padding: "0 13px calc(90px + env(safe-area-inset-bottom))",
@@ -146,7 +147,10 @@ function App({
         <Header />
         <Banner db={db} onPlayer={setProfile} />
         {showPersonal && tab === "table" && (
-          <PersonalHighlightsCard db={db} playerName={viewerName} />
+          <>
+            <PersonalStatsCard db={db} playerName={viewerName} compact />
+            <PersonalHighlightsCard db={db} playerName={viewerName} compact />
+          </>
         )}
         {tab === "input" ? (
           <InputTab db={db} commit={commit} years={years} />
@@ -173,12 +177,12 @@ function App({
         ) : tab === "stats" && statsPanel ? (
           statsPanel
         ) : tab === "records" ? (
-          <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} />
+          <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} allowPick={!readOnly} />
         ) : (
           <PlayersTab db={db} onPlayer={setProfile} />
         )}
         <EGFooter />
-      </div>
+    </div>
       {profile && (
         <ProfileSheet db={db} name={profile} onClose={() => setProfile(null)} />
       )}

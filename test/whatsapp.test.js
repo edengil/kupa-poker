@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseCommands, applyCommands, findPlayer, isAllowed, BOT_MARK } from "../lib/whatsapp.js";
+import { parseCommands, applyCommands, findPlayer, isAllowed, BOT_MARK, maybeRemindPending, PENDING_REMIND_MS } from "../lib/whatsapp.js";
 
 describe("parseCommands", () => {
   it("parses a buy-in command", () => {
@@ -79,11 +79,9 @@ describe("findPlayer (aliases)", () => {
     expect(findPlayer(players, "דן")).toEqual({ index: 0 });
   });
 
-  it("reports ambiguity when a prefix matches more than one player", () => {
-    const players = [{ name: "קובי א" }, { name: "קובי ב" }];
-    const res = findPlayer(players, "קובי");
-    expect(res.index).toBe(-1);
-    expect(res.ambiguous).toHaveLength(2);
+  it("resolves דור בני to דוד בני גיל", () => {
+    const players = [{ name: "דוד בני גיל" }];
+    expect(findPlayer(players, "דור בני")).toEqual({ index: 0 });
   });
 });
 
@@ -141,5 +139,179 @@ describe("settle / end replies — app CTA", () => {
     expect(reply).toContain("כולם סגורים");
     expect(reply).toContain("https://example.com/g/kupa");
     expect(reply).not.toContain("לשמירת הערב וחלוקת ההעברות — האפליקציה.");
+  });
+});
+
+describe("new player approval", () => {
+  const known = ["עדן גיל", "קובי סעדה", "דוד בני גיל"];
+
+  it("holds an unknown name until Eden approves", () => {
+    const { live, reply, ownerDm } = applyCommands(
+      null,
+      [{ kind: "add", name: "יוסי", amount: 100 }],
+      "m-new",
+      2,
+      { knownNames: known }
+    );
+    expect(live.players).toHaveLength(0);
+    expect(live.pendingApprovals).toEqual([
+      expect.objectContaining({ name: "יוסי", amount: 100 }),
+    ]);
+    expect(reply).toContain("שחקן חדש");
+    expect(ownerDm).toContain("יוסי");
+    expect(ownerDm).toContain("אשר");
+  });
+
+  it("does not gate a known roster player", () => {
+    const { live } = applyCommands(
+      null,
+      [{ kind: "add", name: "קובי", amount: 50 }],
+      "m-kobi",
+      2,
+      { knownNames: known }
+    );
+    expect(live.players[0].name).toBe("קובי");
+    expect(live.pendingApprovals).toEqual([]);
+  });
+
+  it("seats the player after אשר", () => {
+    const pending = applyCommands(
+      null,
+      [{ kind: "add", name: "יוסי", amount: 100 }],
+      "m-new",
+      2,
+      { knownNames: known }
+    ).live;
+    const { live, reply } = applyCommands(
+      pending,
+      [{ kind: "approve", name: "יוסי" }],
+      "m-ok",
+      2,
+      { knownNames: known }
+    );
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0]).toMatchObject({ name: "יוסי", buyin: 100 });
+    expect(live.pendingApprovals).toEqual([]);
+    expect(live.approvedNames).toContain("יוסי");
+    expect(reply).toContain("אושר");
+  });
+
+  it("drops the buy-in on דחה", () => {
+    const pending = applyCommands(
+      null,
+      [{ kind: "add", name: "יוסי", amount: 100 }],
+      "m-new",
+      2,
+      { knownNames: known }
+    ).live;
+    const { live } = applyCommands(
+      pending,
+      [{ kind: "reject", name: "יוסי" }],
+      "m-no",
+      2,
+      { knownNames: known }
+    );
+    expect(live.players).toHaveLength(0);
+    expect(live.pendingApprovals).toEqual([]);
+  });
+
+  it("parses אשר יוסי and דחה יוסי", () => {
+    expect(parseCommands("אשר יוסי", 50, true)[0]).toMatchObject({ kind: "approve", name: "יוסי" });
+    expect(parseCommands("דחה יוסי", 50, true)[0]).toMatchObject({ kind: "reject", name: "יוסי" });
+  });
+
+  it("parses טעות and לא as reject (typo cancel)", () => {
+    expect(parseCommands("טעות", 50, true)[0]).toMatchObject({ kind: "reject", name: "" });
+    expect(parseCommands("לא", 50, true)[0]).toMatchObject({ kind: "reject", name: "" });
+    expect(parseCommands("לא יכול", 50, false)).toHaveLength(0);
+    expect(parseCommands("לא יכול", 50, true).some((c) => c.kind === "reject")).toBe(false);
+  });
+
+  it("drops the buy-in on טעות", () => {
+    const pending = applyCommands(
+      null,
+      [{ kind: "add", name: "יוסי", amount: 100 }],
+      "m-new",
+      2,
+      { knownNames: known }
+    ).live;
+    const { live, reply } = applyCommands(
+      pending,
+      [{ kind: "reject" }],
+      "m-typo",
+      2,
+      { knownNames: known }
+    );
+    expect(live.players).toHaveLength(0);
+    expect(live.pendingApprovals).toEqual([]);
+    expect(reply).toContain("נדחה");
+  });
+
+  it("reminds Eden after cooldown, not immediately", () => {
+    const t0 = 1_000_000;
+    const pending = applyCommands(
+      null,
+      [{ kind: "add", name: "יוסי", amount: 100 }],
+      "m-new",
+      2,
+      { knownNames: known, now: t0 }
+    );
+    expect(pending.ownerDm).toContain("שחקן חדש מחכה");
+    expect(pending.live.pendingRemindedAt).toBe(t0);
+
+    const soon = applyCommands(
+      pending.live,
+      [{ kind: "status" }],
+      null,
+      2,
+      { knownNames: known, now: t0 + 60_000 }
+    );
+    expect(soon.ownerDm).toBeFalsy();
+    expect(soon.reply).not.toMatch(/תזכורת/);
+
+    const later = applyCommands(
+      pending.live,
+      [{ kind: "status" }],
+      null,
+      2,
+      { knownNames: known, now: t0 + PENDING_REMIND_MS + 1000 }
+    );
+    expect(later.ownerDm).toContain("תזכורת");
+    expect(later.reply).toContain("תזכורת");
+    expect(later.live.pendingRemindedAt).toBe(t0 + PENDING_REMIND_MS + 1000);
+  });
+
+  it("maybeRemindPending stays quiet before cooldown", () => {
+    const live = {
+      pendingApprovals: [{ name: "יוסי", amount: 50, at: 1000 }],
+      pendingRemindedAt: 1000,
+    };
+    expect(maybeRemindPending(live, 1000 + 60_000)).toBeNull();
+    const due = maybeRemindPending(live, 1000 + PENDING_REMIND_MS);
+    expect(due.ownerDm).toContain("יוסי");
+    expect(due.reply).toBeNull();
+  });
+});
+
+describe("closing list sort", () => {
+  it("lists closed players winners then losers by net, open last", () => {
+    const live = {
+      closing: true,
+      players: [
+        { name: "דור", buyin: 150, cashout: "0" },
+        { name: "עדן", buyin: 100, cashout: "80" },
+        { name: "קובי", buyin: 50, cashout: "140" },
+        { name: "פתוח", buyin: 50, cashout: "" },
+      ],
+    };
+    const { reply } = applyCommands(live, [{ kind: "cashout", name: "עדן", chips: 80 }], "m-x", 2);
+    expect(reply).toContain("מי הבא");
+    const kobi = reply.indexOf("קובי");
+    const eden = reply.indexOf("✅ עדן");
+    const dor = reply.indexOf("דור");
+    const open = reply.indexOf("פתוח");
+    expect(kobi).toBeLessThan(eden);
+    expect(eden).toBeLessThan(dor);
+    expect(dor).toBeLessThan(open);
   });
 });

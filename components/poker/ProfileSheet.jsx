@@ -8,6 +8,7 @@ import { allTimeTotals } from "./totals";
 import { IconBtn, Stat } from "./ui";
 import { TrendingUp, X } from "./icons";
 import { CumChart } from "./CumChart";
+import { PersonalStatsCard } from "./PersonalStatsCard";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ProfileSheet({ db, name, onClose }) {
@@ -90,6 +91,7 @@ export function ProfileSheet({ db, name, onClose }) {
           <Stat label="ערב שיא" value={best ? fmt(best.night) : "—"} color={C.win} />
           <Stat label="ערב גרוע" value={worst ? fmt(worst.night) : "—"} color={C.loss} />
         </div>
+        <PersonalStatsCard db={db} playerName={cn} />
         {rows.length > 1 ? (
           <div
             style={{

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { C } from "./poker/colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./poker/festive";
+import { wazeNavigateUrl } from "./poker/hosts";
 
 /* ============================================================================
    אישורי הגעה לערב מתוכנן.
@@ -141,6 +142,7 @@ export function RsvpCard({ supabase, groupId, plan }) {
 
   const mine = me && rows.find((r) => r.user_id === me.id)?.status;
   const { location, note } = planPlace(plan);
+  const wazeUrl = wazeNavigateUrl(location);
   const confirmed = mine === "yes";
 
   const vote = async (status) => {
@@ -250,8 +252,21 @@ export function RsvpCard({ supabase, groupId, plan }) {
             {planLabel(plan)}
           </div>
           {location && (
-            <div style={{ fontSize: 13, color: C.cream, marginBottom: note ? 6 : 0, lineHeight: 1.4 }}>
-              📍 {location}
+            <div style={{ fontSize: 13, color: C.cream, marginBottom: note ? 6 : 0, lineHeight: 1.45 }}>
+              <div>📍 {location}</div>
+              {wazeUrl && (
+                <>
+                  <div style={{ marginTop: 4, color: C.dim }}>ניווט בווייז:</div>
+                  <a
+                    href={wazeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: C.brass, wordBreak: "break-all" }}
+                  >
+                    {wazeUrl}
+                  </a>
+                </>
+              )}
             </div>
           )}
           {note && (

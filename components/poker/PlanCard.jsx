@@ -4,15 +4,9 @@ import React, { useState, useEffect } from "react";
 import { planLabel } from "../Rsvp";
 import { C } from "./colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./festive";
+import { HOSTS, wazeNavigateUrl } from "./hosts";
 
-/* תכנון ערב + כתובות מארחים — חולץ מ-PokerApp.jsx. */
-const HOSTS = [
-  { label: "אצלי", text: "אצל עדן · לויתן 4, נתניה · קומה 23, דירה 2303 · קוד בניין #4770#" },
-  { label: "אופיר סנה", text: "אצל אופיר סנה · לויתן 4, נתניה · קומה 15, דירה 1503 · קוד בניין #4770#" },
-  { label: "דור ועדן לירז", text: "אצל דור ועדן לירז · תותחנים 16, כפר יונה" },
-  { label: "שגיא גיל", text: "אצל שגיא גיל · יהדות הדממה 11, הרצליה" },
-  { label: "איציק", text: "אצל איציק · יוסף בורג 10, נתניה · קומה 2, דירה 6 · קוד בניין #7580" },
-];
+/* תכנון ערב + בחירת מארח. הכתובות עצמן ב-hosts.js. */
 
 function splitPlanFields(plan) {
   if (!plan) return { location: "", note: "" };
@@ -87,6 +81,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   };
 
   const display = plan ? splitPlanFields(plan) : null;
+  const wazeUrl = display?.location ? wazeNavigateUrl(display.location) : null;
 
   if (!plan && !editing) {
     return (
@@ -225,8 +220,21 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               </button>
             </div>
             {display.location && (
-              <div style={{ fontSize: 12.5, color: C.cream, marginBottom: display.note ? 4 : 8, opacity: 0.92 }}>
-                📍 {display.location}
+              <div style={{ fontSize: 12.5, color: C.cream, marginBottom: display.note ? 4 : 8, opacity: 0.92, lineHeight: 1.45 }}>
+                <div>📍 {display.location}</div>
+                {wazeUrl && (
+                  <>
+                    <div style={{ marginTop: 4, color: C.dim }}>ניווט בווייז:</div>
+                    <a
+                      href={wazeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: C.brass, wordBreak: "break-all" }}
+                    >
+                      {wazeUrl}
+                    </a>
+                  </>
+                )}
               </div>
             )}
             {display.note && (

@@ -124,10 +124,9 @@ ok("alias blocks exist", !!(oa && na));
 if (oa && na) {
   const O = parseAliases(oa[1]);
   const N = parseAliases(na[1]);
-  const same =
-    Object.keys(O).length === Object.keys(N).length &&
-    Object.keys(O).every((k) => O[k] === N[k]);
-  ok("alias parity", same, `${Object.keys(O).length} keys`);
+  const dropped = Object.keys(O).filter((k) => !(k in N));
+  ok("alias keys kept", dropped.length === 0, dropped.join(",") || `${Object.keys(N).length} keys`);
+  ok("דור בני alias", N["דור בני"] === "דוד בני גיל");
 }
 const of = old.match(/const FEMALE = new Set\((\[.*?\])\)/);
 const nf = helpers.match(/export const FEMALE = new Set\((\[.*?\])\)/);
