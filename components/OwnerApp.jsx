@@ -377,7 +377,10 @@ export default function OwnerApp() {
       body: JSON.stringify({ text }),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || "השליחה לקבוצה נכשלה");
+    if (!res.ok) {
+      const msg = [body.error, body.detail].filter(Boolean).join(" — ");
+      throw new Error(msg || "השליחה לקבוצה נכשלה");
+    }
     return body;
   }, [supabase]);
 

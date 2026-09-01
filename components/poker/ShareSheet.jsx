@@ -47,7 +47,10 @@ export function ShareSheet({
         body: JSON.stringify({ text: body }),
       });
       const dataRes = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(dataRes.error || "השליחה נכשלה");
+      if (!res.ok) {
+        const msg = [dataRes.error, dataRes.detail].filter(Boolean).join(" — ");
+        throw new Error(msg || "השליחה נכשלה");
+      }
       setSent(true);
       setTimeout(() => setSent(false), 4000);
     } catch (e) {
