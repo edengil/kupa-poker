@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { planLabel } from "../Rsvp";
 import { C } from "./colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./festive";
-import { HOSTS, wazeNavigateUrl } from "./hosts";
+import { HOSTS, wazeShortUrl } from "./hosts";
 
 /* תכנון ערב + בחירת מארח. הכתובות עצמן ב-hosts.js. */
 
@@ -105,7 +105,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   };
 
   const display = plan ? splitPlanFields(plan) : null;
-  const wazeUrl = display?.location ? wazeNavigateUrl(display.location) : null;
+  const wazeUrl = display?.location ? wazeShortUrl(display.location) : null;
 
   if (!plan && !editing) {
     return (

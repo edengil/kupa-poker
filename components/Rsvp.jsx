@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { C } from "./poker/colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./poker/festive";
-import { wazeNavigateUrl } from "./poker/hosts";
+import { wazeShortUrl } from "./poker/hosts";
 
 /* ============================================================================
    אישורי הגעה לערב מתוכנן.
@@ -142,7 +142,7 @@ export function RsvpCard({ supabase, groupId, plan }) {
 
   const mine = me && rows.find((r) => r.user_id === me.id)?.status;
   const { location, note } = planPlace(plan);
-  const wazeUrl = wazeNavigateUrl(location);
+  const wazeUrl = wazeShortUrl(location);
   const confirmed = mine === "yes";
 
   const vote = async (status) => {

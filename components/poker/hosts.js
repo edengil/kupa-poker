@@ -1,14 +1,15 @@
 /* כתובות מארחים + קישור ווייז להזמנה.
-   השאילתה לווייז נגזרת מהרחוב והעיר בלבד — בלי קוד בניין ובלי קואורדינטות מומצאות. */
+   השאילתה לווייז נגזרת מהרחוב והעיר בלבד — בלי קוד בניין ובלי קואורדינטות מומצאות.
+   בהודעות וואטסאפ משתמשים בקישור קצר בדומיין שלנו (/w/slug) שמפנה לווייז. */
 
 export const HOSTS = [
-  { label: "אצלי", text: "אצל עדן · לויתן 4, נתניה · קומה 23, דירה 2303 · קוד בניין #4770#" },
-  { label: "אופיר סנה", text: "אצל אופיר סנה · לויתן 4, נתניה · קומה 15, דירה 1503 · קוד בניין #4770#" },
-  { label: "דור ועדן לירז", text: "אצל דור ועדן לירז · תותחנים 16, כפר יונה · קומת קרקע" },
-  { label: "שגיא גיל", text: "אצל שגיא גיל · יהדות הדממה 11, הרצליה" },
-  { label: "איציק", text: "אצל איציק · יוסף בורג 10, נתניה · קומה 2, דירה 6 · קוד בניין #7140" },
-  { label: "נתנאל כהן", text: "אצל נתנאל כהן · נורוק 6, נתניה · קומה 1, דירה 1 · קוד בניין 06060" },
-  { label: "עדן שפאק", text: "אצל עדן שפאק · קרל פופר 6, נתניה · קומה 5, דירה 20" },
+  { slug: "eden", label: "אצלי", text: "אצל עדן · לויתן 4, נתניה · קומה 23, דירה 2303 · קוד בניין #4770#" },
+  { slug: "ofir", label: "אופיר סנה", text: "אצל אופיר סנה · לויתן 4, נתניה · קומה 15, דירה 1503 · קוד בניין #4770#" },
+  { slug: "dor", label: "דור ועדן לירז", text: "אצל דור ועדן לירז · תותחנים 16, כפר יונה · קומת קרקע" },
+  { slug: "sagi", label: "שגיא גיל", text: "אצל שגיא גיל · יהדות הדממה 11, הרצליה" },
+  { slug: "itzik", label: "איציק", text: "אצל איציק · יוסף בורג 10, נתניה · קומה 2, דירה 6 · קוד בניין #7140" },
+  { slug: "netanel", label: "נתנאל כהן", text: "אצל נתנאל כהן · נורוק 6, נתניה · קומה 1, דירה 1 · קוד בניין 06060" },
+  { slug: "shpak", label: "עדן שפאק", text: "אצל עדן שפאק · קרל פופר 6, נתניה · קומה 5, דירה 20" },
 ];
 
 /** תווית כפתור ב-PlanCard → שחקן קנוני שמארח. */
@@ -22,14 +23,40 @@ export const HOST_LABEL_PLAYER = {
   "עדן שפאק": "עדן שפאק",
 };
 
-/** מארח קנוני מתוך שורת מיקום (PlanCard / הודעת בוט). */
-export function hostPlayerFromLocation(location) {
+const DEFAULT_SITE = "https://kupa-poker.vercel.app";
+
+/** בסיס האתר לקישורים קצרים — בלי סלאש בסוף. */
+export function siteBaseUrl() {
+  const raw =
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
+    DEFAULT_SITE;
+  return String(raw).replace(/\/$/, "");
+}
+
+/** מארח לפי slug קצר (/w/itzik). */
+export function hostBySlug(slug) {
+  const key = String(slug || "").trim().toLowerCase();
+  if (!key) return null;
+  return HOSTS.find((h) => h.slug === key) || null;
+}
+
+/** מארח ידוע מתוך שורת מיקום (התאמה לטקסט המלא או לראש "אצל …"). */
+export function hostFromLocation(location) {
   const raw = String(location || "").trim();
   if (!raw) return null;
   for (const h of HOSTS) {
     const head = h.text.split(" · ")[0];
-    if (raw === h.text || raw.startsWith(head)) return HOST_LABEL_PLAYER[h.label] || null;
+    if (raw === h.text || raw.startsWith(head)) return h;
   }
+  return null;
+}
+
+/** מארח קנוני מתוך שורת מיקום (PlanCard / הודעת בוט). */
+export function hostPlayerFromLocation(location) {
+  const raw = String(location || "").trim();
+  if (!raw) return null;
+  const known = hostFromLocation(raw);
+  if (known) return HOST_LABEL_PLAYER[known.label] || null;
   const m = raw.match(/אצל\s+([^·\n,]+)/);
   if (!m) return null;
   const who = m[1].trim();
@@ -61,17 +88,31 @@ export function wazeQueryFromLocation(location) {
   return null;
 }
 
+/** קישור ווייז ישיר (יעד ההפניה מ-/w/…). */
 export function wazeNavigateUrl(location) {
   const q = wazeQueryFromLocation(location);
   if (!q) return null;
   return `https://waze.com/ul?q=${encodeURIComponent(q)}&navigate=yes`;
 }
 
-/** שורות להודעת וואטסאפ / תצוגה: כתובת, ואז קישור ווייז בשורה נפרדת. */
+/**
+ * קישור קצר בדומיין שלנו:
+ * מארח ידוע → /w/itzik
+ * כתובת חופשית → /w?q=…
+ */
+export function wazeShortUrl(location) {
+  const known = hostFromLocation(location);
+  if (known?.slug) return `${siteBaseUrl()}/w/${known.slug}`;
+  const q = wazeQueryFromLocation(location);
+  if (!q) return null;
+  return `${siteBaseUrl()}/w?q=${encodeURIComponent(q)}`;
+}
+
+/** שורות להודעת וואטסאפ / תצוגה: כתובת, ואז קישור ווייז קצר בשורה נפרדת. */
 export function planShareLocationLines(location) {
   const loc = String(location || "").trim();
   if (!loc) return [];
-  const url = wazeNavigateUrl(loc);
+  const url = wazeShortUrl(loc);
   if (!url) return [`📍 ${loc}`];
   return [`📍 ${loc}`, "ניווט בווייז:", url];
 }
