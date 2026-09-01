@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
-import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, LIVE_KEY } from "../lib/store";
+import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY } from "../lib/store";
+import { liveFingerprint, mergeLiveStates, remoteLiveAhead } from "../lib/liveMerge";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
@@ -23,25 +24,6 @@ const C = {
   dim: festiveC.dim,
   loss: festiveC.loss,
 };
-
-/** טביעת אצבע ללייב בלי ts — כדי ששמירה מקומית/מרוץ כתיבה לא יחשבו כשינוי חיצוני. */
-function liveFingerprint(live) {
-  if (live == null) return "";
-  let obj = live;
-  if (typeof live === "string") {
-    if (live === "" || live === "null") return "";
-    try {
-      obj = JSON.parse(live);
-    } catch {
-      return live;
-    }
-  }
-  if (obj && typeof obj === "object") {
-    const { ts: _ts, ...rest } = obj;
-    return JSON.stringify(rest);
-  }
-  return JSON.stringify(obj);
-}
 
 function tabIsVisible() {
   return typeof document !== "undefined" && document.visibilityState === "visible";
@@ -75,14 +57,15 @@ export default function OwnerApp() {
     setGeneration((g) => g + 1);
   }, []);
 
-  /* רענון מלא של PokerApp — רק כשהדף לא בשימוש פעיל (מוסתר),
-     אחרת מסמנים וממתינים לחזרה לטאב כדי לא לקפוץ באמצע לייב. */
+  /* רענון מלא של PokerApp.
+     עדכון לייב מהבוט (forgetLive) — תמיד מיד, גם כשהדף גלוי: אחרת
+     יציאות בוואטסאפ לא מופיעות והכפתור "סיים" נשאר כבוי.
+     רענון רך (DB/config) עדיין נדחה בזמן שימוש כדי לא לקפוץ באמצע. */
   const requestRemount = useCallback(
     (opts = {}) => {
       const { forgetLive = false, force = false } = opts;
-      if (!force && tabIsVisible()) {
-        // לא מוחקים מטמון לייב כל עוד המשתמש על הדף
-        pendingRemountRef.current = forgetLive ? "live" : "soft";
+      if (!force && !forgetLive && tabIsVisible()) {
+        pendingRemountRef.current = "soft";
         return;
       }
       if (forgetLive) forgetStoreKey(LIVE_KEY);
@@ -128,20 +111,19 @@ export default function OwnerApp() {
     };
   }, [supabase]);
 
-  /* האם הלייב במסד שונה ממה שמוצג? אם כן — רענון (remount של PokerApp)
-     רק כשהדף לא גלוי/פעיל; בזמן שימוש נדחה כדי לא לקפוץ את הלייב.
+  /* האם הלייב במסד שונה ממה שמוצג? אם כן — remount מיידי עם שכחת מטמון.
      נקרא מפינג של הבוט, מסקר קבוע, ומחזרה לדף. lastLiveRef מתעדכן גם בכל
      כתיבה מקומית, כדי שהשינויים של עצמנו לא ייחשבו "חיצוניים".
 
-     חשוב: לפני ההשוואה שומרים כל שינוי מקומי שעדיין בתור (debounce).
-     בלי זה, באמצע סגירת משחק הרענון היה טוען מהשרת גרסה ישנה ודורס את המסך.
+     חשוב: קודם קוראים מהשרת ורק אם אין שינוי חיצוני עושים flush.
+     flush לפני הקריאה היה דורס יציאות שהבוט בדיוק כתב (המסך המקומי
+     עדיין בלי ג'יטונים) — ואז ההשוואה ראתה "אין שינוי" והכפתור נשאר כבוי.
      השוואה בלי שדה ts — הוא משתנה בכל שמירה ולא אומר שינוי אמיתי. */
   const checkLive = useCallback(async () => {
     const row = groupRef.current;
     if (!row || checkingLiveRef.current) return;
     checkingLiveRef.current = true;
     try {
-      await flushStore();
       const { data, error } = await supabase
         .from("groups")
         .select("live")
@@ -156,13 +138,30 @@ export default function OwnerApp() {
         return;
       }
       if (lastLiveFpRef.current === fp) {
-        // אותו תוכן (אולי ts אחר) — מיישרים בלי remount
+        // אותו תוכן בשרת — בטוח לשטוף כתיבות מקומיות ממתינות
         lastLiveRef.current = s;
+        await flushStore();
         return;
       }
-      lastLiveRef.current = s;
-      lastLiveFpRef.current = fp;
-      requestRemount({ forgetLive: true });
+      // שינוי מהבוט (או ממכשיר אחר) — ממזגים כניסות מקומיות שעוד בתור, בלי לדרוס יציאות
+      const localSnap = snapshotStoreLive();
+      let nextLive = data?.live ?? null;
+      if (localSnap && nextLive && remoteLiveAhead(localSnap, nextLive)) {
+        nextLive = mergeLiveStates(localSnap, nextLive);
+        const { error: writeError } = await supabase
+          .from("groups")
+          .update({ live: nextLive })
+          .eq("id", row.id);
+        if (writeError) {
+          console.warn("live merge write failed:", writeError.message);
+          nextLive = data?.live ?? null;
+        }
+      }
+      lastLiveRef.current = JSON.stringify(nextLive);
+      lastLiveFpRef.current = liveFingerprint(nextLive);
+      forgetStoreKey(LIVE_KEY);
+      seedStoreLive(nextLive);
+      requestRemount({ forgetLive: false, force: true });
     } catch {
     } finally {
       checkingLiveRef.current = false;
