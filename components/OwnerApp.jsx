@@ -363,47 +363,53 @@ export default function OwnerApp() {
     }
   }, [supabase]);
 
+  /* שליחה לקבוצה עם טוקן סשן — אמין יותר מעוגיות בלבד במובייל/PWA. */
+  const sendToWhatsAppGroup = useCallback(async (text) => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("לא מחובר — התחבר מחדש ונסה שוב");
+    const res = await fetch("/api/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ text }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "השליחה לקבוצה נכשלה");
+    return body;
+  }, [supabase]);
+
   /* נשבר שיא בערב שנשמר → הבוט מכריז בקבוצה. נכשל בשקט — ההכרזה
      היא בונוס, ושמירת הערב חשובה ממנה. */
   const notifyRecords = useCallback(async (lines) => {
     try {
-      await fetch("/api/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: `🤖 שיא חדש! 🏆\n\n${lines.join("\n")}` }),
-      });
+      await sendToWhatsAppGroup(`🤖 שיא חדש! 🏆\n\n${lines.join("\n")}`);
     } catch (e) {
       console.warn("record announce failed:", e.message);
     }
-  }, []);
+  }, [sendToWhatsAppGroup]);
 
   /* נקבע ערב חדש (או עודכן) → הזמנה לקבוצה עם הלינק, שהחברים יאשרו הגעה. */
   const notifyPlan = useCallback(async (plan, { isUpdate } = {}) => {
-    try {
-      const slug = groupRef.current?.slug;
-      if (!slug) return;
-      const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      const head = isUpdate ? "עדכון לערב הפוקר! ♠" : "ערב פוקר מתוכנן! ♠";
-      const location = plan.location || "";
-      const note = plan.note || "";
-      const text = [
-        `🤖 ${head}`,
-        planLabel(plan),
-        ...planShareLocationLines(location),
-        ...(note ? [`📝 הערות: ${note}`] : []),
-        "",
-        "מגיעים? מאשרים הגעה כאן:",
-        `${base}/g/${slug}`,
-      ].join("\n");
-      await fetch("/api/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-    } catch (e) {
-      console.warn("plan announce failed:", e.message);
-    }
-  }, []);
+    const slug = groupRef.current?.slug;
+    if (!slug) throw new Error("אין קישור קבוצה — רענן את העמוד");
+    const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    const head = isUpdate ? "עדכון לערב הפוקר! ♠" : "ערב פוקר מתוכנן! ♠";
+    const location = plan.location || "";
+    const note = plan.note || "";
+    const text = [
+      `🤖 ${head}`,
+      planLabel(plan),
+      ...planShareLocationLines(location),
+      ...(note ? [`📝 הערות: ${note}`] : []),
+      "",
+      "מגיעים? מאשרים הגעה כאן:",
+      `${base}/g/${slug}`,
+    ].join("\n");
+    await sendToWhatsAppGroup(text);
+  }, [sendToWhatsAppGroup]);
 
   const signIn = useCallback(async () => {
     const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;

@@ -6,6 +6,7 @@ import { IconBtn } from "./ui";
 import { waOpen } from "./helpers";
 import { CheckCircle2, Copy, Send, Share2, X } from "./icons";
 import { sectionEyebrow } from "./festive";
+import { getSupabase } from "../../lib/supabaseClient";
 
 /* גיליון שיתוף לסיכום / חלוקה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ShareSheet({
@@ -35,13 +36,18 @@ export function ShareSheet({
     setSending(true);
     setErr("");
     try {
+      const supabase = getSupabase();
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch("/api/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ text: body }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "השליחה נכשלה");
+      const dataRes = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(dataRes.error || "השליחה נכשלה");
       setSent(true);
       setTimeout(() => setSent(false), 4000);
     } catch (e) {

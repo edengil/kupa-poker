@@ -41,6 +41,8 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const [time, setTime] = useState("21:00");
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
+  const [sendStatus, setSendStatus] = useState(null); // null | sending | sent | error
+  const [sendError, setSendError] = useState("");
 
   const startEdit = () => {
     const fields = splitPlanFields(plan);
@@ -49,8 +51,24 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     setLocation(fields.location);
     setNote(fields.note);
     setEditing(true);
+    setSendStatus(null);
+    setSendError("");
   };
-  const save = () => {
+
+  const announce = async (next, isUpdate) => {
+    if (typeof onPlanShared !== "function") return;
+    setSendStatus("sending");
+    setSendError("");
+    try {
+      await onPlanShared(next, { isUpdate });
+      setSendStatus("sent");
+    } catch (e) {
+      setSendStatus("error");
+      setSendError(e?.message || "השליחה לקבוצה נכשלה");
+    }
+  };
+
+  const save = async () => {
     if (!iso) return;
     const next = {
       iso,
@@ -59,14 +77,20 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
       note: note.trim(),
       createdAt: Date.now(),
     };
+    const isUpdate = !!plan;
     commit({ ...db, plan: next });
     setEditing(false);
     // ההזמנה יוצאת לקבוצת הוואטסאפ עם הלינק — שהחברים יאשרו הגעה
-    if (typeof onPlanShared === "function") onPlanShared(next, { isUpdate: !!plan });
+    await announce(next, isUpdate);
   };
   const clear = () => {
     commit({ ...db, plan: null });
     setEditing(false);
+    setSendStatus(null);
+    setSendError("");
+  };
+  const resend = () => {
+    if (plan) announce(plan, true);
   };
 
   const field = {
@@ -223,17 +247,25 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               <div style={{ fontSize: 12.5, color: C.cream, marginBottom: display.note ? 4 : 8, opacity: 0.92, lineHeight: 1.45 }}>
                 <div>📍 {display.location}</div>
                 {wazeUrl && (
-                  <>
-                    <div style={{ marginTop: 4, color: C.dim }}>ניווט בווייז:</div>
-                    <a
-                      href={wazeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: C.brass, wordBreak: "break-all" }}
-                    >
-                      {wazeUrl}
-                    </a>
-                  </>
+                  <a
+                    href={wazeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-block",
+                      marginTop: 6,
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${C.brass}66`,
+                      background: `${C.brass}18`,
+                      color: C.brass,
+                      fontWeight: 700,
+                      fontSize: 12.5,
+                      textDecoration: "none",
+                    }}
+                  >
+                    ניווט בווייז
+                  </a>
                 )}
               </div>
             )}
@@ -251,6 +283,67 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
                 <span style={{ fontWeight: 700 }}>הערות · </span>
                 {display.note}
               </div>
+            )}
+            {sendStatus === "sending" && (
+              <div style={{ fontSize: 12, color: C.dim, marginBottom: 8 }}>שולח הזמנה לקבוצה…</div>
+            )}
+            {sendStatus === "sent" && (
+              <div style={{ fontSize: 12, color: C.win, marginBottom: 8, fontWeight: 600 }}>
+                נשלח לקבוצת הוואטסאפ
+              </div>
+            )}
+            {sendStatus === "error" && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: C.loss,
+                  marginBottom: 8,
+                  background: `${C.loss}14`,
+                  border: `1px solid ${C.loss}44`,
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  lineHeight: 1.4,
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>ההזמנה נשמרה, אבל לא נשלחה לקבוצה</div>
+                <div style={{ color: C.dim, marginBottom: 8 }}>{sendError}</div>
+                <button
+                  onClick={resend}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${C.brass}`,
+                    background: C.brass,
+                    color: C.feltDeep,
+                    fontFamily: "inherit",
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  שלח שוב לקבוצה
+                </button>
+              </div>
+            )}
+            {typeof onPlanShared === "function" && sendStatus !== "sending" && sendStatus !== "error" && (
+              <button
+                onClick={resend}
+                style={{
+                  width: "100%",
+                  marginBottom: 8,
+                  padding: "9px 12px",
+                  borderRadius: 10,
+                  border: `1px solid ${C.line}`,
+                  background: C.feltDeep,
+                  color: C.cream,
+                  fontFamily: "inherit",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {sendStatus === "sent" ? "שלח שוב לקבוצת הוואטסאפ" : "שלח הזמנה לקבוצת הוואטסאפ"}
+              </button>
             )}
             {typeof renderRsvps === "function" && renderRsvps(plan.iso)}
           </>

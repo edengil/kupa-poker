@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabaseServer";
+import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { sendToGroup } from "@/lib/whatsapp";
 import { reportError } from "@/lib/monitor";
 import {
@@ -12,37 +13,55 @@ import {
 /* ============================================================================
    שליחת הודעה לקבוצה מתוך האפליקציה.
 
-   הנתיב הזה שולח בשמך בוואטסאפ, ולכן הוא חייב לוודא שזה באמת אתה. הוא לא
-   סומך על שום דבר שמגיע מהדפדפן חוץ מעוגיית הסשן: הוא שולף את המשתמש
-   מ-Supabase, ומוודא שיש לו קבוצה משלו. בלי זה כל מי שמוצא את הכתובת היה
-   יכול לפרסם בקבוצה שלך.
+   הנתיב הזה שולח בשמך בוואטסאפ, ולכן הוא חייב לוודא שזה באמת אתה.
+   תומך גם בעוגיית סשן וגם ב-Bearer (אמין יותר במובייל / PWA).
    ============================================================================ */
 
 export const dynamic = "force-dynamic";
 
 const MAX = 4000; // גבול סביר להודעת וואטסאפ
 
-export async function POST(request) {
-  const supabase = getServerSupabase();
+async function resolveOwner(request) {
+  const authHeader = request.headers.get("authorization") || "";
+  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
+  if (bearer) {
+    const admin = getAdminSupabase();
+    const { data: userData, error } = await admin.auth.getUser(bearer);
+    if (error || !userData?.user) return { error: "לא מחובר", status: 401 };
+    const { data: group } = await admin
+      .from("groups")
+      .select("id, config")
+      .eq("owner_id", userData.user.id)
+      .limit(1)
+      .maybeSingle();
+    if (!group) return { error: "אין קבוצה למשתמש הזה", status: 403 };
+    return { user: userData.user, group, supabase: admin };
+  }
+
+  const supabase = getServerSupabase();
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: "לא מחובר" }, { status: 401 });
-  }
+  if (authError || !user) return { error: "לא מחובר", status: 401 };
 
-  // RLS כבר מגביל לשורה שלו, אבל בדיקה מפורשת עדיפה על הסתמכות
   const { data: group } = await supabase
     .from("groups")
     .select("id, config")
     .eq("owner_id", user.id)
     .limit(1)
     .maybeSingle();
-  if (!group) {
-    return NextResponse.json({ error: "אין קבוצה למשתמש הזה" }, { status: 403 });
+  if (!group) return { error: "אין קבוצה למשתמש הזה", status: 403 };
+  return { user, group, supabase };
+}
+
+export async function POST(request) {
+  const auth = await resolveOwner(request);
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
+  const { group, supabase } = auth;
 
   let text;
   try {
