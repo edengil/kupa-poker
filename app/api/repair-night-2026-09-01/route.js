@@ -109,12 +109,62 @@ function buildPatched(existing) {
   };
 }
 
+const CPS = 2;
+const r2 = (v) => Math.round(v * 100) / 100;
+
+/** ערב שמור לפי הצ'אט — מחליף את 2026-09-02 אם כבר נוצר חלקי/שגוי. */
+function buildSessionRecord(existingId) {
+  const endedAt = Date.parse("2026-09-02T01:21:00+03:00");
+  const entries = NIGHT.players.map((p) => {
+    const chips = +p.cashout || 0;
+    const buyin = +p.buyin || 0;
+    return {
+      name: p.name,
+      amount: r2(chips / CPS - buyin),
+      chips,
+      buyin,
+      tipsGiven: p.tipsGiven,
+      buyinEvents: [{ amount: buyin, at: NIGHT.startedAt, total: buyin }],
+    };
+  });
+  return {
+    id: existingId || "repair_2026_09_01",
+    iso: "2026-09-02",
+    d: 2,
+    mo: 9,
+    y: 2026,
+    entries,
+    tips: NIGHT.tips.map(({ name, amount, at }) => ({ name, amount, at })),
+    startedAt: NIGHT.startedAt,
+    endedAt,
+    location: undefined,
+  };
+}
+
+function summarizeSession(s) {
+  if (!s) return null;
+  return {
+    id: s.id,
+    iso: s.iso,
+    entries: (s.entries || []).map((e) => ({
+      name: e.name,
+      buyin: e.buyin ?? null,
+      chips: e.chips ?? null,
+      amount: e.amount,
+      tipsGiven: e.tipsGiven || 0,
+    })),
+    tipsTotal: (s.tips || []).reduce((sum, t) => sum + (+t.amount || 0), 0),
+  };
+}
+
 export async function GET(request) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const apply = new URL(request.url).searchParams.get("apply") === "1";
+  const url = new URL(request.url);
+  const apply = url.searchParams.get("apply") === "1";
+  const finish = url.searchParams.get("finish") === "1";
   const slug = process.env.KUPA_GROUP_SLUG;
   if (!slug) {
     return NextResponse.json({ error: "KUPA_GROUP_SLUG missing" }, { status: 500 });
@@ -132,27 +182,49 @@ export async function GET(request) {
 
   const before = summarize(row.live);
   const patched = buildPatched(row.live);
-  const sessions = Array.isArray(row.data?.sessions)
-    ? row.data.sessions
-        .map((s) => s.iso || `${s.d}.${s.mo}.${s.y}`)
-        .filter(Boolean)
-        .slice(-8)
-    : [];
+  const data = row.data && typeof row.data === "object" ? { ...row.data } : { sessions: [] };
+  const sessions = Array.isArray(data.sessions) ? [...data.sessions] : [];
+  const existingIdx = sessions.findIndex((s) => s?.iso === "2026-09-02" || s?.iso === "2026-09-01");
+  const existing = existingIdx >= 0 ? sessions[existingIdx] : null;
+  const sessionRec = buildSessionRecord(existing?.id);
+  const nextSessions = [...sessions];
+  if (existingIdx >= 0) nextSessions[existingIdx] = sessionRec;
+  else nextSessions.push(sessionRec);
+  nextSessions.sort((a, b) => String(a.iso).localeCompare(String(b.iso)));
+
+  const sessionIsos = sessions
+    .map((s) => s.iso || `${s.d}.${s.mo}.${s.y}`)
+    .filter(Boolean)
+    .slice(-8);
 
   if (!apply) {
     return NextResponse.json({
       dryRun: true,
-      hint: "הוסף &apply=1 כדי לכתוב",
+      hint: "הוסף &apply=1 לתיקון לייב; &finish=1 גם שומר ערב ומנקה לייב",
       before,
       after: summarize(patched),
-      recentSessions: sessions,
+      existingSession: summarizeSession(existing),
+      repairedSession: summarizeSession(sessionRec),
+      recentSessions: sessionIsos,
     });
   }
 
-  const { error: writeError } = await sb
-    .from("groups")
-    .update({ live: patched })
-    .eq("id", row.id);
+  const patch = finish
+    ? {
+        live: null,
+        data: {
+          ...data,
+          sessions: nextSessions,
+          roster: [
+            ...new Set([
+              ...(Array.isArray(data.roster) ? data.roster : []),
+              ...NIGHT.players.map((p) => p.name),
+            ]),
+          ],
+        },
+      }
+    : { live: patched };
+  const { error: writeError } = await sb.from("groups").update(patch).eq("id", row.id);
   if (writeError) {
     return NextResponse.json({ error: writeError.message }, { status: 500 });
   }
@@ -161,9 +233,14 @@ export async function GET(request) {
   return NextResponse.json({
     dryRun: false,
     written: true,
+    finished: finish,
     before,
-    after: summarize(patched),
-    recentSessions: sessions,
-    next: "רענון באפליקציה (סגירה ופתיחה) → לייב → סיים · שמור. אל תבטל משחק.",
+    after: finish ? null : summarize(patched),
+    existingSession: summarizeSession(existing),
+    repairedSession: finish ? summarizeSession(sessionRec) : undefined,
+    recentSessions: sessionIsos,
+    next: finish
+      ? "רענון באפליקציה — הערב אמור להופיע בטאב ערבים (2.9). לייב אמור להיות ריק."
+      : "רענון באפליקציה → לייב → סיים · שמור. אל תבטל משחק. או קרא שוב עם &finish=1.",
   });
 }
