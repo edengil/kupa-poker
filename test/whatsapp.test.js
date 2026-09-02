@@ -31,6 +31,12 @@ describe("parseCommands", () => {
     const cmds = parseCommands("דן עוד 50\nקובי עוד 100", 50, true);
     expect(cmds).toHaveLength(2);
   });
+
+  it("parses settle phrases including שלח סיכום", () => {
+    for (const phrase of ["סיכום", "סיום", "סיום משחק", "חלוקה", "שלח סיכום", "שלח חלוקה"]) {
+      expect(parseCommands(phrase, 50, true)).toEqual([{ kind: "settle" }]);
+    }
+  });
 });
 
 describe("applyCommands", () => {
