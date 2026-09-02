@@ -43,7 +43,7 @@ describe("applyCommands", () => {
   it("creates a new player on buy-in", () => {
     const { live, reply } = applyCommands(null, [{ kind: "add", name: "קובי", amount: 100 }], "m1");
     expect(live.players).toHaveLength(1);
-    expect(live.players[0]).toMatchObject({ name: "קובי", buyin: 100, cashout: "" });
+    expect(live.players[0]).toMatchObject({ name: "קובי סעדה", buyin: 100, cashout: "" });
     expect(reply).toContain("קובי");
   });
 
@@ -61,15 +61,85 @@ describe("applyCommands", () => {
     expect(live.players[0].cashout).toBe("300");
   });
 
+  it("stores WhatsApp buy-ins and cashouts under full roster names (Live יצא field)", () => {
+    const names = [
+      ["ירין", "ירין מלאך"],
+      ["אופיר", "אופיר סנה"],
+      ["נתנאל", "נתנאל כהן"],
+      ["שגיא", "שגיא גיל"],
+      ["דור", "דור לירז"],
+    ];
+    for (const [short, full] of names) {
+      const seated = applyCommands(null, [{ kind: "add", name: short, amount: 50 }], "m-in").live;
+      expect(seated.players[0].name).toBe(full);
+      expect(seated.players[0].cashout).toBe("");
+      const { live } = applyCommands(seated, [{ kind: "cashout", name: short, chips: 120 }], "m-out");
+      const row = live.players.find((p) => p.name === full);
+      expect(row).toBeTruthy();
+      expect(row.cashout).toBe("120");
+    }
+  });
+
+  it("attaches a cashout to a seated first-name row and expands it", () => {
+    const start = {
+      players: [{ name: "אופיר", buyin: 150, cashout: "" }],
+      applied: {},
+    };
+    const { live } = applyCommands(start, [{ kind: "cashout", name: "אופיר", chips: 280 }], "m-out");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0]).toMatchObject({ name: "אופיר סנה", buyin: 150, cashout: "280" });
+  });
+
+  it("keeps existing aliases like דן and דור בני", () => {
+    const dan = applyCommands(null, [{ kind: "add", name: "דן", amount: 50 }], "m1").live;
+    expect(dan.players[0].name).toBe("דן ינקלויץ");
+    const bni = applyCommands(null, [{ kind: "add", name: "דור בני", amount: 50 }], "m2").live;
+    expect(bni.players[0].name).toBe("דוד בני גיל");
+  });
+
+  it("prefers DEFAULT_ALIASES over a user alias for the same first name", () => {
+    const { live } = applyCommands(
+      null,
+      [{ kind: "add", name: "דור", amount: 50 }],
+      "m1",
+      undefined,
+      { aliases: { דור: "דור אחר" } }
+    );
+    expect(live.players[0].name).toBe("דור לירז");
+  });
+
+  it("still accepts a user-added alias that is not in DEFAULT_ALIASES", () => {
+    const { live } = applyCommands(
+      null,
+      [{ kind: "add", name: "זמיר", amount: 50 }],
+      "m1",
+      undefined,
+      { aliases: { זמיר: "זמיר כהן" }, knownNames: ["זמיר כהן"] }
+    );
+    expect(live.players[0].name).toBe("זמיר כהן");
+  });
+
   it("flags an ambiguous name instead of guessing", () => {
+    const start = {
+      players: [
+        { name: "יוסי א", buyin: 50, cashout: "" },
+        { name: "יוסי ב", buyin: 50, cashout: "" },
+      ],
+    };
+    const { reply } = applyCommands(start, [{ kind: "add", name: "יוסי", amount: 50 }], "m3");
+    expect(reply).toContain("⚠️");
+  });
+
+  it("does not treat an aliased first name as ambiguous", () => {
     const start = {
       players: [
         { name: "קובי א", buyin: 50, cashout: "" },
         { name: "קובי ב", buyin: 50, cashout: "" },
       ],
     };
-    const { reply } = applyCommands(start, [{ kind: "add", name: "קובי", amount: 50 }], "m3");
-    expect(reply).toContain("⚠️");
+    const { live, reply } = applyCommands(start, [{ kind: "add", name: "קובי", amount: 50 }], "m3");
+    expect(reply).not.toContain("⚠️");
+    expect(live.players.some((p) => p.name === "קובי סעדה")).toBe(true);
   });
 
   it("returns help text for the help command", () => {
@@ -82,12 +152,33 @@ describe("findPlayer (aliases)", () => {
   it("resolves a known alias to the full name", () => {
     const players = [{ name: "דן ינקלויץ" }, { name: "דן ויסמן" }];
     // "דן" is aliased to דן ינקלויץ, so it is not ambiguous
-    expect(findPlayer(players, "דן")).toEqual({ index: 0 });
+    expect(findPlayer(players, "דן")).toMatchObject({ index: 0, resolved: "דן ינקלויץ" });
   });
 
   it("resolves דור בני to דוד בני גיל", () => {
     const players = [{ name: "דוד בני גיל" }];
-    expect(findPlayer(players, "דור בני")).toEqual({ index: 0 });
+    expect(findPlayer(players, "דור בני")).toMatchObject({ index: 0, resolved: "דוד בני גיל" });
+  });
+
+  it("resolves Eden's first-name roster aliases to full names", () => {
+    const players = [
+      { name: "ירין מלאך" },
+      { name: "אופיר סנה" },
+      { name: "נתנאל כהן" },
+      { name: "שגיא גיל" },
+      { name: "דור לירז" },
+    ];
+    expect(findPlayer(players, "ירין")).toMatchObject({ index: 0, resolved: "ירין מלאך" });
+    expect(findPlayer(players, "אופיר")).toMatchObject({ index: 1, resolved: "אופיר סנה" });
+    expect(findPlayer(players, "נתנאל")).toMatchObject({ index: 2, resolved: "נתנאל כהן" });
+    expect(findPlayer(players, "שגיא")).toMatchObject({ index: 3, resolved: "שגיא גיל" });
+    expect(findPlayer(players, "דור")).toMatchObject({ index: 4, resolved: "דור לירז" });
+  });
+
+  it("matches a seated first name to the canonical alias", () => {
+    const players = [{ name: "אופיר" }, { name: "שגיא" }];
+    expect(findPlayer(players, "אופיר")).toMatchObject({ index: 0, resolved: "אופיר סנה" });
+    expect(findPlayer(players, "שגיא גיל")).toMatchObject({ index: 1, resolved: "שגיא גיל" });
   });
 });
 
@@ -176,7 +267,7 @@ describe("new player approval", () => {
       2,
       { knownNames: known }
     );
-    expect(live.players[0].name).toBe("קובי");
+    expect(live.players[0].name).toBe("קובי סעדה");
     expect(live.pendingApprovals).toEqual([]);
   });
 
@@ -417,10 +508,18 @@ describe("rename (תקן)", () => {
   });
 
   it("renames a seated player without clearing the night", () => {
-    const start = applyCommands(null, [{ kind: "add", name: "אופיר", amount: 100 }], "m1").live;
-    const other = applyCommands(start, [{ kind: "add", name: "קובי", amount: 50 }], "m2").live;
+    const start = {
+      players: [
+        { name: "אופיר", buyin: 100, cashout: "" },
+        { name: "קובי סעדה", buyin: 50, cashout: "" },
+      ],
+      applied: {},
+      pendingApprovals: [],
+      approvedNames: [],
+      tips: [],
+    };
     const { live, reply, ownerDm } = applyCommands(
-      other,
+      start,
       [{ kind: "rename", from: "אופיר", to: "אופיר סנה" }],
       "m3"
     );

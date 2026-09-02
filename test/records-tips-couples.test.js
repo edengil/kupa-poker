@@ -36,7 +36,7 @@ describe("tip commands", () => {
     const { live, reply } = applyCommands(start, [{ kind: "tip", name: "אופיר", chips: 10 }], "m2");
     expect(live.players[0].tipsGiven).toBe(10);
     expect(live.tips).toHaveLength(1);
-    expect(live.tips[0]).toMatchObject({ name: "אופיר", amount: 10 });
+    expect(live.tips[0]).toMatchObject({ name: "אופיר סנה", amount: 10 });
     expect(reply).toContain("טיפ 10");
     expect(reply.startsWith(BOT_MARK)).toBe(true);
     expect(reply).not.toContain("ביט");
