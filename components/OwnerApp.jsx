@@ -177,11 +177,17 @@ export default function OwnerApp() {
     const boot = (row, broadcaster) => {
       configureStore(
         makeSupabaseStore(supabase, row.id, {
-          onFlush: (patch) => {
+          onFlush: (patch, meta) => {
             // כתיבה שלנו שנגעה בלייב — מעדכנים את נקודת הייחוס לפני הפינג
             if (patch && "live" in patch) {
               lastLiveRef.current = JSON.stringify(patch.live ?? null);
               lastLiveFpRef.current = liveFingerprint(patch.live ?? null);
+              /* flush אימץ יציאות מהבוט למטמון, אבל React עדיין מציג יצא ריק.
+                 בלי remount lastLiveFp כבר תואם לשרת ו-checkLive לא מרענן. */
+              if (meta?.adoptedRemoteLive) {
+                seedStoreLive(patch.live);
+                requestRemount({ forgetLive: false, force: true });
+              }
             }
             broadcaster.ping();
           },

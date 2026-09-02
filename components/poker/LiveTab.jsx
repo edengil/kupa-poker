@@ -202,8 +202,8 @@ export function LiveTab({
   const now = new Date();
   const dLbl = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
   const addPlayer = (nm) => {
-    nm = nm.trim();
-    if (!nm || players.some((p) => p.name === nm)) return;
+    nm = canon(String(nm || "").trim(), A);
+    if (!nm || players.some((p) => canon(p.name, A) === nm)) return;
     setPlayers((p) => {
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());

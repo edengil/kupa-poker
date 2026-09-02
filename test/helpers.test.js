@@ -59,6 +59,11 @@ describe("helpers — aliases", () => {
     expect(DEFAULT_ALIASES["דור בני"]).toBe("דוד בני גיל");
     expect(DEFAULT_ALIASES["בני"]).toBe("דוד בני גיל");
     expect(DEFAULT_ALIASES["בני גיל"]).toBe("דוד בני גיל");
+    expect(DEFAULT_ALIASES["ירין"]).toBe("ירין מלאך");
+    expect(DEFAULT_ALIASES["אופיר"]).toBe("אופיר סנה");
+    expect(DEFAULT_ALIASES["נתנאל"]).toBe("נתנאל כהן");
+    expect(DEFAULT_ALIASES["שגיא"]).toBe("שגיא גיל");
+    expect(DEFAULT_ALIASES["דור"]).toBe("דור לירז");
     expect(Object.keys(DEFAULT_ALIASES).length).toBeGreaterThanOrEqual(30);
   });
 

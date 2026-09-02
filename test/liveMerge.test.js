@@ -3,7 +3,11 @@ import {
   liveFingerprint,
   mergeLiveStates,
   remoteLiveAhead,
+  livePlayerKey,
+  adoptRemoteLiveOnFlush,
 } from "../lib/liveMerge.js";
+
+const row = (players, short) => players.find((p) => p.name === livePlayerKey(short));
 
 describe("liveFingerprint", () => {
   it("ignores ts so local saves do not look like remote changes", () => {
@@ -42,8 +46,8 @@ describe("mergeLiveStates", () => {
       pending: null,
     };
     const merged = mergeLiveStates(local, remote);
-    expect(merged.players.find((p) => p.name === "דן").cashout).toBe("300");
-    expect(merged.players.find((p) => p.name === "קובי").cashout).toBe("100");
+    expect(row(merged.players, "דן").cashout).toBe("300");
+    expect(row(merged.players, "קובי").cashout).toBe("100");
     expect(merged.closing).toBe(true);
     expect(merged.applied.m2).toBeTruthy();
   });
@@ -87,5 +91,54 @@ describe("mergeLiveStates", () => {
     };
     const merged = mergeLiveStates(local, remote);
     expect(merged.players[0].cashout).toBe("");
+  });
+
+  it("attaches WhatsApp cashout on full name to a local first-name Live row (יצא)", () => {
+    const local = {
+      applied: { m1: [{ t: "add" }] },
+      players: [{ name: "אופיר", buyin: 150, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [{ t: "add" }], m2: [{ t: "out", name: "אופיר סנה" }] },
+      players: [{ name: "אופיר סנה", buyin: 150, cashout: "280" }],
+    };
+    const merged = mergeLiveStates(local, remote);
+    expect(merged.players).toHaveLength(1);
+    expect(merged.players[0]).toMatchObject({
+      name: "אופיר סנה",
+      buyin: 150,
+      cashout: "280",
+    });
+  });
+});
+
+describe("adoptRemoteLiveOnFlush", () => {
+  it("adopts bot cashouts so Live יצא can remount with them", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "שגיא", buyin: 250, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [{ t: "out" }] },
+      players: [{ name: "שגיא", buyin: 250, cashout: "400" }],
+    };
+    const { live, adopted } = adoptRemoteLiveOnFlush(local, remote);
+    expect(adopted).toBe(true);
+    expect(row(live.players, "שגיא").cashout).toBe("400");
+    expect(row(live.players, "שגיא").name).toBe("שגיא גיל");
+  });
+
+  it("does not adopt when applied ids already match", () => {
+    const local = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "שגיא", buyin: 250, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "שגיא", buyin: 250, cashout: "400" }],
+    };
+    const { live, adopted } = adoptRemoteLiveOnFlush(local, remote);
+    expect(adopted).toBe(false);
+    expect(live.players[0].cashout).toBe("");
   });
 });

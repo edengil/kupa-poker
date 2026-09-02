@@ -241,7 +241,10 @@ export async function POST(request) {
   ];
 
   // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה
-  const { live: nextLive, reply, ownerDm } = applyCommands(live, cmds, msg.id, undefined, { knownNames });
+  const { live: nextLive, reply, ownerDm } = applyCommands(live, cmds, msg.id, undefined, {
+    knownNames,
+    aliases,
+  });
   if (!reply) return ok({ skipped: "nothing to do" });
 
   const changed = nextLive !== live;
