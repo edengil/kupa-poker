@@ -8,6 +8,9 @@ import {
   canonLivePlayers,
   localLiveBehind,
   decideLivePoll,
+  mergeTipLogs,
+  applyTipTotalsToPlayers,
+  tipShownFor,
 } from "../lib/liveMerge.js";
 
 const row = (players, short) => players.find((p) => p.name === livePlayerKey(short));
@@ -131,6 +134,56 @@ describe("mergeLiveStates", () => {
       cashout: "280",
     });
   });
+
+  it("sums WhatsApp tip events instead of Math.max on the first total", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "אופיר", buyin: 150, cashout: "", tipsGiven: 15 }],
+      tips: [{ id: "t1", name: "אופיר", amount: 15, at: 1 }],
+    };
+    const remote = {
+      applied: { m1: [] },
+      players: [{ name: "אופיר סנה", buyin: 150, cashout: "720", tipsGiven: 15 }],
+      tips: [
+        { id: "t1", name: "אופיר סנה", amount: 15, at: 1 },
+        { id: "t2", name: "אופיר סנה", amount: 10, at: 2 },
+        { id: "t3", name: "אופיר סנה", amount: 1, at: 3 },
+        { id: "t4", name: "אופיר סנה", amount: 10, at: 4 },
+      ],
+    };
+    const merged = mergeLiveStates(local, remote);
+    expect(merged.players[0]).toMatchObject({
+      name: "אופיר סנה",
+      buyin: 150,
+      cashout: "720",
+      tipsGiven: 36,
+    });
+    expect(merged.tips).toHaveLength(4);
+    expect(tipShownFor(merged.players[0], merged.tips)).toBe(36);
+  });
+
+  it("fills a missing later tip when local tipsGiven stopped at an early sum", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "עדן גיל", buyin: 150, cashout: "", tipsGiven: 26 }],
+      tips: [
+        { id: "e1", name: "עדן גיל", amount: 6, at: 1 },
+        { id: "e2", name: "עדן גיל", amount: 20, at: 2 },
+      ],
+    };
+    const remote = {
+      applied: { m1: [] },
+      players: [{ name: "עדן גיל", buyin: 150, cashout: "770", tipsGiven: 26 }],
+      tips: [
+        { id: "e1", name: "עדן גיל", amount: 6, at: 1 },
+        { id: "e2", name: "עדן גיל", amount: 20, at: 2 },
+        { id: "e3", name: "עדן גיל", amount: 10, at: 3 },
+      ],
+    };
+    const merged = mergeLiveStates(local, remote);
+    expect(merged.players[0].tipsGiven).toBe(36);
+    expect(merged.players[0].cashout).toBe("770");
+  });
 });
 
 describe("adoptRemoteLiveOnFlush", () => {
@@ -176,6 +229,27 @@ describe("adoptRemoteLiveOnFlush", () => {
     expect(adopted).toBe(true);
     expect(live.players[0]).toMatchObject({ buyin: 250, cashout: "770" });
   });
+
+  it("adopts the bot tip log when the open tab is frozen at the first tip", () => {
+    const local = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "דור", buyin: 100, cashout: "", tipsGiven: 10 }],
+      tips: [{ id: "d1", name: "דור", amount: 10, at: 1 }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "דור לירז", buyin: 100, cashout: "0", tipsGiven: 10 }],
+      tips: [
+        { id: "d1", name: "דור לירז", amount: 10, at: 1 },
+        { id: "d2", name: "דור לירז", amount: 10, at: 2 },
+        { id: "d3", name: "דור לירז", amount: 10, at: 3 },
+      ],
+    };
+    const { live, adopted } = adoptRemoteLiveOnFlush(local, remote);
+    expect(adopted).toBe(true);
+    expect(row(live.players, "דור").tipsGiven).toBe(30);
+    expect(row(live.players, "דור").cashout).toBe("0");
+  });
 });
 
 describe("canonLivePlayers", () => {
@@ -210,6 +284,23 @@ describe("localLiveBehind", () => {
     const local = { players: [{ name: "דן", buyin: 100, cashout: "" }] };
     const remote = { players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "196" }] };
     expect(localLiveBehind(local, remote)).toBe(false);
+  });
+
+  it("detects a stale Live tab frozen at the first WhatsApp tip total", () => {
+    const local = {
+      players: [{ name: "אופיר", buyin: 150, cashout: "", tipsGiven: 15 }],
+      tips: [{ id: "t1", name: "אופיר", amount: 15, at: 1 }],
+    };
+    const remote = {
+      players: [{ name: "אופיר סנה", buyin: 150, cashout: "720", tipsGiven: 15 }],
+      tips: [
+        { id: "t1", name: "אופיר סנה", amount: 15, at: 1 },
+        { id: "t2", name: "אופיר סנה", amount: 10, at: 2 },
+        { id: "t3", name: "אופיר סנה", amount: 1, at: 3 },
+        { id: "t4", name: "אופיר סנה", amount: 10, at: 4 },
+      ],
+    };
+    expect(localLiveBehind(local, remote)).toBe(true);
   });
 });
 
@@ -248,4 +339,53 @@ describe("decideLivePoll", () => {
     const lastFp = liveFingerprint(remote);
     expect(decideLivePoll(local, remote, lastFp)).toEqual({ action: "remount", merge: true });
   });
+
+  it("remounts when buy-ins match but the on-screen tip total is behind the bot", () => {
+    const local = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "נתנאל", buyin: 100, cashout: "", tipsGiven: 0 }],
+      tips: [],
+    };
+    const remote = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "נתנאל כהן", buyin: 100, cashout: "150", tipsGiven: 3 }],
+      tips: [{ id: "n1", name: "נתנאל כהן", amount: 3, at: 1 }],
+    };
+    const lastFp = liveFingerprint(remote);
+    expect(decideLivePoll(local, remote, lastFp)).toEqual({ action: "remount", merge: true });
+  });
 });
+
+describe("tip log totals", () => {
+  it("unions tip events by id and recomputes tipsGiven from the log", () => {
+    const tips = mergeTipLogs(
+      [{ id: "t1", name: "אופיר", amount: 15, at: 1 }],
+      [
+        { id: "t1", name: "אופיר סנה", amount: 15, at: 1 },
+        { id: "t2", name: "אופיר סנה", amount: 10, at: 2 },
+        { id: "t3", name: "אופיר סנה", amount: 1, at: 3 },
+        { id: "t4", name: "אופיר סנה", amount: 10, at: 4 },
+      ]
+    );
+    expect(tips).toHaveLength(4);
+    const players = applyTipTotalsToPlayers(
+      [{ name: "אופיר", buyin: 150, tipsGiven: 15 }],
+      tips
+    );
+    expect(players[0]).toMatchObject({ name: "אופיר סנה", tipsGiven: 36 });
+  });
+
+  it("displays the tip log sum even when tipsGiven is frozen at the first total", () => {
+    expect(
+      tipShownFor(
+        { name: "דור", tipsGiven: 10 },
+        [
+          { id: "d1", name: "דור לירז", amount: 10, at: 1 },
+          { id: "d2", name: "דור לירז", amount: 10, at: 2 },
+          { id: "d3", name: "דור לירז", amount: 10, at: 3 },
+        ]
+      )
+    ).toBe(30);
+  });
+});
+

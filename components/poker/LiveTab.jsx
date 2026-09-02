@@ -8,7 +8,7 @@ import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "./colors";
 import { fmt, fmtGap } from "./format";
 import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "./helpers";
-import { canonLivePlayers } from "../../lib/liveMerge";
+import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "./config";
 import { brokenRecords } from "./brokenRecords";
 import {
@@ -140,11 +140,14 @@ export function LiveTab({
       if (alive && raw) {
         try {
           const d = JSON.parse(raw);
-          if (Array.isArray(d.players)) setPlayers(canonLivePlayers(d.players, A));
+          const liveTips = Array.isArray(d.tips) ? d.tips : [];
+          if (Array.isArray(d.players)) {
+            setPlayers(applyTipTotalsToPlayers(canonLivePlayers(d.players, A), liveTips, A));
+          }
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
           if (d.startedAt) setStartedAt(d.startedAt);
-          if (Array.isArray(d.tips)) setTips(d.tips);
+          if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
           liveMetaRef.current = {
             applied: d.applied,
@@ -590,6 +593,7 @@ export function LiveTab({
               const fillSummaries = showFill ? summarizeCoupleFills(coupleFills, p.name) : [];
               const partnerShort = partnerName ? shortCoupleName(partnerName) : "";
               const meShort = shortCoupleName(p.name);
+              const shownTip = tipShownFor(p, tips, A);
               return (
                 <React.Fragment key={p.name + ":" + i}>
                 {showGap && (
@@ -703,9 +707,9 @@ export function LiveTab({
                           {formatFillBadge(row)}
                         </span>
                       ))}
-                      {(+p.tipsGiven || 0) > 0 && (
+                      {shownTip > 0 && (
                         <span style={{ fontSize: 11, color: C.dim }}>
-                          טיפ {p.tipsGiven}
+                          טיפ {shownTip}
                         </span>
                       )}
                     </div>
