@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY } from "../lib/store";
-import { liveFingerprint, mergeLiveStates, remoteLiveAhead } from "../lib/liveMerge";
+import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
@@ -132,21 +132,23 @@ export default function OwnerApp() {
       if (error) return;
       const s = JSON.stringify(data?.live ?? null);
       const fp = liveFingerprint(data?.live ?? null);
-      if (lastLiveRef.current === undefined) {
+      const localSnap = snapshotStoreLive();
+      const decision = decideLivePoll(localSnap, data?.live ?? null, lastLiveFpRef.current);
+
+      if (decision.action === "record") {
         lastLiveRef.current = s;
         lastLiveFpRef.current = fp;
         return;
       }
-      if (lastLiveFpRef.current === fp) {
-        // אותו תוכן בשרת — בטוח לשטוף כתיבות מקומיות ממתינות
+      if (decision.action === "flush") {
         lastLiveRef.current = s;
+        lastLiveFpRef.current = fp;
         await flushStore();
         return;
       }
-      // שינוי מהבוט (או ממכשיר אחר) — ממזגים כניסות מקומיות שעוד בתור, בלי לדרוס יציאות
-      const localSnap = snapshotStoreLive();
+
       let nextLive = data?.live ?? null;
-      if (localSnap && nextLive && remoteLiveAhead(localSnap, nextLive)) {
+      if (decision.merge && localSnap && nextLive) {
         nextLive = mergeLiveStates(localSnap, nextLive);
         const { error: writeError } = await supabase
           .from("groups")
@@ -453,6 +455,7 @@ export default function OwnerApp() {
         initialTab={tabRef.current}
         onTabChange={(t) => {
           tabRef.current = t;
+          if (t === "live") checkLive();
         }}
         statsPanel={
           <ViewerStats supabase={supabase} online={online} groupId={group.id} />

@@ -8,6 +8,7 @@ import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "./colors";
 import { fmt, fmtGap } from "./format";
 import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "./helpers";
+import { canonLivePlayers } from "../../lib/liveMerge";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "./config";
 import { brokenRecords } from "./brokenRecords";
 import {
@@ -139,7 +140,7 @@ export function LiveTab({
       if (alive && raw) {
         try {
           const d = JSON.parse(raw);
-          if (Array.isArray(d.players)) setPlayers(d.players);
+          if (Array.isArray(d.players)) setPlayers(canonLivePlayers(d.players, A));
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
           if (d.startedAt) setStartedAt(d.startedAt);

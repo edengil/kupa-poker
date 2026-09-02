@@ -5,6 +5,9 @@ import {
   remoteLiveAhead,
   livePlayerKey,
   adoptRemoteLiveOnFlush,
+  canonLivePlayers,
+  localLiveBehind,
+  decideLivePoll,
 } from "../lib/liveMerge.js";
 
 const row = (players, short) => players.find((p) => p.name === livePlayerKey(short));
@@ -93,6 +96,24 @@ describe("mergeLiveStates", () => {
     expect(merged.players[0].cashout).toBe("");
   });
 
+  it("takes server cashouts when local buy-ins are older even if applied ids match", () => {
+    const local = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "אופיר", buyin: 150, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "אופיר סנה", buyin: 300, cashout: "720" }],
+    };
+    const merged = mergeLiveStates(local, remote);
+    expect(merged.players).toHaveLength(1);
+    expect(merged.players[0]).toMatchObject({
+      name: "אופיר סנה",
+      buyin: 300,
+      cashout: "720",
+    });
+  });
+
   it("attaches WhatsApp cashout on full name to a local first-name Live row (יצא)", () => {
     const local = {
       applied: { m1: [{ t: "add" }] },
@@ -128,7 +149,7 @@ describe("adoptRemoteLiveOnFlush", () => {
     expect(row(live.players, "שגיא").name).toBe("שגיא גיל");
   });
 
-  it("does not adopt when applied ids already match", () => {
+  it("does not adopt when applied ids already match and buyins are equal", () => {
     const local = {
       applied: { m1: [], m2: [] },
       players: [{ name: "שגיא", buyin: 250, cashout: "" }],
@@ -140,5 +161,91 @@ describe("adoptRemoteLiveOnFlush", () => {
     const { live, adopted } = adoptRemoteLiveOnFlush(local, remote);
     expect(adopted).toBe(false);
     expect(live.players[0].cashout).toBe("");
+  });
+
+  it("adopts server cashouts when the open tab still has older buy-ins", () => {
+    const local = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "עדן גיל", buyin: 150, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "עדן גיל", buyin: 250, cashout: "770" }],
+    };
+    const { live, adopted } = adoptRemoteLiveOnFlush(local, remote);
+    expect(adopted).toBe(true);
+    expect(live.players[0]).toMatchObject({ buyin: 250, cashout: "770" });
+  });
+});
+
+describe("canonLivePlayers", () => {
+  it("expands seated first names immediately via DEFAULT_ALIASES", () => {
+    const out = canonLivePlayers([
+      { name: "אופיר", buyin: 150, cashout: "" },
+      { name: "נתנאל", buyin: 100, cashout: "" },
+      { name: "דור", buyin: 100, cashout: "" },
+      { name: "שגיא", buyin: 200, cashout: "" },
+      { name: "ירין", buyin: 50, cashout: "" },
+      { name: "עדן גיל", buyin: 150, cashout: "" },
+    ]);
+    expect(out.map((p) => p.name)).toEqual([
+      "אופיר סנה",
+      "נתנאל כהן",
+      "דור לירז",
+      "שגיא גיל",
+      "ירין מלאך",
+      "עדן גיל",
+    ]);
+  });
+});
+
+describe("localLiveBehind", () => {
+  it("detects a stale Live tab with older buy-ins", () => {
+    const local = { players: [{ name: "קובי", buyin: 100, cashout: "" }] };
+    const remote = { players: [{ name: "קובי סעדה", buyin: 200, cashout: "200" }] };
+    expect(localLiveBehind(local, remote)).toBe(true);
+  });
+
+  it("is false when buy-ins match even if cashout differs (UI clear)", () => {
+    const local = { players: [{ name: "דן", buyin: 100, cashout: "" }] };
+    const remote = { players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "196" }] };
+    expect(localLiveBehind(local, remote)).toBe(false);
+  });
+});
+
+describe("decideLivePoll", () => {
+  it("does not flush a stale snapshot when lastLiveFp already matches the server", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "עדן גיל", buyin: 150, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [{ t: "out" }] },
+      players: [{ name: "עדן גיל", buyin: 250, cashout: "770" }],
+    };
+    const lastFp = liveFingerprint(remote);
+    const decision = decideLivePoll(local, remote, lastFp);
+    expect(decision).toEqual({ action: "remount", merge: true });
+  });
+
+  it("flushes when the on-screen snapshot already matches the server", () => {
+    const live = {
+      applied: { m1: [] },
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "196" }],
+    };
+    expect(decideLivePoll(live, live, liveFingerprint(live))).toEqual({ action: "flush" });
+  });
+
+  it("remounts a long-open tab when lastLiveFp matches server but the snapshot is behind", () => {
+    const local = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "עדן גיל", buyin: 150, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [] },
+      players: [{ name: "עדן גיל", buyin: 250, cashout: "770" }],
+    };
+    const lastFp = liveFingerprint(remote);
+    expect(decideLivePoll(local, remote, lastFp)).toEqual({ action: "remount", merge: true });
   });
 });
