@@ -346,11 +346,16 @@ export default function OwnerApp() {
   /* ------------------ שמירה אחרונה לפני יציאה מהדף ------------------ */
   useEffect(() => {
     const flush = () => flushStore();
+    const onOnline = () => {
+      flushStore();
+    };
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", flush);
+    window.addEventListener("online", onOnline);
     return () => {
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("online", onOnline);
       flush();
     };
   }, []);
@@ -467,7 +472,7 @@ export default function OwnerApp() {
       />
       {saveStatus !== "saved" && (
         <div role="status" aria-live="polite" style={{ textAlign: "center", padding: 8, color: saveStatus === "error" ? C.loss : C.dim, fontSize: 13 }}>
-          {({ pending: "ממתין לשמירה…", saving: "שומר…", error: "השמירה נכשלה. השאר את המסך פתוח ונסה שוב." })[saveStatus]}
+          {({ pending: "ממתין לשמירה… (גם בלי רשת — יעלה כשתתחבר)", saving: "שומר…", error: "השמירה לשרת נכשלה. הנתונים נשמרו במכשיר — השאר פתוח או לחץ לנסות שוב." })[saveStatus]}
           {saveStatus === "error" && <button type="button" onClick={() => flushStore()} style={{ marginInlineStart: 10 }}>נסה לשמור שוב</button>}
         </div>
       )}

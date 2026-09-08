@@ -5,19 +5,48 @@ function client() {
   const update = vi.fn().mockResolvedValue({ error: null });
   const read = vi.fn().mockResolvedValue({ data: { live: null }, error: null });
   return {
-    update, read,
+    update,
+    read,
     from: () => ({
       update: (patch) => ({ eq: () => update(patch) }),
       select: () => ({ eq: () => ({ single: read }) }),
     }),
   };
 }
+
+function memoryLocalStorage() {
+  const mem = Object.create(null);
+  return {
+    getItem: (k) => (Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null),
+    setItem: (k, v) => {
+      mem[k] = String(v);
+    },
+    removeItem: (k) => {
+      delete mem[k];
+    },
+    get length() {
+      return Object.keys(mem).length;
+    },
+    key: (i) => Object.keys(mem)[i] ?? null,
+  };
+}
+
 describe("store durability and ordering", () => {
-  beforeEach(() => { vi.useFakeTimers(); vi.spyOn(console, "error").mockImplementation(() => {}); });
-  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("localStorage", memoryLocalStorage());
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it("retains a failed write and reports success only after retry", async () => {
-    const api = client(), onStatus = vi.fn(), onFlush = vi.fn();
+    const api = client(),
+      onStatus = vi.fn(),
+      onFlush = vi.fn();
     api.update.mockResolvedValueOnce({ error: { message: "offline" } });
     const store = makeSupabaseStore(api, "test", { onStatus, onFlush });
     await store.set(DB_KEY, '{"sessions":[]}');
@@ -34,7 +63,12 @@ describe("store durability and ordering", () => {
   it("serializes overlapping writes and preserves newer edits after an older failure", async () => {
     const api = client();
     let finish;
-    api.update.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    api.update.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
     const store = makeSupabaseStore(api, "test");
     await store.set(DB_KEY, '{"version":1}');
     const first = store.flush();
@@ -60,7 +94,8 @@ describe("store durability and ordering", () => {
   });
 
   it("rejects corrupt JSON without polluting the cache", async () => {
-    const api = client(), store = makeSupabaseStore(api, "test");
+    const api = client(),
+      store = makeSupabaseStore(api, "test");
     await store.set(DB_KEY, '{"version":1}');
     expect(await store.set(DB_KEY, "invalid")).toBe(false);
     expect(await store.get(DB_KEY)).toBe('{"version":1}');
@@ -77,14 +112,37 @@ describe("store durability and ordering", () => {
   it("does not replace a local edit with a delayed background read", async () => {
     const api = client();
     let finish;
-    api.read.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    vi.stubGlobal("localStorage", { getItem: () => '{"version":1}', setItem: vi.fn() });
+    api.read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    localStorage.setItem("poker:cache:test:data", '{"version":1}');
     const store = makeSupabaseStore(api, "test");
     await store.get(DB_KEY);
     await store.set(DB_KEY, '{"version":3}');
     finish({ data: { data: { version: 2 } }, error: null });
-    await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(await store.get(DB_KEY)).toBe('{"version":3}');
     await store.flush();
+  });
+
+  it("rehydrates pending writes after reload so offline edits are not lost", async () => {
+    const api = client();
+    api.update.mockResolvedValueOnce({ error: { message: "offline" } });
+    const first = makeSupabaseStore(api, "group-a");
+    await first.set(DB_KEY, '{"sessions":[{"id":"n1"}]}');
+    await first.set(LIVE_KEY, '{"players":[{"name":"דן","buyin":50,"cashout":""}]}');
+    expect(await first.flush()).toBe(false);
+
+    const second = makeSupabaseStore(api, "group-a");
+    expect(second.hasPending()).toBe(true);
+    expect(await second.get(DB_KEY)).toBe('{"sessions":[{"id":"n1"}]}');
+    expect(await second.get(LIVE_KEY)).toContain("דן");
+    expect(await second.flush()).toBe(true);
+    expect(second.hasPending()).toBe(false);
+    expect(api.update).toHaveBeenCalled();
   });
 });
