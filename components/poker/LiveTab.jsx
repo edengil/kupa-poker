@@ -192,9 +192,10 @@ export function LiveTab({
         tips,
         coupleFills,
         actionLog,
+        cps,
       })
     );
-  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, hydrated]);
+  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, cps, hydrated]);
 
   // ההצעה נעלמת לבד אחרי 15 שניות כדי לא להפריע
   useEffect(() => {

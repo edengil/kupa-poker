@@ -145,4 +145,22 @@ describe("store durability and ordering", () => {
     expect(second.hasPending()).toBe(false);
     expect(api.update).toHaveBeenCalled();
   });
+
+  it("keeps an in-flight write recoverable on disk until acknowledgment", async () => {
+    const api = client();
+    let finish;
+    api.update.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const store = makeSupabaseStore(api, "in-flight");
+    await store.set(DB_KEY, '{"version":1}');
+    const writing = store.flush();
+    await Promise.resolve();
+    expect(JSON.parse(localStorage.getItem("poker:pending:in-flight"))).toEqual({ data: { version: 1 } });
+    await store.set(DB_KEY, '{"version":2}');
+    expect(JSON.parse(localStorage.getItem("poker:pending:in-flight"))).toEqual({ data: { version: 2 } });
+    finish({ error: null });
+    await writing;
+    expect(JSON.parse(localStorage.getItem("poker:pending:in-flight"))).toEqual({ data: { version: 2 } });
+    await store.flush();
+    expect(localStorage.getItem("poker:pending:in-flight")).toBeNull();
+  });
 });
