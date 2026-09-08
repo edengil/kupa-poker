@@ -13,7 +13,7 @@ import { CalendarDays, CheckCircle2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { AliasCard } from "./AliasCard";
 import { BackupCard } from "./BackupCard";
-import { GapsBoard } from "./GapsBoard";
+import { GapsBoard } from "./GapsBoard.jsx";
 import { checkNightBalance, confirmSaveIfUnbalanced } from "./nightBalance";
 
 /* טאב הזנה — חולץ מ-PokerApp.jsx כ-JSX נקי. */

@@ -4,12 +4,13 @@ import React, { useMemo } from "react";
 import { C } from "./colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "./festive";
 import { settlementTextForSession } from "../../lib/nightShare";
+import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
 
 /**
  * כרטיס «חלוקה אחרונה» בראש טאב הטבלה — מי מעביר למי.
  * מחושב תמיד מחדש; גלוי גם לצופים ב־/g/{slug}.
  */
-export function LastSettlementCard({ db }) {
+export function LastSettlementCard({ db, commit, readOnly = false }) {
   const card = useMemo(() => {
     const sessions = db?.sessions || [];
     if (!sessions.length) return null;
@@ -18,12 +19,18 @@ export function LastSettlementCard({ db }) {
     const text = settlementTextForSession(latest);
     if (!text || !text.trim()) return null;
     /* מדגישים את שורות ההעברה — אותו ניסוח כמו ShareSheet «חלוקה» */
-    return { session: latest, text };
+    return { session: latest, text, ...paymentPlan(latest) };
   }, [db?.sessions]);
 
   if (!card) return null;
 
-  const { session, text } = card;
+  const { session, text, transfers, paid } = card;
+  const paidCount = transfers.filter((_, i) => paid[i]).length;
+  const outstanding = transfers.reduce((sum, transfer, i) => sum + (paid[i] ? 0 : transfer.amount), 0);
+  const mark = (index, value) => {
+    if (readOnly || !commit) return;
+    commit({ ...db, sessions: db.sessions.map((s) => s.id === session.id ? markTransfer(s, index, value) : s) });
+  };
 
   return (
     <section
@@ -50,7 +57,7 @@ export function LastSettlementCard({ db }) {
             lineHeight: 1.5,
           }}
         >
-          מי צריך להעביר למי
+          {paidCount} מתוך {transfers.length} העברות סומנו כשולמו · נותרו {outstanding.toLocaleString("he-IL")}₪
         </p>
         <div
           dir="rtl"
@@ -66,7 +73,15 @@ export function LastSettlementCard({ db }) {
             padding: "11px 12px",
           }}
         >
-          {text}
+          {transfers.map((transfer, index) => (
+            <label key={index} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 0", borderBottom: index < transfers.length - 1 ? `1px solid ${C.line}` : "none" }}>
+              {!readOnly && commit && <input type="checkbox" checked={!!paid[index]} onChange={(e) => mark(index, e.target.checked)} aria-label={`שולם: ${transfer.from} אל ${transfer.to}, ${transfer.amount} שקלים`} style={{ width: 20, height: 20, accentColor: C.win }} />}
+              <span style={{ flex: 1 }}>{transfer.from} אל {transfer.to}</span>
+              <b>{transfer.amount}₪</b>
+              <span style={{ color: paid[index] ? C.win : C.dim, fontSize: 12 }}>{paid[index] ? "שולם" : "ממתין"}</span>
+            </label>
+          ))}
+          <details style={{ marginTop: 8 }}><summary style={{ cursor: "pointer", color: C.dim, fontSize: 12 }}>נוסח החלוקה המלא</summary>{text}</details>
         </div>
       </div>
     </section>

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { C } from "./colors";
-import { exportDb, normalize } from "./db";
+import { exportDb, validateImport } from "./db";
 import { exportSessionsCsv } from "./csvExport";
 import { Download, Upload } from "./icons";
 
@@ -26,19 +26,23 @@ const btn = {
 /* גיבוי JSON + ייצוא CSV לאקסל — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function BackupCard({ db, commit }) {
   const fileRef = useRef();
+  const [candidate, setCandidate] = useState(null);
+  const [error, setError] = useState("");
 
   const onFile = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    setCandidate(null);
+    setError("");
     const r = new FileReader();
     r.onload = () => {
       try {
-        commit(normalize(JSON.parse(r.result)));
-        alert("יובא בהצלחה");
-      } catch {
-        alert("קובץ לא תקין");
+        setCandidate(validateImport(JSON.parse(r.result)));
+      } catch (e) {
+        setError(e.message || "קובץ לא תקין");
       }
     };
+    r.onerror = () => setError("לא ניתן לקרוא את הקובץ.");
     r.readAsText(f);
     e.target.value = "";
   };
@@ -89,6 +93,14 @@ export function BackupCard({ db, commit }) {
           style={{ display: "none" }}
         />
       </div>
+      {error && <p role="alert" style={{ color: C.loss }}>{error}</p>}
+      {candidate && <div style={{ marginTop: 12, lineHeight: 1.7 }}>
+        <p>הגיבוי מכיל {candidate.sessions.length} ערבים ו־{candidate.yearly.length} מאזנים שנתיים. אישור יחליף את הנתונים הנוכחיים. תחילה יירד גיבוי של הנתונים הקיימים.</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={btn} onClick={() => { exportDb(db); commit(candidate); setCandidate(null); }}>גבה והחלף נתונים</button>
+          <button style={btn} onClick={() => setCandidate(null)}>ביטול</button>
+        </div>
+      </div>}
     </div>
   );
 }

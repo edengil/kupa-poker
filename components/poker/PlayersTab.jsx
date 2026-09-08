@@ -10,7 +10,9 @@ import { ChevronLeft, Crown } from "./icons";
 
 /* טאב שחקנים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function PlayersTab({ db, onPlayer }) {
-  const A = AL(db);
+  const A = useMemo(() => AL(db), [db]);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("balance");
   const nowD = new Date();
   const [scope, setScope] = useState("all"); // all | year | month
   const [y, setY] = useState(nowD.getFullYear());
@@ -56,6 +58,14 @@ export function PlayersTab({ db, onPlayer }) {
     }
     return c;
   }, [db, scope, y, mo, A]);
+
+  const visibleTotals = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("he");
+    const rows = totals.filter((t) => t.name.toLocaleLowerCase("he").includes(needle));
+    if (sort === "name") rows.sort((a, b) => a.name.localeCompare(b.name, "he"));
+    if (sort === "attendance") rows.sort((a, b) => (counts[b.name] || 0) - (counts[a.name] || 0));
+    return rows;
+  }, [totals, counts, query, sort]);
 
   const sub =
     scope === "all"
@@ -123,11 +133,21 @@ export function PlayersTab({ db, onPlayer }) {
         )}
       </div>
       <p style={{ color: C.dim, fontSize: 12, margin: "0 2px 12px" }}>{sub}</p>
-      {!totals.length ? (
-        <Empty text="אין ערבים בתקופה הזאת." />
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <input type="search" aria-label="חיפוש שחקן" placeholder="חיפוש שחקן…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ ...sel, flex: 1, minWidth: 140, borderRadius: 10 }} />
+        <select aria-label="מיון שחקנים" value={sort} onChange={(e) => setSort(e.target.value)} style={sel}>
+          <option value="balance">לפי מאזן</option>
+          <option value="attendance">לפי נוכחות</option>
+          <option value="name">לפי שם</option>
+        </select>
+      </div>
+      <p role="status" style={{ fontSize: 12, color: C.dim }}>{visibleTotals.length} שחקנים</p>
+      {!visibleTotals.length ? (
+        <Empty text={query ? "לא נמצאו שחקנים. נסה שם אחר." : "אין ערבים בתקופה הזאת."} />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {totals.map((t, i) => {
+          {visibleTotals.map((t) => {
+            const i = totals.indexOf(t);
             const c = counts[t.name] || 0;
             const avg = c ? r2(t.amount / c) : null;
             return (

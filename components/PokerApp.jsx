@@ -16,7 +16,7 @@ import { normalize } from "./poker/db";
 import { InputTab } from "./poker/InputTab";
 import { brokenRecords } from "./poker/brokenRecords";
 import { RecordsTab } from "./poker/RecordsTab";
-import { RecordsAlert } from "./poker/RecordsAlert";
+import { RecordsAlert } from "./poker/RecordsAlert.jsx";
 import { normalizeRecordAlertLines } from "./poker/recordsAlert";
 import { PlayersTab } from "./poker/PlayersTab";
 import { ProfileSheet } from "./poker/ProfileSheet";
@@ -49,6 +49,7 @@ function App({
 }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [recordAlert, setRecordAlert] = useState(null);
   // initialTab מאפשר לרענון מבחוץ (remount אחרי פינג מהבוט) לא לזרוק
   // את המשתמש בחזרה לטבלה
@@ -70,7 +71,7 @@ function App({
         try {
           d = normalize(JSON.parse(raw));
         } catch {
-          d = buildSeedDb();
+          throw new Error("הנתונים שהתקבלו אינם תקינים. לא בוצע שינוי בהיסטוריה.");
         }
       } else d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
       // גיבוי ג'יטונים מצ'אט אוג׳ 2026 — ממלא ערבים ישנים בלי שדה chips
@@ -86,7 +87,7 @@ function App({
           store.set(DB_KEY, JSON.stringify(d));
         }
       }
-    })();
+    })().catch((error) => { if (alive) setLoadError(error.message); });
     return () => {
       alive = false;
     };
@@ -153,7 +154,10 @@ function App({
         }}
       >
         <Style />
-        <div>טוען…</div>
+        <div role={loadError ? "alert" : "status"}>
+          {loadError || "טוען…"}
+          {loadError && <button onClick={() => window.location.reload()} style={{ display: "block", margin: "16px auto" }}>נסה שוב</button>}
+        </div>
       </div>
     );
   }
@@ -218,6 +222,7 @@ function App({
         ) : tab === "table" ? (
           <TableTab
             db={db}
+            commit={commit}
             years={years}
             readOnly={readOnly}
             scope={scope}

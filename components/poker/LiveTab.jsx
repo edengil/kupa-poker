@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { store } from "../../lib/store";
+import { store, flushStore } from "../../lib/store";
 import { buildReport, buildSettlement, partitionByNet } from "../../lib/report";
 import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
 import { nightSummaryText } from "../../lib/nightShare";
@@ -273,6 +273,7 @@ export function LiveTab({
     net: p.cashout === "" ? null : r2((+p.cashout || 0) / cps - (+p.buyin || 0)),
   }));
   const settled = nets.filter((n) => n.net !== null);
+  const canFinish = players.length > 0 && players.every((p) => p.cashout !== "");
   const netSum = r2(settled.reduce((s, n) => s + n.net, 0));
   const cashSumChips = players.reduce(
     (s, p) => s + (p.cashout === "" ? 0 : +p.cashout || 0),
@@ -298,7 +299,11 @@ export function LiveTab({
       }),
     [players, entriesCount, startedAt, nowTs, cps]
   );
-  function saveNight() {
+  async function saveNight() {
+    if (players.some((p) => p.cashout === "")) {
+      alert("יש שחקנים שעדיין לא הוזנו להם ג׳יטונים ביציאה. יש להשלים את כולם לפני סיום הערב (גם 0).");
+      return;
+    }
     /* נטו ב־₪ כמו תמיד; בנוסף chips / tipsGiven על כל רשומה כדי ששיאי
        ג'יטונים וטיפים יעבדו מכאן והלאה. */
     const entries = players
@@ -326,9 +331,11 @@ export function LiveTab({
       cps,
     });
     if (!confirmSaveIfUnbalanced(balCheck)) return;
-    const d = now.getDate(),
-      mo = now.getMonth() + 1,
-      y = now.getFullYear();
+    /* תאריך הערב = תחילת המשחק (לא חצות אחרי סגירה מאוחרת). */
+    const when = startedAt ? new Date(startedAt) : now;
+    const d = when.getDate(),
+      mo = when.getMonth() + 1,
+      y = when.getFullYear();
     const iso = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const endedAt = Date.now();
     const rec = {
@@ -339,6 +346,7 @@ export function LiveTab({
       y,
       entries,
       tips: tips.length ? tips.map(({ name, amount, at }) => ({ name, amount, at })) : undefined,
+      cps,
       coupleFills: coupleFills.length ? coupleFills : undefined,
       startedAt: startedAt || null,
       endedAt,
@@ -361,6 +369,10 @@ export function LiveTab({
       plan: null, // הערב התקיים — ההזמנה כבר לא רלוונטית
     });
     store.set(LIVE_KEY, "");
+    const saved = await flushStore();
+    if (saved === false) {
+      alert("הערב נשמר במכשיר, אבל השמירה לשרת נכשלה. השאר את המסך פתוח עד שמופיע «כל השינויים נשמרו».");
+    }
     // החלוקה מחושבת כאן ונשמרת לתצוגה מקדימה. היא לא נשלחת לשום מקום
     // עד שתאשר אותה במסך השיתוף.
     const split = buildSettlement(settle(players, cps), {
@@ -947,19 +959,20 @@ export function LiveTab({
 
           <button
             onClick={saveNight}
-            disabled={!settled.length}
+            disabled={!canFinish}
             style={{
-              ...(settled.length ? brassCta : brassCtaMuted),
+              ...(canFinish ? brassCta : brassCtaMuted),
               width: "100%",
               marginTop: 12,
               padding: 14,
               borderRadius: 12,
               fontSize: 16,
-              cursor: settled.length ? "pointer" : "not-allowed",
+              cursor: canFinish ? "pointer" : "not-allowed",
             }}
           >
             סיים · שמור · שלח סיכום
           </button>
+          {!canFinish && <p role="status" style={{ color: C.dim, fontSize: 13 }}>יש להשלים ג׳יטונים ביציאה לכל השחקנים, כולל 0 למי שהפסיד הכול.</p>}
           <div
             style={{
               marginTop: 10,

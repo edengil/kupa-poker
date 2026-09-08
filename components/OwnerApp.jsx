@@ -41,6 +41,7 @@ export default function OwnerApp() {
   const [phase, setPhase] = useState("loading"); // loading | signedOut | ready | error
   const [group, setGroup] = useState(null);
   const [message, setMessage] = useState("");
+  const [saveStatus, setSaveStatus] = useState("saved");
   const [online, setOnline] = useState([]); // מי צופה עכשיו — נוכחות חיה
   const [generation, setGeneration] = useState(0); // remount רק כשבאמת צריך (רקע / חזרה לדף)
   const [viewerAuth, setViewerAuth] = useState(null);
@@ -179,6 +180,7 @@ export default function OwnerApp() {
     const boot = (row, broadcaster) => {
       configureStore(
         makeSupabaseStore(supabase, row.id, {
+          onStatus: setSaveStatus,
           onFlush: (patch, meta) => {
             // כתיבה שלנו שנגעה בלייב — מעדכנים את נקודת הייחוס לפני הפינג
             if (patch && "live" in patch) {
@@ -430,7 +432,7 @@ export default function OwnerApp() {
   }, [supabase]);
 
   const signOut = useCallback(async () => {
-    await flushStore();
+    if (await flushStore() === false) return;
     clearLocalCache();
     try {
       localStorage.removeItem("poker:cache:group");
@@ -445,6 +447,12 @@ export default function OwnerApp() {
   return (
     <>
       <ShareBar slug={group.slug} onSignOut={signOut} />
+      {saveStatus !== "saved" && (
+        <div role="status" aria-live="polite" style={{ textAlign: "center", padding: 8, color: saveStatus === "error" ? C.loss : C.dim, fontSize: 13 }}>
+          {({ pending: "ממתין לשמירה…", saving: "שומר…", error: "השמירה נכשלה. השאר את המסך פתוח ונסה שוב." })[saveStatus]}
+          {saveStatus === "error" && <button type="button" onClick={() => flushStore()} style={{ marginInlineStart: 10 }}>נסה לשמור שוב</button>}
+        </div>
+      )}
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 13px" }}>
         <InstallButton />
         <Viewers supabase={supabase} online={online} groupId={group.id} />
