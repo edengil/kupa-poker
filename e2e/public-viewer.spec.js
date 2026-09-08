@@ -22,6 +22,8 @@ test.describe("צופה ציבורי", () => {
     await page.goto("/preview/viewer?history=0&live=1");
     await expect(page.getByTestId("preview-viewer-live")).toBeVisible();
     await expect(page.getByText("חי בלייב")).toBeVisible();
+    await expect(page.getByText("צפייה בלבד")).toBeVisible();
+    await expect(page.getByRole("button", { name: /חי בלייב/ })).toBeDisabled();
     await expect(page.getByText("אלפא צופה")).toHaveCount(0);
   });
 });

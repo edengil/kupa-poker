@@ -26,6 +26,7 @@ export function PokerTable({
   onSeat,
   startedAt,
   elapsed,
+  readOnly = false,
 }) {
   const players = seatSort(rawPlayers);
   const n = players.length;
@@ -119,6 +120,7 @@ export function PokerTable({
         return (
           <button
             key={p.name}
+            disabled={readOnly}
             onClick={() => onSeat(i)}
             style={{
               position: "absolute",
@@ -128,7 +130,7 @@ export function PokerTable({
               width: 78,
               padding: "7px 4px",
               borderRadius: 12,
-              cursor: "pointer",
+              cursor: readOnly ? "default" : "pointer",
               border: `1px solid ${C.brassSoft}`,
               background: C.feltDeep,
               color: C.cream,
@@ -172,7 +174,7 @@ export function PokerTable({
           pointerEvents: "none",
         }}
       >
-        לחיצה על שחקן מוסיפה {addAmt}₪
+        {readOnly ? "צפייה בלבד" : `לחיצה על שחקן מוסיפה ${addAmt}₪`}
       </div>
     </div>
   );

@@ -214,10 +214,9 @@ describe("buyin is last snapshot, not a sum", () => {
   });
 });
 
-describe("audit-nights.json goldens", () => {
-  const audit = JSON.parse(
-    fs.readFileSync(path.join(process.cwd(), "scripts", "audit-nights.json"), "utf8")
-  );
+describe("night-goldens.json", () => {
+  const goldPath = path.join(process.cwd(), "scripts", "night-goldens.json");
+  const audit = JSON.parse(fs.readFileSync(goldPath, "utf8"));
 
   it("locks 18.7 Eden 970 and David Beni once", () => {
     const g = audit.golden.find((x) => x.iso === "2026-07-18");

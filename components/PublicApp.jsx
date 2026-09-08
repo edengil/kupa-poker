@@ -270,6 +270,7 @@ export default function PublicApp({ slug }) {
             ♠ משחק עכשיו
           </h2>
           <PokerTable
+            readOnly
             players={live.players} cps={cps} addAmt={live.addAmt || 50}
             pot={pot} potChips={pot * cps} onSeat={() => {}}
             startedAt={live.startedAt}

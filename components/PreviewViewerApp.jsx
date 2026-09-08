@@ -73,10 +73,11 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
       >
         סביבת צופה · היסטוריה {shareHistory ? "גלויה" : "מוסתרת"} · בלי התחברות
       </div>
-      {live?.players?.length > 0 && (
+      {ready && live?.players?.length > 0 && (
         <div style={{ maxWidth: 640, margin: "0 auto", padding: "13px 13px 0" }} data-testid="preview-viewer-live">
           <h2 style={{ margin: "0 2px 9px", fontSize: 15, fontWeight: 700 }}>♠ משחק עכשיו</h2>
           <PokerTable
+            readOnly
             players={live.players}
             cps={cps}
             addAmt={live.addAmt || 50}
