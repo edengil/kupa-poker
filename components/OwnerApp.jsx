@@ -14,6 +14,7 @@ import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "./poker/festive";
 import { C as festiveC } from "./poker/colors";
 import { planShareLocationLines } from "./poker/hosts";
+import { getConfig, onConfig, setConfig } from "./poker/config";
 
 const C = {
   feltDeep: festiveC.feltDeep,
@@ -446,7 +447,24 @@ export default function OwnerApp() {
 
   return (
     <>
-      <ShareBar slug={group.slug} onSignOut={signOut} />
+      <ShareBar
+        slug={group.slug}
+        groupId={group.id}
+        supabase={supabase}
+        onSignOut={signOut}
+        onSlugChange={(next) => {
+          setGroup((g) => {
+            const row = { ...g, slug: next };
+            try {
+              localStorage.setItem("poker:cache:group", JSON.stringify(row));
+            } catch {}
+            groupRef.current = row;
+            return row;
+          });
+          broadcasterRef.current?.dispose();
+          broadcasterRef.current = createBroadcaster(supabase, next, checkLive);
+        }}
+      />
       {saveStatus !== "saved" && (
         <div role="status" aria-live="polite" style={{ textAlign: "center", padding: 8, color: saveStatus === "error" ? C.loss : C.dim, fontSize: 13 }}>
           {({ pending: "ממתין לשמירה…", saving: "שומר…", error: "השמירה נכשלה. השאר את המסך פתוח ונסה שוב." })[saveStatus]}
@@ -511,14 +529,18 @@ function SignIn({ onSignIn }) {
 }
 
 /* ========================= רצועת השיתוף למעלה ========================= */
-function ShareBar({ slug, onSignOut }) {
+function ShareBar({ slug, groupId, supabase, onSignOut, onSlugChange }) {
   const [copied, setCopied] = useState(false);
   const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [shareHistory, setShareHistory] = useState(() => getConfig().shareHistory !== false);
 
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
     setUrl(`${base}/g/${slug}`);
   }, [slug]);
+
+  useEffect(() => onConfig((c) => setShareHistory(c.shareHistory !== false)), []);
 
   const copy = async () => {
     const text = `הטבלה של הקבוצה: ${url}`;
@@ -537,6 +559,34 @@ function ShareBar({ slug, onSignOut }) {
     } catch {}
   };
 
+  const toggleHistory = () => {
+    const next = !shareHistory;
+    setConfig({ shareHistory: next });
+    setShareHistory(next);
+  };
+
+  const rotate = async () => {
+    if (busy) return;
+    const ok = confirm(
+      "להחליף את לינק הצפייה?\n\nהלינק הישן יפסיק לעבוד מיד.\nאם הבוט בוואטסאפ משתמש באותו slug — צריך לעדכן גם ב-Vercel את KUPA_GROUP_SLUG ולעשות Redeploy."
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const next = newSlug();
+      const { error } = await supabase.from("groups").update({ slug: next }).eq("id", groupId);
+      if (error) throw error;
+      try {
+        localStorage.removeItem(`poker:cache:pub:${slug}`);
+      } catch {}
+      onSlugChange?.(next);
+    } catch (e) {
+      alert(e?.message || "החלפת הלינק נכשלה");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -550,43 +600,70 @@ function ShareBar({ slug, onSignOut }) {
           maxWidth: 640,
           margin: "0 auto",
           display: "flex",
-          alignItems: "center",
-          gap: 10,
+          flexDirection: "column",
+          gap: 8,
         }}
       >
-        <button
-          onClick={copy}
-          style={{
-            flex: 1,
-            padding: "9px 12px",
-            borderRadius: 11,
-            border: `1px solid ${C.brass}`,
-            background: "transparent",
-            color: C.brass,
-            fontFamily: "inherit",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            textAlign: "center",
-          }}
-        >
-          {copied ? "הלינק הועתק" : "שליחת לינק לצפייה"}
-        </button>
-        <button
-          onClick={onSignOut}
-          style={{
-            padding: "9px 12px",
-            borderRadius: 11,
-            border: "none",
-            background: "transparent",
-            color: C.dim,
-            fontFamily: "inherit",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          יציאה
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            onClick={copy}
+            style={{
+              flex: 1,
+              padding: "9px 12px",
+              borderRadius: 11,
+              border: `1px solid ${C.brass}`,
+              background: "transparent",
+              color: C.brass,
+              fontFamily: "inherit",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              textAlign: "center",
+            }}
+          >
+            {copied ? "הלינק הועתק" : "שליחת לינק לצפייה"}
+          </button>
+          <button
+            type="button"
+            onClick={onSignOut}
+            style={{
+              padding: "9px 12px",
+              borderRadius: 11,
+              border: "none",
+              background: "transparent",
+              color: C.dim,
+              fontFamily: "inherit",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            יציאה
+          </button>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12, color: C.dim }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <input type="checkbox" checked={shareHistory} onChange={toggleHistory} style={{ accentColor: C.brass }} />
+            שתף גם היסטוריה לצופים
+          </label>
+          <button
+            type="button"
+            onClick={rotate}
+            disabled={busy}
+            style={{
+              marginInlineStart: "auto",
+              background: "none",
+              border: "none",
+              color: C.loss,
+              fontSize: 12,
+              cursor: busy ? "wait" : "pointer",
+              textDecoration: "underline",
+              fontFamily: "inherit",
+            }}
+          >
+            {busy ? "מחליף…" : "החלף לינק"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import PokerApp, { PokerTable } from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
+import { snapshotForViewer, viewerCps } from "../lib/publicShare";
 import { getPushSupport, getPushSubscription, subscribePush, unsubscribePush } from "../lib/pushClient";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
@@ -26,6 +27,10 @@ const C = {
 // גיבוי ל-WebSocket. בטלפון הערוץ נופל כשהמסך ננעל, ולא תמיד מתאושש.
 const POLL_MS = 12000;
 
+function bootViewerStore(snap) {
+  configureStore(makeReadOnlyStore(snapshotForViewer(snap)));
+}
+
 export default function PublicApp({ slug }) {
   const supabase = getSupabase();
   const [phase, setPhase] = useState("loading"); // loading | signedOut | ready | missing
@@ -36,6 +41,7 @@ export default function PublicApp({ slug }) {
   const [now, setNow] = useState(() => Date.now());
   const [generation, setGeneration] = useState(0);
   const [viewerAuth, setViewerAuth] = useState(null);
+  const [pubConfig, setPubConfig] = useState({});
   const dataRef = useRef(null);
   const loggedRef = useRef(false);
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
@@ -48,11 +54,12 @@ export default function PublicApp({ slug }) {
     const cacheKey = `poker:cache:pub:${slug}`;
 
     const apply = (snap) => {
-      configureStore(makeReadOnlyStore(snap));
+      bootViewerStore(snap);
       dataRef.current = JSON.stringify(snap.data ?? null);
       setGroupId(snap.id);
       setLive(snap.live ?? null);
       setPlan(snap.data?.plan ?? null);
+      setPubConfig(snap.config || {});
       setPhase("ready");
     };
 
@@ -79,10 +86,11 @@ export default function PublicApp({ slug }) {
     // עלינו מהמטמון — מיישרים מול מה שחזר מהרשת
     setLive(snap.live ?? null);
     setPlan(snap.data?.plan ?? null);
+    setPubConfig(snap.config || {});
     const serialized = JSON.stringify(snap.data ?? null);
     if (serialized !== dataRef.current) {
       dataRef.current = serialized;
-      configureStore(makeReadOnlyStore(snap));
+      bootViewerStore(snap);
       setGeneration((g) => g + 1);
     }
     return snap;
@@ -97,11 +105,12 @@ export default function PublicApp({ slug }) {
     try {
       const cached = JSON.parse(localStorage.getItem(`poker:cache:pub:${slug}`) || "null");
       if (cached?.id) {
-        configureStore(makeReadOnlyStore(cached));
+        bootViewerStore(cached);
         dataRef.current = JSON.stringify(cached.data ?? null);
         setGroupId(cached.id);
         setLive(cached.live ?? null);
         setPlan(cached.data?.plan ?? null);
+        setPubConfig(cached.config || {});
         setPhase("ready");
       }
     } catch {}
@@ -171,10 +180,11 @@ export default function PublicApp({ slug }) {
     } catch {}
     setLive(next.live ?? null);
     setPlan(next.data?.plan ?? null);
+    setPubConfig(next.config || {});
     const serialized = JSON.stringify(next.data ?? null);
     if (serialized !== dataRef.current) {
       dataRef.current = serialized;
-      configureStore(makeReadOnlyStore(next));
+      bootViewerStore(next);
       setGeneration((g) => g + 1);
       setFresh(true);
       setTimeout(() => setFresh(false), 2500);
@@ -229,7 +239,7 @@ export default function PublicApp({ slug }) {
 
   const running = live?.players?.length > 0;
   const pot = running ? live.players.reduce((s, p) => s + (+p.buyin || 0), 0) : 0;
-  const cps = 2;
+  const cps = viewerCps({ config: pubConfig }, live);
 
   return (
     <>

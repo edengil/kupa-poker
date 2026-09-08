@@ -9,6 +9,8 @@ const DEFAULT_CONFIG = {
   chipsPerShekel: 2,
   defaultBuyin: 50,
   botOn: false, // הבוט בוואטסאפ מגיב רק כשהדגל דלוק; נדלק אוטומטית עם פתיחת משחק
+  /* צופים ב-/g/slug רואים גם היסטוריה; false = רק משחק חי + הזמנה */
+  shareHistory: true,
 };
 
 let _configCache = { ...DEFAULT_CONFIG };
