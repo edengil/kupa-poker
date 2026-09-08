@@ -2,8 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store, flushStore } from "../../lib/store";
-import { buildReport, buildSettlement, partitionByNet } from "../../lib/report";
-import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
+import { buildReport, partitionByNet } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "./colors";
 import { fmt, fmtGap } from "./format";
@@ -24,6 +23,7 @@ import {
 } from "./coupleFills";
 import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { ShareSheet } from "./ShareSheet";
+import { LiveSettlementBuilder } from "./LiveSettlementBuilder";
 import { PlanCard } from "./PlanCard";
 import { BotToggle } from "./BotToggle";
 import { PokerTable } from "./PokerTable";
@@ -121,6 +121,7 @@ export function LiveTab({
   const [addAmt, setAddAmt] = useState(50);
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
   const [share, setShare] = useState(null);
+  const [settleBuilder, setSettleBuilder] = useState(null);
   const [hydrated, setHydrated] = useState(false);
   const [startedAt, setStartedAt] = useState(null); // חותמת זמן התחלת המשחק
   const [prompt, setPrompt] = useState(null); // הצעה לשלוח עדכון אחרי כניסה
@@ -410,25 +411,9 @@ export function LiveTab({
     if (saved === false) {
       alert("הערב נשמר במכשיר, אבל השמירה לשרת נכשלה. השאר את המסך פתוח עד שמופיע «כל השינויים נשמרו».");
     }
-    // החלוקה מחושבת כאן ונשמרת לתצוגה מקדימה. היא לא נשלחת לשום מקום
-    // עד שתאשר אותה במסך השיתוף.
-    const split = buildSettlement(settle(players, cps), {
-      now: endedAt,
-      isCashOnly,
-      transferVerb,
-    });
-    /* סיכום + טיפים כמו בשיתוף מטאב ערבים; החלוקה בטאב נפרד ב־ShareSheet */
+    /* סיכום + טיפים; חלוקה ידנית במסך נפרד לפני שליחה לקבוצה */
     const summaryText = nightSummaryText({ ...rec, cps }, A);
-    setShare({
-      entries: entries.map(({ name, amount }) => ({ name, amount })),
-      d,
-      mo,
-      final: true,
-      startedAt: startedAt || null,
-      endedAt,
-      settlement: split,
-      raw: summaryText,
-    });
+    const playersSnap = players.map((p) => ({ ...p }));
     setPlayers([]);
     setEntriesCount("");
     setStartedAt(null);
@@ -438,6 +423,13 @@ export function LiveTab({
     setMenuIdx(null);
     // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
     if (getConfig().botOn) setConfig({ botOn: false });
+    setSettleBuilder({
+      players: playersSnap,
+      cps,
+      endedAt,
+      summaryText,
+      title: `חלוקה ${d}.${mo}.${y}`,
+    });
   }
 
   /* מילוי זוגי: כל לחיצה = 30 ג'יטונים מהערימה של from לשותף.
@@ -1091,6 +1083,18 @@ export function LiveTab({
             </span>
           </div>
         </>
+      )}
+
+      {settleBuilder && (
+        <LiveSettlementBuilder
+          players={settleBuilder.players}
+          cps={settleBuilder.cps}
+          endedAt={settleBuilder.endedAt}
+          summaryText={settleBuilder.summaryText}
+          title={settleBuilder.title}
+          onClose={() => setSettleBuilder(null)}
+          onDone={() => {}}
+        />
       )}
 
       {share && (
