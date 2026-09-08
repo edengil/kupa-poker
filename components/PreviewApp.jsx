@@ -25,7 +25,11 @@ export default function PreviewApp() {
   }, []);
 
   return <>
-    <div role="status" style={{ padding: 10, textAlign: "center", background: "#D9A441", color: "#0A2B21", fontSize: 13 }}>
+    <div
+      role="status"
+      data-testid="preview-banner"
+      style={{ padding: 10, textAlign: "center", background: "#D9A441", color: "#0A2B21", fontSize: 13 }}
+    >
       סביבת בדיקה מקומית · השינויים נשמרים בדפדפן בלבד · אין לשלוח הודעות לקבוצה
     </div>
     {ready && <PokerApp />}

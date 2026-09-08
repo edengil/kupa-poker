@@ -7,3 +7,7 @@ _scratch_wa/
 *.zip
 .vercel
 .env*
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

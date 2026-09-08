@@ -103,7 +103,10 @@ export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false }) {
           return (
             <button
               key={id}
+              type="button"
+              aria-label={label}
               aria-current={on ? "page" : undefined}
+              data-testid={`tab-${id}`}
               onClick={() => setTab(id)}
               style={{
                 flex: 1,

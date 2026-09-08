@@ -13,10 +13,12 @@ import { ChevronDown } from "./icons";
    ============================================================================ */
 
 /** כפתור אייקון קטן (שיתוף / עריכה / מחיקה). danger צובע באדום. */
-export function IconBtn({ children, onClick, danger }) {
+export function IconBtn({ children, onClick, danger, ...rest }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      {...rest}
       style={{
         background: C.feltDeep,
         border: `1px solid ${C.line}`,

@@ -174,6 +174,7 @@ export function LiveSettlementBuilder({
       <div
         role="dialog"
         aria-label="חלוקת תשלומים"
+        data-testid="live-settlement-builder"
         style={{
           width: "100%",
           maxWidth: 640,
@@ -190,7 +191,7 @@ export function LiveSettlementBuilder({
             <div style={sectionEyebrow}>חלוקה ידנית · רק אצלך</div>
             <h2 style={{ margin: "4px 0 0", fontSize: 17, color: C.cream }}>{title || "חלוקת ערב"}</h2>
           </div>
-          <IconBtn onClick={onClose} aria-label="סגור">
+          <IconBtn onClick={onClose} aria-label="סגור" data-testid="settlement-close">
             <X size={18} />
           </IconBtn>
         </div>

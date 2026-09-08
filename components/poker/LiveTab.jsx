@@ -493,11 +493,16 @@ export function LiveTab({
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addPlayer(name)}
               placeholder="שם"
+              aria-label="שם שחקן ללייב"
+              data-testid="live-player-name"
               style={{ ...inputStyle, marginTop: 4, width: "100%" }}
             />
           </div>
           <button
+            type="button"
             onClick={() => addPlayer(name)}
+            aria-label="הוסף שחקן"
+            data-testid="live-add-player"
             style={{
               ...brassCta,
               borderRadius: 9,
@@ -836,6 +841,8 @@ export function LiveTab({
                         }
                         onBlur={(e) => commitCashout(i, e.target.value.replace(/\D/g, ""))}
                         placeholder="—"
+                        aria-label={`יציאה ${p.name}`}
+                        data-testid={`live-cashout-${p.name}`}
                         style={{
                           ...inputStyle,
                           width: 66,
@@ -1000,8 +1007,11 @@ export function LiveTab({
           )}
 
           <button
+            type="button"
             onClick={saveNight}
             disabled={!canFinish}
+            data-testid="live-finish"
+            aria-label="סיים ערב"
             style={{
               ...(canFinish ? brassCta : brassCtaMuted),
               width: "100%",
@@ -1045,6 +1055,8 @@ export function LiveTab({
                   type="button"
                   onClick={undoAction}
                   title={labelAction(actionLog[actionLog.length - 1])}
+                  data-testid="live-undo"
+                  aria-label="בטל אחרון"
                   style={{
                     background: "none",
                     border: "none",
