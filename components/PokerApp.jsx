@@ -4,33 +4,62 @@
    הועבר אוטומטית מ-index.html המקורי. הלוגיקה לא שונתה.
    שינויים: שכבת האחסון הוחלפה ב-lib/store, ונוסף מצב readOnly.
    המודולים חולצו ל-components/poker/*; כאן נשארת רק מעטפת ה-App.
+   טאבים כבדים נטענים lazy כדי שהמסך הראשון (טבלה) יעלה מהר.
    ============================================================================ */
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback } from "react";
 import { store } from "../lib/store";
 import { C } from "./poker/colors";
 import { Header, TabBar, Style } from "./poker/chrome";
-import { SessionsTab } from "./poker/SessionsTab";
 import { Banner } from "./poker/Banner";
 import { TableTab } from "./poker/TableTab";
 import { normalize } from "./poker/db";
-import { InputTab } from "./poker/InputTab";
 import { brokenRecords } from "./poker/brokenRecords";
-import { RecordsTab } from "./poker/RecordsTab";
 import { RecordsAlert } from "./poker/RecordsAlert.jsx";
 import { normalizeRecordAlertLines } from "./poker/recordsAlert";
-import { PlayersTab } from "./poker/PlayersTab";
-import { ProfileSheet } from "./poker/ProfileSheet";
-import { LiveTab } from "./poker/LiveTab";
-import { PokerTable } from "./poker/PokerTable";
 import { DB_KEY, loadConfig } from "./poker/config";
-import { buildSeedDb } from "./poker/seed";
 import { applyChipBackfill } from "./poker/chipBackfill";
 import { applyTipBackfill } from "./poker/tipBackfill";
 import { PersonalHighlightsCard } from "./poker/PersonalHighlightsCard";
 import { PersonalStatsCard } from "./poker/PersonalStatsCard";
 import { MonthHeroesCard } from "./poker/MonthHeroesCard";
+import { RecentFormCard } from "./poker/RecentFormCard";
 import { matchViewerToPlayer } from "./poker/personalHighlights";
 import { EGFooter } from "./Logo";
+
+const LiveTab = lazy(() =>
+  import("./poker/LiveTab").then((m) => ({ default: m.LiveTab }))
+);
+const InputTab = lazy(() =>
+  import("./poker/InputTab").then((m) => ({ default: m.InputTab }))
+);
+const SessionsTab = lazy(() =>
+  import("./poker/SessionsTab").then((m) => ({ default: m.SessionsTab }))
+);
+const RecordsTab = lazy(() =>
+  import("./poker/RecordsTab").then((m) => ({ default: m.RecordsTab }))
+);
+const PlayersTab = lazy(() =>
+  import("./poker/PlayersTab").then((m) => ({ default: m.PlayersTab }))
+);
+const ProfileSheet = lazy(() =>
+  import("./poker/ProfileSheet").then((m) => ({ default: m.ProfileSheet }))
+);
+
+function TabFallback() {
+  return (
+    <div
+      role="status"
+      style={{
+        textAlign: "center",
+        padding: "28px 12px",
+        color: C.dim,
+        fontSize: 14,
+      }}
+    >
+      טוען…
+    </div>
+  );
+}
 
 // שיתוף אמין: (1) Web Share API — גיליון השיתוף של iOS, בוחרים וואטסאפ והקבוצה; הטקסט עובר נקי.
 // (2) נפילה להעתקה ללוח (כמו באפליקציית הטעינות). (3) נפילה אחרונה: deep-link ישיר לאפליקציה.
@@ -59,7 +88,6 @@ function App({
     setTabState(id);
     if (typeof onTabChange === "function") onTabChange(id);
   };
-  const canWrite = !readOnly;
   const [profile, setProfile] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -73,7 +101,10 @@ function App({
         } catch {
           throw new Error("הנתונים שהתקבלו אינם תקינים. לא בוצע שינוי בהיסטוריה.");
         }
-      } else d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
+      } else {
+        const { buildSeedDb } = await import("./poker/seed");
+        d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
+      }
       // גיבוי ג'יטונים מצ'אט אוג׳ 2026 — ממלא ערבים ישנים בלי שדה chips
       const chipsFilled = applyChipBackfill(d);
       // גיבוי טיפים חד־פעמי (למשל טיפ שנרשם אחרי סגירת הערב)
@@ -87,7 +118,9 @@ function App({
           store.set(DB_KEY, JSON.stringify(d));
         }
       }
-    })().catch((error) => { if (alive) setLoadError(error.message); });
+    })().catch((error) => {
+      if (alive) setLoadError(error.message);
+    });
     return () => {
       alive = false;
     };
@@ -141,7 +174,7 @@ function App({
   );
 
   if (!ready || !db) {
-  return (
+    return (
       <div
         dir="rtl"
         style={{
@@ -156,7 +189,11 @@ function App({
         <Style />
         <div role={loadError ? "alert" : "status"}>
           {loadError || "טוען…"}
-          {loadError && <button onClick={() => window.location.reload()} style={{ display: "block", margin: "16px auto" }}>נסה שוב</button>}
+          {loadError && (
+            <button onClick={() => window.location.reload()} style={{ display: "block", margin: "16px auto" }}>
+              נסה שוב
+            </button>
+          )}
         </div>
       </div>
     );
@@ -175,7 +212,7 @@ function App({
       <Style />
       <RecordsAlert lines={recordAlert} onDismiss={dismissRecordAlert} />
       <div
-                style={{
+        style={{
           maxWidth: 640,
           margin: "0 auto",
           padding: "0 13px calc(90px + env(safe-area-inset-bottom))",
@@ -193,56 +230,63 @@ function App({
           setMo={setPeriodMo}
         />
         {tab === "table" && <MonthHeroesCard db={db} onPlayer={setProfile} />}
+        {tab === "table" && (
+          <RecentFormCard db={db} playerName={viewerName} onPlayer={setProfile} />
+        )}
         {showPersonal && tab === "table" && (
           <>
             <PersonalStatsCard db={db} playerName={viewerName} compact />
             <PersonalHighlightsCard db={db} playerName={viewerName} compact />
           </>
         )}
-        {tab === "input" ? (
-          <InputTab db={db} commit={commit} years={years} />
-        ) : tab === "live" ? (
-          <LiveTab
-            db={db}
-            commit={commit}
-            onGameStart={onGameStart}
-            renderRsvps={renderRsvps}
-            onRecords={handleRecords}
-            onPlanShared={onPlanShared}
-          />
-        ) : tab === "sessions" ? (
-          <SessionsTab
-            db={db}
-            commit={commit}
-            goEdit={(r) => {
-              setTab("input");
-              setTimeout(() => window.__loadRaw?.(r), 0);
-            }}
-          />
-        ) : tab === "table" ? (
-          <TableTab
-            db={db}
-            commit={commit}
-            years={years}
-            readOnly={readOnly}
-            scope={scope}
-            setScope={setScope}
-            y={y}
-            setY={setPeriodY}
-            mo={mo}
-            setMo={setPeriodMo}
-          />
-        ) : tab === "stats" && statsPanel ? (
-          statsPanel
-        ) : tab === "records" ? (
-          <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} allowPick={!readOnly} />
-        ) : (
-          <PlayersTab db={db} onPlayer={setProfile} />
-        )}
+        <Suspense fallback={<TabFallback />}>
+          {tab === "input" ? (
+            <InputTab db={db} commit={commit} years={years} />
+          ) : tab === "live" ? (
+            <LiveTab
+              db={db}
+              commit={commit}
+              onGameStart={onGameStart}
+              renderRsvps={renderRsvps}
+              onRecords={handleRecords}
+              onPlanShared={onPlanShared}
+            />
+          ) : tab === "sessions" ? (
+            <SessionsTab
+              db={db}
+              commit={commit}
+              goEdit={(r) => {
+                setTab("input");
+                setTimeout(() => window.__loadRaw?.(r), 0);
+              }}
+            />
+          ) : tab === "table" ? (
+            <TableTab
+              db={db}
+              commit={commit}
+              years={years}
+              readOnly={readOnly}
+              scope={scope}
+              setScope={setScope}
+              y={y}
+              setY={setPeriodY}
+              mo={mo}
+              setMo={setPeriodMo}
+            />
+          ) : tab === "stats" && statsPanel ? (
+            statsPanel
+          ) : tab === "records" ? (
+            <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} allowPick={!readOnly} />
+          ) : (
+            <PlayersTab db={db} onPlayer={setProfile} />
+          )}
+        </Suspense>
         <EGFooter />
-    </div>
+      </div>
       {profile && (
-        <ProfileSheet db={db} name={profile} onClose={() => setProfile(null)} />
+        <Suspense fallback={null}>
+          <ProfileSheet db={db} name={profile} onClose={() => setProfile(null)} />
+        </Suspense>
       )}
       <TabBar
         tab={tab}
@@ -256,4 +300,5 @@ function App({
 }
 
 export default App;
-export { PokerTable, brokenRecords };
+export { PokerTable } from "./poker/PokerTable";
+export { brokenRecords };

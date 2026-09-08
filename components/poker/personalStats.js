@@ -293,6 +293,13 @@ export function computePersonalStats(db, playerName, opts = {}) {
   }
 
   const last = nights[nights.length - 1];
+  const recentForm = nights.slice(-8).map((n) => ({
+    iso: n.iso,
+    d: n.d,
+    mo: n.mo,
+    y: n.y,
+    amount: n.amount,
+  }));
   const firstMins = [];
   for (const n of nights) {
     const row = chatMap?.[n.iso];
@@ -357,6 +364,7 @@ export function computePersonalStats(db, playerName, opts = {}) {
     hourlyNights: timed.length,
     bestChips,
     lastNight: last,
+    recentForm,
     avgFirstMins,
     arrivalNights: firstMins.length,
     partners,
@@ -523,6 +531,36 @@ export function personalStatRows(stats, { compact = false } = {}) {
       detail: `${stats.hostedCount} פעמים · נטו ${fmt(stats.hostedNet)}`,
       tone: (stats.hostedNet ?? 0) >= 0 ? "win" : "loss",
       note: "סכום הנטו בערבים שאירחת אצלך",
+    });
+  }
+
+  /* רצף פעיל וטופס — גם במסך הבית (קומפקטי), לא רק בפרופיל המלא */
+  if (stats.currentWinStreak >= 2) {
+    push({
+      icon: "🎖️",
+      title: "רצף ניצחונות פעיל",
+      detail: `${stats.currentWinStreak} ערבים`,
+      tone: "win",
+    });
+  } else if (stats.currentLossStreak >= 2) {
+    push({
+      icon: "🌧️",
+      title: "רצף הפסדים פעיל",
+      detail: `${stats.currentLossStreak} ערבים`,
+      tone: "loss",
+    });
+  }
+  if (stats.recentForm?.length) {
+    const text = stats.recentForm
+      .map((n) => (n.amount > 0 ? "נ" : n.amount < 0 ? "ה" : "ת"))
+      .join(" ");
+    const net = r2(stats.recentForm.reduce((s, n) => s + n.amount, 0));
+    push({
+      icon: "◆",
+      title: `טופס ${stats.recentForm.length} אחרונים`,
+      detail: text,
+      note: `נטו ${fmt(net)}`,
+      tone: net >= 0 ? "win" : "loss",
     });
   }
 
