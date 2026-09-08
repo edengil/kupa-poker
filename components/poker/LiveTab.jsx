@@ -9,6 +9,7 @@ import { C } from "./colors";
 import { fmt, fmtGap } from "./format";
 import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "./helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
+import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "./config";
 import { brokenRecords } from "./brokenRecords";
 import {
@@ -127,10 +128,12 @@ export function LiveTab({
   /* טיפים + מילוי זוגי — נשמרים בלייב; מילוי זוגי רק מהאפליקציה (לא בוואטסאפ) */
   const [tips, setTips] = useState([]);
   const [coupleFills, setCoupleFills] = useState([]);
+  const [actionLog, setActionLog] = useState([]);
   const [menuIdx, setMenuIdx] = useState(null); // תפריט עדין למילוי זוגי
   const longPressRef = useRef(null);
   /* שדות שהבוט כותב (applied/pending/closing/מחמאות) — נשמרים כדי לא לדרוס אותם */
   const liveMetaRef = useRef({});
+  const cashoutDraftRef = useRef({}); // ערך יצא לפני עריכה — ליומן ביטול
 
   // שחזור משחק פעיל אחרי סגירת האפליקציה
   useEffect(() => {
@@ -149,6 +152,7 @@ export function LiveTab({
           if (d.startedAt) setStartedAt(d.startedAt);
           if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
+          if (Array.isArray(d.actionLog)) setActionLog(d.actionLog);
           liveMetaRef.current = {
             applied: d.applied,
             pending: d.pending,
@@ -186,9 +190,10 @@ export function LiveTab({
         startedAt,
         tips,
         coupleFills,
+        actionLog,
       })
     );
-  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, hydrated]);
+  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, hydrated]);
 
   // ההצעה נעלמת לבד אחרי 15 שניות כדי לא להפריע
   useEffect(() => {
@@ -227,11 +232,13 @@ export function LiveTab({
         },
       ];
     });
+    setActionLog((log) => appendAction(log, { t: "seat", name: nm, amount: addAmt }));
     setName("");
   };
   const GRACE_MS = 10 * 60 * 1000; // 10 דק' חסד בתחילת המשחק — לא מציעים לשלוח
   const bump = (i, amt) => {
     const at = Date.now();
+    const nm = players[i] && players[i].name;
     setPlayers((p) =>
       p.map((x, j) => {
         if (j !== i) return x;
@@ -245,8 +252,8 @@ export function LiveTab({
         return next;
       })
     );
+    if (nm && amt) setActionLog((log) => appendAction(log, { t: "buyin", name: nm, amount: amt }));
     if (amt > 0 && startedAt && Date.now() - startedAt > GRACE_MS) {
-      const nm = players[i] && players[i].name;
       setPrompt({
         name: nm,
         amt,
@@ -265,7 +272,37 @@ export function LiveTab({
           : x
       )
     );
-  const rm = (i) => setPlayers((p) => p.filter((_, j) => j !== i));
+  const commitCashout = (i, nextCashout) => {
+    const p = players[i];
+    if (!p) return;
+    const before =
+      cashoutDraftRef.current[p.name] !== undefined
+        ? cashoutDraftRef.current[p.name]
+        : p.cashout;
+    const chips = String(nextCashout ?? "");
+    if (String(before ?? "") === chips) return;
+    setField(i, { cashout: chips });
+    setActionLog((log) =>
+      appendAction(log, { t: "cashout", name: p.name, chips, before: before ?? "" })
+    );
+    delete cashoutDraftRef.current[p.name];
+  };
+  const rm = (i) => {
+    const p = players[i];
+    if (!p) return;
+    setActionLog((log) =>
+      appendAction(log, { t: "remove", name: p.name, at: i, player: { ...p } })
+    );
+    setPlayers((list) => list.filter((_, j) => j !== i));
+  };
+  const undoAction = () => {
+    const out = undoLast({ players, tips, coupleFills, actionLog });
+    if (!out) return;
+    setPlayers(out.players);
+    setTips(out.tips);
+    setCoupleFills(out.coupleFills);
+    setActionLog(out.actionLog);
+  };
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
   const potChips = pot * cps;
   const nets = players.map((p) => ({
@@ -397,6 +434,7 @@ export function LiveTab({
     setStartedAt(null);
     setTips([]);
     setCoupleFills([]);
+    setActionLog([]);
     setMenuIdx(null);
     // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
     if (getConfig().botOn) setConfig({ botOn: false });
@@ -414,6 +452,14 @@ export function LiveTab({
     }
     setPlayers(res.players);
     setCoupleFills((f) => [...f, res.event]);
+    setActionLog((log) =>
+      appendAction(log, {
+        t: "fill",
+        from: res.event.from,
+        to: res.event.to,
+        chips: res.event.chips,
+      })
+    );
     setMenuIdx(null);
   }
 
@@ -788,11 +834,15 @@ export function LiveTab({
                       <span style={{ fontSize: 11.5, color: C.dim }}>יצא (ג&apos;יטונים)</span>
                       <input
                         value={p.cashout}
+                        onFocus={() => {
+                          cashoutDraftRef.current[p.name] = p.cashout;
+                        }}
                         onChange={(e) =>
                           setField(i, {
                             cashout: e.target.value.replace(/\D/g, ""),
                           })
                         }
+                        onBlur={(e) => commitCashout(i, e.target.value.replace(/\D/g, ""))}
                         placeholder="—"
                         style={{
                           ...inputStyle,
@@ -973,6 +1023,16 @@ export function LiveTab({
             סיים · שמור · שלח סיכום
           </button>
           {!canFinish && <p role="status" style={{ color: C.dim, fontSize: 13 }}>יש להשלים ג׳יטונים ביציאה לכל השחקנים, כולל 0 למי שהפסיד הכול.</p>}
+          {actionLog.length > 0 && (
+            <details style={{ marginTop: 10, color: C.dim, fontSize: 12 }}>
+              <summary style={{ cursor: "pointer" }}>יומן פעולות ({actionLog.length})</summary>
+              <ul style={{ margin: "8px 0 0", paddingInlineStart: 18, lineHeight: 1.7 }}>
+                {[...actionLog].reverse().slice(0, 8).map((a) => (
+                  <li key={a.id}>{labelAction(a)}</li>
+                ))}
+              </ul>
+            </details>
+          )}
           <div
             style={{
               marginTop: 10,
@@ -987,12 +1047,32 @@ export function LiveTab({
               <CheckCircle2 size={13} color={C.win} />
               המשחק נשמר אוטומטית
             </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {actionLog.length > 0 && (
+                <button
+                  type="button"
+                  onClick={undoAction}
+                  title={labelAction(actionLog[actionLog.length - 1])}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: C.brass,
+                    fontSize: 11.5,
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  בטל אחרון
+                </button>
+              )}
             <button
               onClick={() => {
                 if (confirm("לבטל את המשחק הפעיל? הנתונים שלו יימחקו.")) {
                   setPlayers([]);
                   setTips([]);
                   setCoupleFills([]);
+                  setActionLog([]);
                   setMenuIdx(null);
                 }
               }}
@@ -1008,6 +1088,7 @@ export function LiveTab({
             >
               בטל משחק
             </button>
+            </span>
           </div>
         </>
       )}
