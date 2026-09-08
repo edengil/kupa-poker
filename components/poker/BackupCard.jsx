@@ -81,7 +81,7 @@ export function BackupCard({ db, commit }) {
           <Download size={16} />
           גיבוי JSON
         </button>
-        <button type="button" onClick={() => fileRef.current?.click()} style={btn}>
+        <button type="button" onClick={() => fileRef.current?.click()} style={btn} data-testid="backup-import-btn">
           <Upload size={16} />
           ייבוא
         </button>
@@ -90,17 +90,40 @@ export function BackupCard({ db, commit }) {
           type="file"
           accept=".json,application/json"
           onChange={onFile}
+          data-testid="backup-import-input"
           style={{ display: "none" }}
         />
       </div>
-      {error && <p role="alert" style={{ color: C.loss }}>{error}</p>}
-      {candidate && <div style={{ marginTop: 12, lineHeight: 1.7 }}>
-        <p>הגיבוי מכיל {candidate.sessions.length} ערבים ו־{candidate.yearly.length} מאזנים שנתיים. אישור יחליף את הנתונים הנוכחיים. תחילה יירד גיבוי של הנתונים הקיימים.</p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={btn} onClick={() => { exportDb(db); commit(candidate); setCandidate(null); }}>גבה והחלף נתונים</button>
-          <button style={btn} onClick={() => setCandidate(null)}>ביטול</button>
+      {error && (
+        <p role="alert" data-testid="backup-import-error" style={{ color: C.loss }}>
+          {error}
+        </p>
+      )}
+      {candidate && (
+        <div style={{ marginTop: 12, lineHeight: 1.7 }} data-testid="backup-import-confirm">
+          <p>
+            הגיבוי מכיל {candidate.sessions.length} ערבים ו־{candidate.yearly.length} מאזנים שנתיים. אישור
+            יחליף את הנתונים הנוכחיים. תחילה יירד גיבוי של הנתונים הקיימים.
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              data-testid="backup-import-apply"
+              style={btn}
+              onClick={() => {
+                exportDb(db);
+                commit(candidate);
+                setCandidate(null);
+              }}
+            >
+              גבה והחלף נתונים
+            </button>
+            <button type="button" style={btn} onClick={() => setCandidate(null)}>
+              ביטול
+            </button>
+          </div>
         </div>
-      </div>}
+      )}
     </div>
   );
 }
