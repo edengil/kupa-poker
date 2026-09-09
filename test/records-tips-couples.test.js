@@ -4,6 +4,7 @@ import { nextTipCompliment, formatTipCompliment, TIP_COMPLIMENTS } from "../lib/
 import { computeChipRecords, bestChipCashout } from "../components/poker/chipRecords.js";
 import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS, FILL_COUPLES } from "../components/poker/coupleFills.js";
 import { computeTipRecords } from "../components/poker/tipRecords.js";
+import { computeExtraRecords, weekdayFromStart } from "../components/poker/extraRecords.js";
 import {
   sessionDurationMs,
   timedSessions,
@@ -352,6 +353,86 @@ describe("tip records", () => {
     expect(recs.mostTipChipsNight).toMatchObject({ name: "אופיר סנה", chips: 40 });
     expect(recs.mostTipChipsNight2).toMatchObject({ name: "נתנאל כהן", chips: 24 });
     expect(recs.mostTipChipsNight3).toMatchObject({ name: "דן ינקלויץ", chips: 20 });
+  });
+
+  it("explains biggest single tip vs total tip chips in one night", () => {
+    const db = {
+      aliases: {},
+      sessions: [
+        {
+          iso: "2026-08-01",
+          d: 1,
+          mo: 8,
+          y: 2026,
+          entries: [{ name: "עדן", amount: 10 }],
+          tips: [
+            { name: "עדן", amount: 20, at: 1 },
+            { name: "עדן", amount: 16, at: 2 },
+          ],
+        },
+        {
+          iso: "2026-08-08",
+          d: 8,
+          mo: 8,
+          y: 2026,
+          entries: [{ name: "ירין", amount: 0 }],
+          tips: [{ name: "ירין", amount: 50, at: 1 }],
+        },
+      ],
+    };
+    const recs = computeTipRecords(db);
+    expect(recs.biggestTip).toMatchObject({ name: "ירין מלאך", amount: 50 });
+    expect(recs.mostTipChipsNight).toMatchObject({ name: "ירין מלאך", chips: 50 });
+    expect(recs.mostTipChipsNight2).toMatchObject({ name: "עדן גיל", chips: 36 });
+    expect(recs.lastTipsNight).toMatchObject({
+      d: 8,
+      mo: 8,
+      y: 2026,
+      count: 1,
+      chips: 50,
+      leader: { name: "ירין מלאך", chips: 50 },
+    });
+  });
+});
+
+describe("weekday from start", () => {
+  it("uses startedAt instead of session iso date", () => {
+    const wedStart = Date.parse("2026-08-05T21:00:00+03:00"); // Wednesday
+    expect(weekdayFromStart({
+      iso: "2026-08-06",
+      startedAt: wedStart,
+    })).toBe("רביעי");
+  });
+
+  it("groups longest weekday by start day in extra records", () => {
+    const wedStart = Date.parse("2026-08-05T21:00:00+03:00");
+    const wedEnd = Date.parse("2026-08-06T02:00:00+03:00");
+    const thuStart = Date.parse("2026-08-06T21:00:00+03:00");
+    const thuEnd = Date.parse("2026-08-07T01:00:00+03:00");
+
+    const mk = (iso, startedAt, endedAt, n) => ({
+      iso,
+      d: +iso.slice(-2),
+      mo: 8,
+      y: 2026,
+      startedAt,
+      endedAt,
+      entries: Array.from({ length: n }, (_, i) => ({ name: `p${i}`, amount: 0 })),
+    });
+
+    const db = {
+      sessions: [
+        mk("2026-08-06", wedStart, wedEnd, 4),
+        mk("2026-08-07", wedStart, wedEnd, 4),
+        mk("2026-08-08", wedStart, wedEnd, 4),
+        mk("2026-08-07", thuStart, thuEnd, 4),
+        mk("2026-08-08", thuStart, thuEnd, 4),
+        mk("2026-08-09", thuStart, thuEnd, 4),
+      ],
+    };
+
+    const recs = computeExtraRecords(db, { nightsMap: {}, spans: {}, hostsMap: {} });
+    expect(recs.longestDay.day).toBe("רביעי");
   });
 });
 

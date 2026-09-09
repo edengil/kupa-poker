@@ -175,6 +175,9 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
         <div style={sectionTitle({ margin: "12px 2px 0" })}>
           💸 שיאי טיפים
         </div>
+        <p style={{ margin: "0 2px 8px", color: C.dim, fontSize: 11.5, lineHeight: 1.6 }}>
+          כל כרטיס מודד משהו אחר: &quot;טיפ בודד&quot; הוא פעולה אחת, &quot;ג&apos;יטוני טיפ בערב&quot; הוא סכום כל הטיפים של אותו שחקן באותו ערב.
+        </p>
         {!recs.tips ? (
           <div style={{
             background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
@@ -189,7 +192,7 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
         ) : (
           <>
             {recs.tips.biggestTip && (
-              <Card icon="💎" title="הטיפ הגדול ביותר" holder={recs.tips.biggestTip.name}
+              <Card icon="💎" title="הטיפ הבודד הגדול ביותר" holder={recs.tips.biggestTip.name}
                 value={`${recs.tips.biggestTip.amount} ג'`} tone={C.win}
                 sub={dt(recs.tips.biggestTip)}
                 runner={recs.tips.biggestTip2 &&
@@ -205,13 +208,19 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
                   `${recs.tips.mostTipsNight2.name} · ${recs.tips.mostTipsNight2.count} טיפים · ${dt(recs.tips.mostTipsNight2)}`} />
             )}
             {recs.tips.mostTipChipsNight && (
-              <Card icon="🪙" title="הכי הרבה ג'יטוני טיפ בערב" holder={recs.tips.mostTipChipsNight.name}
+              <Card icon="🪙" title="הכי הרבה ג'יטוני טיפ בערב אחד" holder={recs.tips.mostTipChipsNight.name}
                 value={`${recs.tips.mostTipChipsNight.chips} ג'`}
                 sub={dt(recs.tips.mostTipChipsNight)}
                 runner={recs.tips.mostTipChipsNight2 &&
                   `${recs.tips.mostTipChipsNight2.name} · ${recs.tips.mostTipChipsNight2.chips} ג' · ${dt(recs.tips.mostTipChipsNight2)}`}
                 third={recs.tips.mostTipChipsNight3 &&
                   `${recs.tips.mostTipChipsNight3.name} · ${recs.tips.mostTipChipsNight3.chips} ג' · ${dt(recs.tips.mostTipChipsNight3)}`} />
+            )}
+            {recs.tips.lastTipsNight && (
+              <Card icon="🕘" title="טיפי הערב האחרון"
+                holder={recs.tips.lastTipsNight.leader ? recs.tips.lastTipsNight.leader.name : "ללא מוביל"}
+                value={`${recs.tips.lastTipsNight.chips} ג'`}
+                sub={`${dt(recs.tips.lastTipsNight)} · ${recs.tips.lastTipsNight.count} טיפים`} />
             )}
             {recs.tips.monthKing && (
               <Card icon="🏅" title={`מלך הטיפים · ${recs.tips.monthLabel}`}
@@ -417,7 +426,7 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
               <Card icon="📆" title="היום בשבוע הכי ארוך לקבוצה"
                 holder={`יום ${recs.extra.longestDay.day}`}
                 value={durWords(recs.extra.longestDay.avgMs)}
-                sub={`ממוצע משך · ${recs.extra.longestDay.n} ערבים`} />
+                sub={`ממוצע משך · ${recs.extra.longestDay.n} ערבים · לפי יום התחלה`} />
             )}
             {recs.extra.richestDay && (
               <Card icon="💰" title="היום בשבוע הכי פעיל לקבוצה"

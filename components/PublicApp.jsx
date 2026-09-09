@@ -47,18 +47,50 @@ export default function PublicApp({ slug }) {
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
   const tabRef = useRef("table"); // רענון נתונים לא מחזיר את הצופה לטבלה
 
-  // Permission-sensitive snapshots are fetched fresh; never render old history from disk.
   const load = useCallback(async () => {
-    try { localStorage.removeItem(`poker:cache:pub:${slug}`); } catch {}
+    const cacheKey = `poker:cache:pub:${slug}`;
+
+    const apply = (snap) => {
+      bootViewerStore(snap);
+      dataRef.current = JSON.stringify([snap.data, snap.config]);
+      setGroupId(snap.id);
+      setLive(snap.live ?? null);
+      setPlan(snap.data?.plan ?? null);
+      setPubConfig(snap.config || {});
+      setPhase("ready");
+    };
+
+    let cached = null;
+    try {
+      const raw = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      if (raw?.v2 === true && raw?.snap?.id) cached = raw.snap;
+      else if (raw?.id) localStorage.removeItem(cacheKey);
+    } catch {}
+
+    if (cached) apply(cached);
+
     const snap = await fetchSnapshot(supabase, slug);
-    if (!snap) { setPhase("missing"); return null; }
-    bootViewerStore(snap);
-    dataRef.current = JSON.stringify([snap.data, snap.config]);
-    setGroupId(snap.id);
-    setLive(snap.live ?? null);
-    setPlan(snap.data?.plan ?? null);
-    setPubConfig(snap.config || {});
-    setPhase("ready");
+    if (!snap) {
+      if (!cached) setPhase("missing");
+      return cached || null;
+    }
+
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({ v2: true, snap }));
+    } catch {}
+
+    if (!cached) {
+      apply(snap);
+      return snap;
+    }
+
+    const serialized = JSON.stringify([snap.data, snap.config]);
+    if (serialized !== dataRef.current) {
+      apply(snap);
+      setGeneration((g) => g + 1);
+      setFresh(true);
+      setTimeout(() => setFresh(false), 2500);
+    }
     return snap;
   }, [supabase, slug]);
 
@@ -125,6 +157,9 @@ export default function PublicApp({ slug }) {
   const refresh = useCallback(async () => {
     const next = await fetchSnapshot(supabase, slug);
     if (!next) { setPhase("missing"); return; }
+    try {
+      localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap: next }));
+    } catch {}
     setLive(next.live ?? null);
     setPlan(next.data?.plan ?? null);
     setPubConfig(next.config || {});

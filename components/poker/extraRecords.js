@@ -25,6 +25,22 @@ export function weekdayHe(iso) {
   return DAYS_HE[d.getDay()] || null;
 }
 
+/** יום בשבוע לפי שעת התחלה — לא לפי תאריך הסיום. */
+export function weekdayFromStart(s, spans = CHAT_NIGHT_SPANS) {
+  const startedAt = Number(s?.startedAt);
+  if (Number.isFinite(startedAt) && startedAt > 0) {
+    const d = new Date(startedAt);
+    return DAYS_HE[d.getDay()] || null;
+  }
+  const span = (s?.iso && (spans?.[s.iso] || spans?.[prevIso(s.iso)])) || null;
+  const chatStart = Number(span?.s);
+  if (Number.isFinite(chatStart) && chatStart > 0) {
+    const d = new Date(chatStart);
+    return DAYS_HE[d.getDay()] || null;
+  }
+  return weekdayHe(s?.iso);
+}
+
 export function clockParts(ts) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: IL_TZ,
@@ -173,7 +189,7 @@ export function computeExtraRecords(db, opts = {}) {
   for (const s of sessions) {
     const durationMs = sessionDurationMs(s, spans);
     const hours = durationMs != null && durationMs > 0 ? durationMs / 3600000 : null;
-    const day = weekdayHe(s.iso);
+    const day = weekdayFromStart(s, spans);
     const host = hostForSession(s, A, hostsMap);
     const rows = [];
     let moved = 0;

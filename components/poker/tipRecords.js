@@ -47,6 +47,15 @@ function rank(list, key) {
   return [sorted[0] || null, sorted[1] || null, sorted[2] || null];
 }
 
+function topTipperInNight(night) {
+  if (!night) return null;
+  const rows = Object.entries(night.byName)
+    .filter(([k]) => !k.endsWith("__count") && !k.includes("__"))
+    .map(([name, chips]) => ({ name, chips }))
+    .sort((a, b) => b.chips - a.chips);
+  return rows[0] || null;
+}
+
 /**
  * @returns {null | object} שיאי טיפים לתצוגה ב-RecordsTab
  */
@@ -103,6 +112,8 @@ export function computeTipRecords(db) {
 
   const monthTotals = sumBy(monthNights);
   const allTotals = sumBy(nights);
+  const lastTipsNight = nights[nights.length - 1] || null;
+  const lastTipsLeader = topTipperInNight(lastTipsNight);
 
   return {
     monthLabel: `${MONTHS[last.mo - 1]} ${last.y}`,
@@ -114,6 +125,16 @@ export function computeTipRecords(db) {
     mostTipChipsNight,
     mostTipChipsNight2,
     mostTipChipsNight3,
+    lastTipsNight: lastTipsNight
+      ? {
+          d: lastTipsNight.s.d,
+          mo: lastTipsNight.s.mo,
+          y: lastTipsNight.s.y,
+          count: lastTipsNight.count,
+          chips: lastTipsNight.chips,
+          leader: lastTipsLeader,
+        }
+      : null,
     monthKing: monthTotals[0] || null,
     monthKing2: monthTotals[1] || null,
     monthKing3: monthTotals[2] || null,
