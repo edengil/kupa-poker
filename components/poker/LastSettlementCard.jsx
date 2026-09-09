@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
+import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { C } from "./colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "./festive";
 import { settlementTextForSession } from "../../lib/nightShare";
@@ -11,6 +12,7 @@ import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
  * מחושב תמיד מחדש; גלוי גם לצופים ב־/g/{slug}.
  */
 export function LastSettlementCard({ db, commit, readOnly = false }) {
+  const [editing, setEditing] = useState(false);
   const card = useMemo(() => {
     const sessions = db?.sessions || [];
     if (!sessions.length) return null;
@@ -43,6 +45,7 @@ export function LastSettlementCard({ db, commit, readOnly = false }) {
       }}
       aria-label={`חלוקה אחרונה ${session.d}.${session.mo}.${session.y}`}
     >
+      {editing && <SavedSettlementEditor db={db} commit={commit} sessionId={session.id} onClose={() => setEditing(false)} />}
       <div style={festiveGlow} aria-hidden />
       <div style={{ position: "relative" }}>
         <div style={{ ...sectionEyebrow, marginBottom: 8 }}>
@@ -59,6 +62,7 @@ export function LastSettlementCard({ db, commit, readOnly = false }) {
         >
           {paidCount} מתוך {transfers.length} העברות סומנו כשולמו · נותרו {outstanding.toLocaleString("he-IL")}₪
         </p>
+        {!readOnly && commit && <button onClick={() => setEditing(true)} style={{ color: C.brass, background: C.feltDeep, border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, marginBottom: 8 }}>עריכת חלוקה ידנית</button>}
         <div
           dir="rtl"
           style={{

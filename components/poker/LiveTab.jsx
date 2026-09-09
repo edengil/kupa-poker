@@ -23,7 +23,7 @@ import {
 } from "./coupleFills";
 import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { ShareSheet } from "./ShareSheet";
-import { LiveSettlementBuilder } from "./LiveSettlementBuilder";
+import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { PlanCard } from "./PlanCard";
 import { BotToggle } from "./BotToggle";
 import { PokerTable } from "./PokerTable";
@@ -425,6 +425,7 @@ export function LiveTab({
     // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
     if (getConfig().botOn) setConfig({ botOn: false });
     setSettleBuilder({
+      sessionId: rec.id,
       players: playersSnap,
       cps,
       endedAt,
@@ -1099,14 +1100,9 @@ export function LiveTab({
       )}
 
       {settleBuilder && (
-        <LiveSettlementBuilder
-          players={settleBuilder.players}
-          cps={settleBuilder.cps}
-          endedAt={settleBuilder.endedAt}
-          summaryText={settleBuilder.summaryText}
-          title={settleBuilder.title}
+        <SavedSettlementEditor
+          db={db} commit={commit} sessionId={settleBuilder.sessionId}
           onClose={() => setSettleBuilder(null)}
-          onDone={() => {}}
         />
       )}
 

@@ -29,10 +29,14 @@ export function LiveSettlementBuilder({
   title,
   onClose,
   onDone,
+  initialPayments = [],
+  onChange,
 }) {
   const opening = useMemo(() => openingBalances(players, cps), [players, cps]);
-  const [balances, setBalances] = useState(opening.balances);
-  const [manualPayments, setManualPayments] = useState([]);
+  const [balances, setBalances] = useState(() =>
+    initialPayments.reduce((b, p) => applyManualPayment(b, p), opening.balances)
+  );
+  const [manualPayments, setManualPayments] = useState(initialPayments);
   const [fromName, setFromName] = useState("");
   const [toName, setToName] = useState("");
   const [amount, setAmount] = useState("");
@@ -79,11 +83,10 @@ export function LiveSettlementBuilder({
         to: toName,
         amount: +amount,
       });
+      const payments = [...manualPayments, { from: fromName, to: toName, amount: Math.round(+amount), id: crypto.randomUUID() }];
+      onChange?.(payments);
       setBalances(next);
-      setManualPayments((list) => [
-        ...list,
-        { from: fromName, to: toName, amount: Math.round(+amount), id: `m_${Date.now()}` },
-      ]);
+      setManualPayments(payments);
       const stillOwes = Math.max(0, -(next[fromName] || 0));
       if (stillOwes > 0) {
         const creds = creditorsOf(next);
@@ -106,6 +109,7 @@ export function LiveSettlementBuilder({
     const kept = manualPayments.slice(0, -1);
     let next = { ...opening.balances };
     for (const p of kept) next = applyManualPayment(next, p);
+    onChange?.(kept);
     setManualPayments(kept);
     setBalances(next);
     setErr("");
@@ -197,7 +201,7 @@ export function LiveSettlementBuilder({
         </div>
 
         <p style={{ margin: "0 0 12px", color: C.dim, fontSize: 13, lineHeight: 1.5 }}>
-          סמן מי שילם למי במציאות. אפשר לערוך סכום. מה שנשאר יחושב אוטומטית לפני השליחה לקבוצה.
+          סמן מי שילם למי במציאות. כל רישום נשמר בערב ומופיע כשולם בטבלה. מה שנשאר יחושב אוטומטית לפני השליחה לקבוצה.
         </p>
 
         {debtors.length === 0 ? (

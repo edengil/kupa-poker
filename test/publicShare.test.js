@@ -26,7 +26,8 @@ describe("publicShare", () => {
     expect(out.data.yearly).toEqual([]);
     expect(out.data.monthly).toEqual([]);
     expect(out.data.plan).toEqual({ iso: "2026-09-10" });
-    expect(out.data.roster).toEqual(["דן"]);
+    expect(out.data.roster).toEqual([]);
+    expect(out.data.aliases).toEqual({});
   });
 
   it("reads chips-per-shekel from config for viewers", () => {

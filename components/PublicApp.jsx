@@ -47,73 +47,23 @@ export default function PublicApp({ slug }) {
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
   const tabRef = useRef("table"); // רענון נתונים לא מחזיר את הצופה לטבלה
 
-  /* ---------------------- טעינה אחרי התחברות ----------------------
-     העתק אחרון של התמונה נשמר ב-localStorage: בביקור חוזר הדף עולה מיד
-     ממנו, והרשת רק מיישרת ברקע (בדיוק כמו רענון רגיל). */
+  // Permission-sensitive snapshots are fetched fresh; never render old history from disk.
   const load = useCallback(async () => {
-    const cacheKey = `poker:cache:pub:${slug}`;
-
-    const apply = (snap) => {
-      bootViewerStore(snap);
-      dataRef.current = JSON.stringify(snap.data ?? null);
-      setGroupId(snap.id);
-      setLive(snap.live ?? null);
-      setPlan(snap.data?.plan ?? null);
-      setPubConfig(snap.config || {});
-      setPhase("ready");
-    };
-
-    let cached = null;
-    try {
-      cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
-    } catch {}
-    if (cached?.id) apply(cached);
-
+    try { localStorage.removeItem(`poker:cache:pub:${slug}`); } catch {}
     const snap = await fetchSnapshot(supabase, slug);
-    if (!snap) {
-      if (!cached?.id) setPhase("missing");
-      return cached?.id ? cached : null;
-    }
-    try {
-      localStorage.setItem(cacheKey, JSON.stringify(snap));
-    } catch {}
-
-    if (!cached?.id) {
-      apply(snap);
-      return snap;
-    }
-
-    // עלינו מהמטמון — מיישרים מול מה שחזר מהרשת
+    if (!snap) { setPhase("missing"); return null; }
+    bootViewerStore(snap);
+    dataRef.current = JSON.stringify([snap.data, snap.config]);
+    setGroupId(snap.id);
     setLive(snap.live ?? null);
     setPlan(snap.data?.plan ?? null);
     setPubConfig(snap.config || {});
-    const serialized = JSON.stringify(snap.data ?? null);
-    if (serialized !== dataRef.current) {
-      dataRef.current = serialized;
-      bootViewerStore(snap);
-      setGeneration((g) => g + 1);
-    }
+    setPhase("ready");
     return snap;
   }, [supabase, slug]);
 
   useEffect(() => {
     let alive = true;
-
-    /* מסלול מהיר: עולים מהמטמון מיד, עוד לפני בדיקת הסשן.
-       getSession בספארי/PWA נתקע לפעמים עד שנוגעים במסך — אסור לחכות לו.
-       אם יתברר שאין סשן, נעבור למסך ההתחברות מיד אחר כך. */
-    try {
-      const cached = JSON.parse(localStorage.getItem(`poker:cache:pub:${slug}`) || "null");
-      if (cached?.id) {
-        bootViewerStore(cached);
-        dataRef.current = JSON.stringify(cached.data ?? null);
-        setGroupId(cached.id);
-        setLive(cached.live ?? null);
-        setPlan(cached.data?.plan ?? null);
-        setPubConfig(cached.config || {});
-        setPhase("ready");
-      }
-    } catch {}
 
     (async () => {
       const { data } = await supabase.auth.getSession();
@@ -174,14 +124,11 @@ export default function PublicApp({ slug }) {
   /* --------------------------- רענון --------------------------- */
   const refresh = useCallback(async () => {
     const next = await fetchSnapshot(supabase, slug);
-    if (!next) return;
-    try {
-      localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify(next));
-    } catch {}
+    if (!next) { setPhase("missing"); return; }
     setLive(next.live ?? null);
     setPlan(next.data?.plan ?? null);
     setPubConfig(next.config || {});
-    const serialized = JSON.stringify(next.data ?? null);
+    const serialized = JSON.stringify([next.data, next.config]);
     if (serialized !== dataRef.current) {
       dataRef.current = serialized;
       bootViewerStore(next);

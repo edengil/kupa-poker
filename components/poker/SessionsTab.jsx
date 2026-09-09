@@ -8,10 +8,12 @@ import { Empty, IconBtn } from "./ui";
 import { Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
+import { SavedSettlementEditor } from "./SavedSettlementEditor";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function SessionsTab({ db, commit, goEdit }) {
   const [share, setShare] = useState(null);
+  const [settlementId, setSettlementId] = useState(null);
   const A = AL(db);
   if (!db.sessions.length) {
     return <Empty text="עדיין אין ערבים. עבור להזנה או ללייב." />;
@@ -78,6 +80,23 @@ export function SessionsTab({ db, commit, goEdit }) {
                 {s.d}.{s.mo}.{s.y}
               </b>
               <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setSettlementId(s.id)}
+                  data-testid={`session-settlement-${s.id}`}
+                  style={{
+                    background: C.feltDeep,
+                    color: C.brass,
+                    border: `1px solid ${C.line}`,
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    fontSize: 12,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  חלוקה ותשלומים
+                </button>
                 <IconBtn onClick={() => openShare(s)}>
                   <Share2 size={15} />
                 </IconBtn>
@@ -118,6 +137,7 @@ export function SessionsTab({ db, commit, goEdit }) {
           </div>
         );
       })}
+      {settlementId && <SavedSettlementEditor db={db} commit={commit} sessionId={settlementId} onClose={() => setSettlementId(null)} />}
       {share && (
         <ShareSheet
           title={`סיכום פוקר ${share.session.d}.${share.session.mo}`}
