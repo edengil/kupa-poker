@@ -204,11 +204,20 @@ export default function OwnerApp() {
                 requestRemount({ forgetLive: false, force: true });
               }
             }
+            /* ערבים שחולצו מהשרת בזמן flush — חובה לרענן את המסך */
+            if (meta?.adoptedRemoteData) {
+              requestRemount({ forgetLive: false, force: true });
+            }
             broadcaster.ping();
           },
-          // מטמון DB/config לא עדכני — קודם שומרים לייב מקומי; remount רק ברקע
-          // כדי לא לקפוץ באמצע לייב. בלי forget על הלייב.
-          onStale: async () => {
+          // מטמון ישן: לא עושים flush של data ישן לשרת (זה מה שמחק ערבים).
+          // מוחקים את המטמון ומרעננים מהשרת.
+          onStale: async (key) => {
+            if (key === DB_KEY) {
+              forgetStoreKey(DB_KEY);
+              requestRemount({ forgetLive: false, force: true });
+              return;
+            }
             await flushStore();
             requestRemount({ forgetLive: false });
           },

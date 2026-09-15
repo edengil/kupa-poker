@@ -22,17 +22,21 @@ export function SessionsTab({ db, commit, goEdit }) {
   const del = (id) => {
     // אישור לפני מחיקה — ערב שנמחק בטעות לוקח איתו את כל רישום הכסף שלו
     if (typeof window !== "undefined" && !window.confirm("למחוק את הערב? אי אפשר לבטל.")) return;
+    const drop = String(id);
     commit({
       ...db,
       sessions: db.sessions.filter((s) => s.id !== id),
+      deletedSessionIds: [...new Set([...(db.deletedSessionIds || []), drop])],
     });
   };
 
   const edit = (s) => {
     const raw = s.raw || toWhatsApp(s.entries, s, null, A);
+    const drop = String(s.id);
     commit({
       ...db,
       sessions: db.sessions.filter((x) => x.id !== s.id),
+      deletedSessionIds: [...new Set([...(db.deletedSessionIds || []), drop])],
     });
     goEdit(raw);
   };
