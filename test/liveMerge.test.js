@@ -302,6 +302,21 @@ describe("localLiveBehind", () => {
     };
     expect(localLiveBehind(local, remote)).toBe(true);
   });
+
+  it("does not treat a local player removal as being behind the server", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [] },
+      players: [
+        { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+        { name: "איציק תפילין", buyin: 50, cashout: "" },
+      ],
+    };
+    expect(localLiveBehind(local, remote)).toBe(false);
+  });
 });
 
 describe("decideLivePoll", () => {
@@ -353,6 +368,57 @@ describe("decideLivePoll", () => {
     };
     const lastFp = liveFingerprint(remote);
     expect(decideLivePoll(local, remote, lastFp)).toEqual({ action: "remount", merge: true });
+  });
+
+  it("flushes a local player removal instead of remounting and resurrecting them", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+      actionLog: [{ t: "remove", name: "איציק תפילין" }],
+    };
+    const remote = {
+      applied: { m1: [] },
+      players: [
+        { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+        { name: "איציק תפילין", buyin: 50, cashout: "" },
+      ],
+    };
+    expect(decideLivePoll(local, remote, liveFingerprint(remote))).toEqual({ action: "flush" });
+  });
+});
+
+describe("mergeLiveStates player removal", () => {
+  it("does not resurrect a player removed locally when the bot is not ahead", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+      actionLog: [{ t: "remove", name: "איציק תפילין", player: { name: "איציק תפילין", buyin: 50 } }],
+    };
+    const remote = {
+      applied: { m1: [] },
+      players: [
+        { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+        { name: "איציק תפילין", buyin: 50, cashout: "" },
+      ],
+    };
+    const merged = mergeLiveStates(local, remote);
+    expect(merged.players.map((p) => p.name)).toEqual(["דן ינקלויץ"]);
+  });
+
+  it("still adopts a player the bot just seated via WhatsApp", () => {
+    const local = {
+      applied: { m1: [] },
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [{ t: "add", name: "איציק תפילין" }] },
+      players: [
+        { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+        { name: "איציק תפילין", buyin: 50, cashout: "" },
+      ],
+    };
+    const merged = mergeLiveStates(local, remote);
+    expect(merged.players.map((p) => p.name)).toEqual(["דן ינקלויץ", "איציק תפילין"]);
   });
 });
 
