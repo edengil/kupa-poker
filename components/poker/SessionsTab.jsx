@@ -54,6 +54,10 @@ export function SessionsTab({ db, commit }) {
     >
       {list.map((s) => {
         const b = balance(s.entries);
+        const winners = (s.entries || []).filter((e) => e.amount > 0);
+        const even = (s.entries || []).filter((e) => e.amount === 0);
+        const debtors = (s.entries || []).filter((e) => e.amount < 0);
+        const ordered = [...winners, ...even, ...debtors];
         return (
           <div
             key={s.id}
@@ -113,21 +117,25 @@ export function SessionsTab({ db, commit }) {
               </div>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {s.entries.map((e, i) => (
-                <span
-                  key={i}
-                  style={{
-                    fontSize: 12.5,
-                    padding: "3px 9px",
-                    borderRadius: 20,
-                    background: C.feltDeep,
-                    color: e.amount >= 0 ? C.win : C.loss,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {canon(e.name, A)} {fmt(e.amount)}
-                </span>
-              ))}
+              {ordered.map((e, i) => {
+                const zero = e.amount === 0;
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      fontSize: 12.5,
+                      padding: "3px 9px",
+                      borderRadius: 20,
+                      background: C.feltDeep,
+                      color: zero ? C.dim : e.amount > 0 ? C.win : C.loss,
+                      border: zero ? `1px dashed ${C.line}` : "1px solid transparent",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {canon(e.name, A)} {zero ? "באפס" : fmt(e.amount)}
+                  </span>
+                );
+              })}
             </div>
             <div
               style={{
@@ -137,6 +145,7 @@ export function SessionsTab({ db, commit }) {
               }}
             >
               {b.gap === 0 ? "✓ מאוזן" : `⚠ פער ${fmtGap(b.gap)}`}
+              {even.length > 0 ? ` · ${even.length} סגרו באפס` : ""}
             </div>
           </div>
         );

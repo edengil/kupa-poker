@@ -360,8 +360,8 @@ export function LiveTab({
           tipsGiven: +p.tipsGiven || 0,
           buyinEvents: Array.isArray(p.buyinEvents) && p.buyinEvents.length ? p.buyinEvents : undefined,
         };
-      })
-      .filter((e) => e.amount !== 0 || e.chips > 0 || e.tipsGiven > 0);
+      });
+    /* כולל מי שסגר באפס — קודם סוננו החוצה כש־chips=0 */
     if (!entries.length) return;
     /* אזהרה רכה לפני שמירה לא־מאוזנת — לא חוסם קניות/ישיבה באמצע המשחק */
     const balCheck = checkNightBalance({

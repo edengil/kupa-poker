@@ -55,7 +55,7 @@ function Ledger({ totals, official, readOnly = false }) {
           style={{
             height: "100%",
             width: `${(Math.abs(t.amount) / max) * 100}%`,
-            background: t.amount >= 0 ? C.win : C.loss,
+            background: t.amount > 0 ? C.win : t.amount < 0 ? C.loss : C.dim,
             borderRadius: 5,
           }}
         />
@@ -85,15 +85,20 @@ function Ledger({ totals, official, readOnly = false }) {
       {winners.map((t, i) => (
         <Row key={t.name} t={t} top={i === 0} />
       ))}
+      {zeros.length > 0 && (
+        <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 4 }}>
+          <GroupLabel>סגרו באפס</GroupLabel>
+        </div>
+      )}
+      {zeros.map((t) => (
+        <Row key={t.name} t={t} />
+      ))}
       {losers.length > 0 && (
         <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 4 }}>
           <GroupLabel>מפסידים</GroupLabel>
         </div>
       )}
       {losers.map((t) => (
-        <Row key={t.name} t={t} />
-      ))}
-      {zeros.map((t) => (
         <Row key={t.name} t={t} />
       ))}
       {/* בדיקת הסגירה (והפער, אם יש) — עניין פנימי של המנהל. צופים מהלינק
