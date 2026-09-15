@@ -3,6 +3,7 @@ import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { sendToGroup } from "@/lib/whatsapp";
 import { dueReports, buildPeriodReport } from "@/lib/summary";
 import { reportError } from "@/lib/monitor";
+import { authorizedCron } from "@/lib/cronAuth";
 import {
   normalizePins,
   pinAfterSend,
@@ -12,32 +13,22 @@ import {
 /* ============================================================================
    הדוחות התקופתיים לקבוצה.
 
-   ה-cron של Vercel קורא לכאן פעם בחודש (ב-1 בבוקר שעון ישראל), והנתיב מחליט
-   לבד מה מגיע לשלוח: חודשי תמיד, רבעוני אחרי סוף רבעון, חצי-שנתי ביולי
-   ובינואר, ושנתי בינואר. מה שכבר נשלח מסומן ב-config ולא נשלח שוב — כך
-   שגם הרצה ידנית כפולה לא תציף את הקבוצה.
+   Vercel Cron קורא לכאן כל יום (~08:00 שעון ישראל בקיץ).
+   חודשי — כל חודש (סיכום החודש הקודם), ננעץ לחודש.
+   רבעוני — בינואר/אפריל/יולי/אוקטובר.
+   שנתי (+חצי שנתי) — בינואר.
 
-   בדיקה ידנית:  /api/reports?secret=<הסוד>&force=m   (או q / h / y)
+   מה שכבר נשלח מסומן ב-config.sentReports — בלי כפילות, עם השלמה אם פספסנו את ה-1.
+
+   בדיקה: /api/reports?secret=<סוד>&force=m   (או q / h / y)
    ============================================================================ */
 
 export const dynamic = "force-dynamic";
 
-function authorized(request) {
-  const url = new URL(request.url);
-  const qs = url.searchParams.get("secret");
-  const header = request.headers.get("authorization") || "";
-  return (
-    (Boolean(process.env.WHATSAPP_WEBHOOK_SECRET) && qs === process.env.WHATSAPP_WEBHOOK_SECRET) ||
-    (Boolean(process.env.CRON_SECRET) && header === `Bearer ${process.env.CRON_SECRET}`)
-  );
-}
-
 export async function GET(request) {
-  if (!authorized(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!authorizedCron(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const force = new URL(request.url).searchParams.get("force");
-  // התאריך מוכרע לפי שעון ישראל, לא לפי השרת — אחרת דוח של ה-1 בחודש
-  // עלול להישלח ב-31 בערב
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));
   const due = dueReports(now, force);
   if (!due.length) return NextResponse.json({ ok: true, due: [] });
@@ -81,7 +72,7 @@ export async function GET(request) {
           },
         });
       }
-      results.push({ key: rep.key, sent: true });
+      results.push({ key: rep.key, sent: true, pinned: Boolean(pinType) });
     } catch (e) {
       await reportError(e, `reports/send ${rep.key}`);
       results.push({ key: rep.key, error: e.message });

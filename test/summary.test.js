@@ -50,6 +50,27 @@ describe("buildPeriodReport", () => {
     expect(text).toBeTypeOf("string");
     expect(text).toContain("יולי");
     expect(text).toContain("עדן");
+    expect(text).toContain("🏆");
+    expect(text).toContain("✨ שיאים");
+  });
+
+  it("falls back to iso when y/mo missing", () => {
+    const text = buildPeriodReport(
+      {
+        sessions: [
+          {
+            iso: "2026-07-05",
+            d: 5,
+            entries: [
+              { name: "א", amount: 40 },
+              { name: "ב", amount: -40 },
+            ],
+          },
+        ],
+      },
+      { kind: "m", y: 2026, mo: 7, key: "m:2026-07" }
+    );
+    expect(text).toContain("א");
   });
 
   it("returns null when there are no sessions in range", () => {

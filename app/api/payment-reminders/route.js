@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { sendToGroup } from "@/lib/whatsapp";
 import { reportError } from "@/lib/monitor";
+import { authorizedCron } from "@/lib/cronAuth";
 import {
   jerusalemYmd,
   isPaymentReminderWindow,
@@ -25,18 +26,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function authorized(request) {
-  const url = new URL(request.url);
-  const qs = url.searchParams.get("secret");
-  const header = request.headers.get("authorization") || "";
-  return (
-    (Boolean(process.env.WHATSAPP_WEBHOOK_SECRET) && qs === process.env.WHATSAPP_WEBHOOK_SECRET) ||
-    (Boolean(process.env.CRON_SECRET) && header === `Bearer ${process.env.CRON_SECRET}`)
-  );
-}
-
 export async function GET(request) {
-  if (!authorized(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!authorizedCron(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const force = Boolean(new URL(request.url).searchParams.get("force"));
   const today = jerusalemYmd();
