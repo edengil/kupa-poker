@@ -149,9 +149,19 @@ export default function OwnerApp() {
         return;
       }
 
+      /* אחרי ה-fetch ייתכן שהמשתמש ערך שוב — ממזגים את המצב העדכני, לא את הסנאפשוט הישן. */
+      const latestLocal = snapshotStoreLive();
+      if (latestLocal === null) {
+        lastLiveRef.current = s;
+        lastLiveFpRef.current = fp;
+        await flushStore();
+        return;
+      }
+
       let nextLive = data?.live ?? null;
-      if (decision.merge && localSnap && nextLive) {
-        nextLive = mergeLiveStates(localSnap, nextLive);
+      const mergeBase = latestLocal ?? localSnap;
+      if (decision.merge && mergeBase && nextLive) {
+        nextLive = mergeLiveStates(mergeBase, nextLive);
         const { error: writeError } = await supabase
           .from("groups")
           .update({ live: nextLive })

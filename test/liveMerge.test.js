@@ -408,6 +408,26 @@ describe("decideLivePoll", () => {
     expect(localLiveBehind(local, remote)).toBe(false);
     expect(decideLivePoll(local, remote, liveFingerprint(remote))).toEqual({ action: "flush" });
   });
+
+  it("remounts instead of flushing when another device saved a newer editedAt", () => {
+    const local = {
+      applied: { m1: [] },
+      editedAt: 1000,
+      players: [
+        { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+        { name: "איציק תפילין", buyin: 50, cashout: "" },
+      ],
+    };
+    const remote = {
+      applied: { m1: [] },
+      editedAt: 5000,
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+    };
+    expect(decideLivePoll(local, remote, liveFingerprint(local))).toEqual({
+      action: "remount",
+      merge: true,
+    });
+  });
 });
 
 describe("mergeLiveStates player removal", () => {
@@ -499,6 +519,62 @@ describe("mergeLiveStates player removal", () => {
       players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "200" }],
     };
     expect(mergeLiveStates(local, remote).actionLog).toHaveLength(3);
+  });
+
+  it("adopts a newer remote editedAt on flush instead of overwriting it", () => {
+    const local = {
+      applied: { m1: [] },
+      editedAt: 1000,
+      players: [
+        { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+        { name: "איציק תפילין", buyin: 50, cashout: "" },
+      ],
+    };
+    const remote = {
+      applied: { m1: [] },
+      editedAt: 9000,
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+    };
+    const { live, adopted } = adoptRemoteLiveOnFlush(local, remote);
+    expect(adopted).toBe(true);
+    expect(live.players.map((p) => p.name)).toEqual(["דן ינקלויץ"]);
+    expect(live.editedAt).toBe(9000);
+  });
+
+  it("drops a player removed on a newer device while keeping a local-only removal when the screen is newer", () => {
+    const newerRemote = mergeLiveStates(
+      {
+        applied: { m1: [] },
+        editedAt: 1000,
+        players: [
+          { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+          { name: "איציק תפילין", buyin: 50, cashout: "" },
+        ],
+      },
+      {
+        applied: { m1: [] },
+        editedAt: 9000,
+        players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+      }
+    );
+    expect(newerRemote.players.map((p) => p.name)).toEqual(["דן ינקלויץ"]);
+
+    const newerLocal = mergeLiveStates(
+      {
+        applied: { m1: [] },
+        editedAt: 9000,
+        players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+      },
+      {
+        applied: { m1: [] },
+        editedAt: 1000,
+        players: [
+          { name: "דן ינקלויץ", buyin: 100, cashout: "" },
+          { name: "איציק תפילין", buyin: 50, cashout: "" },
+        ],
+      }
+    );
+    expect(newerLocal.players.map((p) => p.name)).toEqual(["דן ינקלויץ"]);
   });
 });
 
