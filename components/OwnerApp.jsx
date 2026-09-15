@@ -222,9 +222,14 @@ export default function OwnerApp() {
     const cacheKey = "poker:cache:group";
 
     // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם.
-    // ובכיוון ההפוך: פינג שמגיע מבחוץ (פקודה בוואטסאפ) מרענן את המסך מיד.
+    // ובכיוון ההפוך: פינג מבחוץ (וואטסאפ / סימון שולם של צופה) מרענן.
     const mkBroadcaster = (slug) => {
-      const b = createBroadcaster(supabase, slug, checkLive);
+      const b = createBroadcaster(supabase, slug, () => {
+        checkLive();
+        /* סימוני תשלום מעדכנים data ולא live — חובה לרענן גם את ההיסטוריה */
+        forgetStoreKey(DB_KEY);
+        requestRemount({ forgetLive: false, force: true });
+      });
       broadcasterRef.current = b;
       return b;
     };
