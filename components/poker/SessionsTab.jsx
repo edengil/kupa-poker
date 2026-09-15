@@ -14,20 +14,21 @@ import { SavedSettlementEditor } from "./SavedSettlementEditor";
 export function SessionsTab({ db, commit, goEdit }) {
   const [share, setShare] = useState(null);
   const [settlementId, setSettlementId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const A = AL(db);
   if (!db.sessions.length) {
     return <Empty text="עדיין אין ערבים. עבור להזנה או ללייב." />;
   }
 
-  const del = (id) => {
-    // אישור לפני מחיקה — ערב שנמחק בטעות לוקח איתו את כל רישום הכסף שלו
-    if (typeof window !== "undefined" && !window.confirm("למחוק את הערב? אי אפשר לבטל.")) return;
-    const drop = String(id);
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    const drop = String(pendingDelete.id);
     commit({
       ...db,
-      sessions: db.sessions.filter((s) => s.id !== id),
+      sessions: db.sessions.filter((s) => s.id !== pendingDelete.id),
       deletedSessionIds: [...new Set([...(db.deletedSessionIds || []), drop])],
     });
+    setPendingDelete(null);
   };
 
   const edit = (s) => {
@@ -103,7 +104,11 @@ export function SessionsTab({ db, commit, goEdit }) {
                 <IconBtn onClick={() => edit(s)}>
                   <Pencil size={15} />
                 </IconBtn>
-                <IconBtn onClick={() => del(s.id)} danger>
+                <IconBtn
+                  onClick={() => setPendingDelete({ id: s.id, label: `${s.d}.${s.mo}.${s.y}` })}
+                  danger
+                  data-testid={`session-delete-${s.id}`}
+                >
                   <Trash2 size={15} />
                 </IconBtn>
               </div>
@@ -145,6 +150,85 @@ export function SessionsTab({ db, commit, goEdit }) {
           settlement={share.settlement}
           onClose={() => setShare(null)}
         />
+      )}
+      {pendingDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-session-title"
+          data-testid="delete-session-confirm"
+          onClick={() => setPendingDelete(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 80,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 340,
+              background: C.card,
+              border: `1px solid ${C.line}`,
+              borderRadius: 14,
+              padding: 18,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div id="delete-session-title" style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>
+              למחוק את הערב?
+            </div>
+            <div style={{ fontSize: 14, color: C.dim, lineHeight: 1.45, marginBottom: 16 }}>
+              ערב {pendingDelete.label} יימחק לצמיתות, כולל כל הרישום והחלוקה שלו. אי אפשר לבטל.
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "stretch" }}>
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                data-testid="delete-session-cancel"
+                style={{
+                  flex: 1,
+                  background: C.feltDeep,
+                  color: C.text,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 10,
+                  padding: "11px 12px",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                data-testid="delete-session-confirm-btn"
+                style={{
+                  flex: 1,
+                  background: C.loss,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "11px 12px",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                כן, למחוק
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

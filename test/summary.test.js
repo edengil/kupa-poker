@@ -52,6 +52,42 @@ describe("buildPeriodReport", () => {
     expect(text).toContain("עדן");
     expect(text).toContain("🏆");
     expect(text).toContain("✨ שיאים");
+    expect(text).toContain("מי מגיע לו");
+    expect(text).toContain("מי חייב");
+  });
+
+  it("merges short names via DEFAULT_ALIASES so one person is not both winner and debtor", () => {
+    const text = buildPeriodReport(
+      {
+        aliases: {},
+        sessions: [
+          {
+            y: 2026,
+            mo: 8,
+            d: 1,
+            entries: [
+              { name: "קובי", amount: 400 },
+              { name: "אורן", amount: -400 },
+            ],
+          },
+          {
+            y: 2026,
+            mo: 8,
+            d: 16,
+            entries: [
+              { name: "קובי סעדה", amount: -100 },
+              { name: "אורן גיל", amount: 100 },
+            ],
+          },
+        ],
+      },
+      { kind: "m", y: 2026, mo: 8, key: "m:2026-08" }
+    );
+    expect(text).toContain("קובי סעדה מגיע");
+    expect(text).not.toMatch(/קובי סעדה חייב/);
+    expect(text).not.toMatch(/^💸 קובי /m);
+    expect(text).toContain("אורן גיל חייב");
+    expect(text).not.toMatch(/אורן גיל מגיע/);
   });
 
   it("falls back to iso when y/mo missing", () => {
