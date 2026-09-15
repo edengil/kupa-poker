@@ -385,6 +385,29 @@ describe("decideLivePoll", () => {
     };
     expect(decideLivePoll(local, remote, liveFingerprint(remote))).toEqual({ action: "flush" });
   });
+
+  it("flushes a cleared live game instead of resurrecting it from the server", () => {
+    const remote = {
+      applied: { m1: [] },
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+    };
+    expect(decideLivePoll(null, remote, liveFingerprint(remote))).toEqual({ action: "flush" });
+  });
+
+  it("flushes a local buy-in undo when the screen is newer than the server", () => {
+    const local = {
+      applied: { m1: [] },
+      editedAt: 2000,
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [] },
+      editedAt: 1000,
+      players: [{ name: "דן ינקלויץ", buyin: 150, cashout: "" }],
+    };
+    expect(localLiveBehind(local, remote)).toBe(false);
+    expect(decideLivePoll(local, remote, liveFingerprint(remote))).toEqual({ action: "flush" });
+  });
 });
 
 describe("mergeLiveStates player removal", () => {
@@ -419,6 +442,63 @@ describe("mergeLiveStates player removal", () => {
     };
     const merged = mergeLiveStates(local, remote);
     expect(merged.players.map((p) => p.name)).toEqual(["דן ינקלויץ", "איציק תפילין"]);
+  });
+
+  it("keeps a local buy-in undo when merging newer tip events from the server", () => {
+    const local = {
+      applied: { m1: [] },
+      editedAt: 5000,
+      players: [{ name: "אופיר סנה", buyin: 100, cashout: "", tipsGiven: 15 }],
+      tips: [{ id: "t1", name: "אופיר סנה", amount: 15, at: 1 }],
+    };
+    const remote = {
+      applied: { m1: [] },
+      editedAt: 1000,
+      players: [{ name: "אופיר סנה", buyin: 150, cashout: "300", tipsGiven: 15 }],
+      tips: [
+        { id: "t1", name: "אופיר סנה", amount: 15, at: 1 },
+        { id: "t2", name: "אופיר סנה", amount: 10, at: 2 },
+      ],
+    };
+    const merged = mergeLiveStates(local, remote);
+    expect(merged.players[0].buyin).toBe(100);
+    expect(merged.players[0].cashout).toBe("");
+    expect(merged.tips).toHaveLength(2);
+  });
+
+  it("keeps a shorter local couple-fill list after undo when bot is not ahead", () => {
+    const local = {
+      applied: { m1: [] },
+      coupleFills: [{ from: "עדן גיל", to: "אורן גיל", chips: 30 }],
+      players: [{ name: "עדן גיל", buyin: 100, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [] },
+      coupleFills: [
+        { from: "עדן גיל", to: "אורן גיל", chips: 30 },
+        { from: "עדן גיל", to: "אורן גיל", chips: 30 },
+      ],
+      players: [{ name: "עדן גיל", buyin: 100, cashout: "" }],
+    };
+    expect(mergeLiveStates(local, remote).coupleFills).toHaveLength(1);
+  });
+
+  it("preserves a longer local action log even when adopting remote cashouts", () => {
+    const local = {
+      applied: { m1: [], m2: [] },
+      actionLog: [
+        { t: "seat", name: "דן ינקלויץ" },
+        { t: "buyin", name: "דן ינקלויץ", amount: 50 },
+        { t: "cashout", name: "דן ינקלויץ", chips: "10" },
+      ],
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "" }],
+    };
+    const remote = {
+      applied: { m1: [], m2: [], m3: [{ t: "out" }] },
+      actionLog: [{ t: "seat", name: "דן ינקלויץ" }],
+      players: [{ name: "דן ינקלויץ", buyin: 100, cashout: "200" }],
+    };
+    expect(mergeLiveStates(local, remote).actionLog).toHaveLength(3);
   });
 });
 

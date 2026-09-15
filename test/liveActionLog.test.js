@@ -71,4 +71,8 @@ describe("liveActionLog", () => {
     expect(pickActionLog([{ id: 1 }, { id: 2 }], [{ id: 3 }], false)).toHaveLength(2);
     expect(pickActionLog([{ id: 1 }], [{ id: 3 }, { id: 4 }], true)).toHaveLength(2);
   });
+
+  it("keeps a longer local log even when remote is preferred", () => {
+    expect(pickActionLog([{ id: 1 }, { id: 2 }, { id: 3 }], [{ id: 9 }], true)).toHaveLength(3);
+  });
 });

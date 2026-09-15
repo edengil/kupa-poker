@@ -193,6 +193,7 @@ export function LiveTab({
         coupleFills,
         actionLog,
         cps,
+        editedAt: Date.now(),
       })
     );
   }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, cps, hydrated]);
