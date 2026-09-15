@@ -23,12 +23,15 @@ function isPokerish(text) {
   const t = String(text || "");
   return (
     /סיכום פוקר/.test(t) ||
+    /סיכום (?:ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)/.test(t) ||
+    /סיכום רבעון|סיכום שנת|סיכום חצי שנה/.test(t) ||
     /חשבון סופי/.test(t) ||
     /·\s*חלוקה/.test(t) ||
     /\d{1,2}\/\d{1,2}\/\d{4}\s*·\s*חלוקה/.test(t) ||
     (/חלוקה/.test(t) && /מעביר|מגיע|חייב/.test(t)) ||
     /טיפים הערב/.test(t) ||
-    (/מגיע \d/.test(t) && /חייב/.test(t)) ||
+    /טבלת הנטו/.test(t) ||
+    (/מגיע/.test(t) && /חייב/.test(t)) ||
     /מעביר \d+ ל/.test(t)
   );
 }
@@ -69,24 +72,28 @@ export async function GET(request) {
 
   const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
   const hits = [];
+  const recent = [];
   for (const m of messages) {
     const text = msgText(m);
-    if (!text || !isPokerish(text)) continue;
     const ts = Number(m.timestamp || m.time || 0);
-    hits.push({
+    const row = {
       id: m.id || m.message_id || null,
       ts,
       iso: ts ? new Date(ts * (ts < 2e10 ? 1000 : 1)).toISOString() : null,
       fromMe: Boolean(m.from_me),
       preview: text.slice(0, 120),
       text,
-    });
+    };
+    if (recent.length < 15) recent.push({ ...row, text: text.slice(0, 400) });
+    if (!text || !isPokerish(text)) continue;
+    hits.push(row);
   }
 
   return NextResponse.json({
     ok: true,
     scanned: messages.length,
     hits: hits.length,
+    recent,
     messages: hits,
   });
 }

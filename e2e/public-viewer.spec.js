@@ -10,12 +10,14 @@ test.describe("צופה ציבורי", () => {
     await expect(page.getByText("אלפא צופה").first()).toBeVisible({ timeout: 20_000 });
   });
 
-  test("בלי שיתוף היסטוריה — מסתירים ערבים ומאזנים", async ({ page }) => {
+  test("בלי שיתוף היסטוריה — חלוקה אחרונה גלויה, בלי טאב לייב", async ({ page }) => {
     await page.goto("/preview/viewer?history=0");
     await expect(page.getByTestId("preview-viewer-banner")).toContainText("היסטוריה מוסתרת");
-    await expect(page.getByText("אלפא צופה")).toHaveCount(0);
     await expect(page.getByTestId("tab-live")).toHaveCount(0);
     await expect(page.getByTestId("tab-table")).toBeVisible();
+    /* ערב אחרון נשאר לסימון העברות — השם מופיע בכרטיס החלוקה */
+    await expect(page.getByTestId("last-settlement-card")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("last-settlement-card").getByText("אלפא צופה").first()).toBeVisible();
   });
 
   test("עם לייב פעיל — מוצג משחק עכשיו גם בלי היסטוריה", async ({ page }) => {
@@ -24,6 +26,6 @@ test.describe("צופה ציבורי", () => {
     await expect(page.getByText("חי בלייב")).toBeVisible();
     await expect(page.getByText("צפייה בלבד")).toBeVisible();
     await expect(page.getByRole("button", { name: /חי בלייב/ })).toBeDisabled();
-    await expect(page.getByText("אלפא צופה")).toHaveCount(0);
+    await expect(page.getByTestId("last-settlement-card")).toBeVisible({ timeout: 20_000 });
   });
 });
