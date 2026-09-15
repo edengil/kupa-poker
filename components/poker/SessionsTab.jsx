@@ -31,14 +31,10 @@ export function SessionsTab({ db, commit, goEdit }) {
   };
 
   const edit = (s) => {
+    /* רק פותחים הזנה עם הטקסט — בלי למחוק את הערב.
+       מחיקה לפני שמירה מחקה ערבים כשעורכים כמה ברצף. */
     const raw = s.raw || toWhatsApp(s.entries, s, null, A);
-    const drop = String(s.id);
-    commit({
-      ...db,
-      sessions: db.sessions.filter((x) => x.id !== s.id),
-      deletedSessionIds: [...new Set([...(db.deletedSessionIds || []), drop])],
-    });
-    goEdit(raw);
+    goEdit(raw, s.id);
   };
 
   const openShare = (s) => {

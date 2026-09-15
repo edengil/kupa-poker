@@ -24,9 +24,14 @@ export function InputTab({ db, commit, years }) {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [toast, setToast] = useState(null);
   const [splitShare, setSplitShare] = useState(null);
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
-    window.__loadRaw = (r) => setText(r);
+    window.__loadRaw = (r, sessionId) => {
+      setText(r);
+      setKind("session");
+      setEditingId(sessionId || null);
+    };
     return () => {
       delete window.__loadRaw;
     };
@@ -71,7 +76,17 @@ export function InputTab({ db, commit, years }) {
     const next = { ...db };
     if (kind === "session") {
       Object.assign(rec, { d: date.d, mo: date.mo, y: date.y, iso: date.iso });
-      next.sessions = [...db.sessions, rec].sort((a, b) => a.iso.localeCompare(b.iso));
+      if (editingId) {
+        const exists = db.sessions.some((s) => s.id === editingId);
+        rec.id = editingId;
+        next.sessions = exists
+          ? db.sessions.map((s) => (s.id === editingId ? { ...s, ...rec, id: editingId } : s))
+          : [...db.sessions, rec];
+        next.sessions = [...next.sessions].sort((a, b) => a.iso.localeCompare(b.iso));
+        next.deletedSessionIds = (db.deletedSessionIds || []).filter((id) => id !== editingId);
+      } else {
+        next.sessions = [...db.sessions, rec].sort((a, b) => a.iso.localeCompare(b.iso));
+      }
     } else if (kind === "month") {
       Object.assign(rec, { mo: month, y: year });
       next.monthly = [...db.monthly.filter((x) => !(x.mo === month && x.y === year)), rec];
@@ -81,6 +96,7 @@ export function InputTab({ db, commit, years }) {
     }
     commit(next);
     setText("");
+    setEditingId(null);
     setToast(
       kind === "session"
         ? `נשמר ערב ${date.d}.${date.mo}`

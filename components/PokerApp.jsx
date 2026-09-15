@@ -257,9 +257,9 @@ function App({
             <SessionsTab
               db={db}
               commit={commit}
-              goEdit={(r) => {
+              goEdit={(raw, sessionId) => {
                 setTab("input");
-                setTimeout(() => window.__loadRaw?.(r), 0);
+                setTimeout(() => window.__loadRaw?.(raw, sessionId), 0);
               }}
             />
           ) : tab === "table" ? (
