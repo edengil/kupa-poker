@@ -5,6 +5,8 @@ import {
   sessionsDueForPaymentReminder,
   buildPaymentReminderText,
   unpaidTransfers,
+  isPaymentReminderWindow,
+  PAYMENT_REMINDER_HOUR,
 } from "../lib/paymentReminder";
 import { paymentPlan } from "../lib/paymentTracking";
 
@@ -84,5 +86,15 @@ describe("buildPaymentReminderText", () => {
     expect(text.startsWith("🤖")).toBe(true);
     expect(text).toContain("https://example.com/g/kupa");
     expect(text).toContain("אישור העברות");
+  });
+});
+
+describe("isPaymentReminderWindow", () => {
+  it("defaults to 10:00 Israel", () => {
+    expect(PAYMENT_REMINDER_HOUR).toBe(10);
+  });
+
+  it("force always opens the window", () => {
+    expect(isPaymentReminderWindow(new Date("2026-01-01T00:00:00Z"), { force: true })).toBe(true);
   });
 });

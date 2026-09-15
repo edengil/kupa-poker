@@ -2,6 +2,6 @@
   "crons": [
     { "path": "/api/keep-alive", "schedule": "0 6 * * 1" },
     { "path": "/api/reports", "schedule": "0 5 * * *" },
-    { "path": "/api/payment-reminders", "schedule": "0 5 * * *" }
+    { "path": "/api/payment-reminders", "schedule": "0 7,8 * * *" }
   ]
 }

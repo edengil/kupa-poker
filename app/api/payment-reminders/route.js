@@ -4,16 +4,20 @@ import { sendToGroup } from "@/lib/whatsapp";
 import { reportError } from "@/lib/monitor";
 import {
   jerusalemYmd,
+  isPaymentReminderWindow,
   sessionsDueForPaymentReminder,
   buildPaymentReminderText,
   siteUrlFromEnv,
+  PAYMENT_REMINDER_HOUR,
 } from "@/lib/paymentReminder";
 
 /* ============================================================================
-   תזכורת בוקר למחרת הערב — לינק לסימון העברות באפליקציה.
+   תזכורת ביום שאחרי המשחק ב־10:00 שעון ישראל — לינק לסימון העברות.
 
-   Vercel cron (~08:00 שעון ישראל בקיץ) קורא לכאן מדי יום.
-   נשלח רק אם יש ערב ש־iso שלו היה אתמול, ויש העברות פתוחות.
+   דוגמה: שיחקנו חמישי → שישי ב־10 בבוקר (רק אם נשארו העברות פתוחות).
+   בימים בלי ערב אתמול — לא נשלחת הודעה.
+
+   Vercel cron ב־07:00 ו־08:00 UTC (חורף/קיץ) + בדיקת שעה מקומית.
    dedup ב־config.sentPaymentReminders לפי מזהה הערב.
 
    בדיקה: /api/payment-reminders?secret=<סוד>&force=1
@@ -34,8 +38,18 @@ function authorized(request) {
 export async function GET(request) {
   if (!authorized(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
-  const force = new URL(request.url).searchParams.get("force");
+  const force = Boolean(new URL(request.url).searchParams.get("force"));
   const today = jerusalemYmd();
+  if (!isPaymentReminderWindow(new Date(), { force })) {
+    return NextResponse.json({
+      ok: true,
+      today,
+      skipped: "not reminder hour",
+      hour: PAYMENT_REMINDER_HOUR,
+      results: [],
+    });
+  }
+
   const supabase = getAdminSupabase();
   const slug = process.env.KUPA_GROUP_SLUG;
   const { data: row, error } = await supabase
@@ -53,7 +67,7 @@ export async function GET(request) {
 
   const sent = { ...(row.config?.sentPaymentReminders || {}) };
   const due = sessionsDueForPaymentReminder(row.data?.sessions, today, {
-    force: Boolean(force),
+    force,
     alreadySent: sent,
   });
 
