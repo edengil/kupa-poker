@@ -50,10 +50,10 @@ describe("buildPeriodReport", () => {
     expect(text).toBeTypeOf("string");
     expect(text).toContain("יולי");
     expect(text).toContain("עדן");
-    expect(text).toContain("🏆");
+    expect(text).toContain("🥇");
+    expect(text).toContain("+150₪");
     expect(text).toContain("✨ שיאים");
-    expect(text).toContain("מי מגיע לו");
-    expect(text).toContain("מי חייב");
+    expect(text).not.toMatch(/מגיע|חייב/);
   });
 
   it("merges short names via DEFAULT_ALIASES so one person is not both winner and debtor", () => {
@@ -83,11 +83,11 @@ describe("buildPeriodReport", () => {
       },
       { kind: "m", y: 2026, mo: 8, key: "m:2026-08" }
     );
-    expect(text).toContain("קובי סעדה מגיע");
-    expect(text).not.toMatch(/קובי סעדה חייב/);
-    expect(text).not.toMatch(/^💸 קובי /m);
-    expect(text).toContain("אורן גיל חייב");
-    expect(text).not.toMatch(/אורן גיל מגיע/);
+    expect(text).toMatch(/קובי סעדה \+300₪/);
+    expect(text).toMatch(/אורן גיל -300₪/);
+    expect(text).not.toMatch(/מגיע|חייב/);
+    /* שורת דירוג אחת בלבד — השם יכול לחזור בשיאים */
+    expect(text.split("\n").filter((l) => /^\S+\s+קובי סעדה [+-]/.test(l) || /^[🥇🥈🥉•]\s+קובי סעדה/.test(l)).length).toBe(1);
   });
 
   it("falls back to iso when y/mo missing", () => {
