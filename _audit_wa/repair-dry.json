@@ -1,0 +1,162 @@
+﻿{
+    "dryRun":  true,
+    "hint":  "×××¡×£ \u0026apply=1 ××× ×××ª××",
+    "before":  {
+                   "players":  [
+                                   {
+                                       "name":  "×¢×× ×××",
+                                       "buyin":  150,
+                                       "cashout":  null,
+                                       "tipsGiven":  26
+                                   },
+                                   {
+                                       "name":  "×××¨× ×××",
+                                       "buyin":  200,
+                                       "cashout":  null,
+                                       "tipsGiven":  10
+                                   },
+                                   {
+                                       "name":  "×§××× ×¡×¢××",
+                                       "buyin":  100,
+                                       "cashout":  null,
+                                       "tipsGiven":  10
+                                   },
+                                   {
+                                       "name":  "×× ×× ×§××××¥",
+                                       "buyin":  200,
+                                       "cashout":  null,
+                                       "tipsGiven":  10
+                                   },
+                                   {
+                                       "name":  "×××¦××§ ×ª×¤××××",
+                                       "buyin":  100,
+                                       "cashout":  null,
+                                       "tipsGiven":  0
+                                   },
+                                   {
+                                       "name":  "×©××× ×××",
+                                       "buyin":  250,
+                                       "cashout":  null,
+                                       "tipsGiven":  13
+                                   },
+                                   {
+                                       "name":  "×××¤××¨ ×¡× ×",
+                                       "buyin":  150,
+                                       "cashout":  null,
+                                       "tipsGiven":  15
+                                   },
+                                   {
+                                       "name":  "×¢×× ×××¨×",
+                                       "buyin":  150,
+                                       "cashout":  null,
+                                       "tipsGiven":  0
+                                   },
+                                   {
+                                       "name":  "×××¨ ×××¨×",
+                                       "buyin":  100,
+                                       "cashout":  null,
+                                       "tipsGiven":  10
+                                   },
+                                   {
+                                       "name":  "××¨×× ××××",
+                                       "buyin":  50,
+                                       "cashout":  null,
+                                       "tipsGiven":  0
+                                   },
+                                   {
+                                       "name":  "× ×ª× ×× ×××",
+                                       "buyin":  100,
+                                       "cashout":  null,
+                                       "tipsGiven":  0
+                                   }
+                               ],
+                   "tipsTotal":  94,
+                   "tipsCount":  10,
+                   "entriesCount":  "40",
+                   "startedAt":  1788284171747
+               },
+    "after":  {
+                  "players":  [
+                                  {
+                                      "name":  "×©××× ×××",
+                                      "buyin":  450,
+                                      "cashout":  700,
+                                      "tipsGiven":  13
+                                  },
+                                  {
+                                      "name":  "×× ×× ×§××××¥",
+                                      "buyin":  400,
+                                      "cashout":  196,
+                                      "tipsGiven":  15
+                                  },
+                                  {
+                                      "name":  "×××¨× ×××",
+                                      "buyin":  250,
+                                      "cashout":  560,
+                                      "tipsGiven":  10
+                                  },
+                                  {
+                                      "name":  "×§××× ×¡×¢××",
+                                      "buyin":  200,
+                                      "cashout":  200,
+                                      "tipsGiven":  10
+                                  },
+                                  {
+                                      "name":  "×××¨ ×××¨×",
+                                      "buyin":  150,
+                                      "cashout":  0,
+                                      "tipsGiven":  30
+                                  },
+                                  {
+                                      "name":  "× ×ª× ×× ×××",
+                                      "buyin":  150,
+                                      "cashout":  150,
+                                      "tipsGiven":  3
+                                  },
+                                  {
+                                      "name":  "×¢×× ×××",
+                                      "buyin":  150,
+                                      "cashout":  770,
+                                      "tipsGiven":  36
+                                  },
+                                  {
+                                      "name":  "×¢×× ×××¨×",
+                                      "buyin":  150,
+                                      "cashout":  0,
+                                      "tipsGiven":  0
+                                  },
+                                  {
+                                      "name":  "×××¦××§ ×ª×¤××××",
+                                      "buyin":  125,
+                                      "cashout":  0,
+                                      "tipsGiven":  0
+                                  },
+                                  {
+                                      "name":  "×××¤××¨ ×¡× ×",
+                                      "buyin":  150,
+                                      "cashout":  720,
+                                      "tipsGiven":  36
+                                  },
+                                  {
+                                      "name":  "××¨×× ××××",
+                                      "buyin":  50,
+                                      "cashout":  1160,
+                                      "tipsGiven":  50
+                                  }
+                              ],
+                  "tipsTotal":  203,
+                  "tipsCount":  21,
+                  "entriesCount":  "45",
+                  "startedAt":  1788284171747
+              },
+    "recentSessions":  [
+                           "2026-08-03",
+                           "2026-08-06",
+                           "2026-08-09",
+                           "2026-08-12",
+                           "2026-08-16",
+                           "2026-08-23",
+                           "2026-08-27",
+                           "2026-09-02"
+                       ]
+}
