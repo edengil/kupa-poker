@@ -7,6 +7,7 @@ import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
 import { getPushSupport, getPushSubscription, subscribePush, unsubscribePush } from "../lib/pushClient";
+import { paymentPlan, markPaymentViaRpc } from "../lib/paymentTracking";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
@@ -93,6 +94,44 @@ export default function PublicApp({ slug }) {
     }
     return snap;
   }, [supabase, slug]);
+
+  const markPayment = useCallback(
+    async (session, index, paid) => {
+      const { fingerprint } = paymentPlan(session);
+      const data = await markPaymentViaRpc(supabase, {
+        slug,
+        sessionId: session.id,
+        fingerprint,
+        index,
+        paid,
+      });
+      if (!data) {
+        alert("לא הצלחתי לשמור את הסימון. רענן ונסה שוב.");
+        return;
+      }
+      const snap = {
+        id: groupId,
+        data,
+        live,
+        config: pubConfig,
+      };
+      bootViewerStore(snap);
+      dataRef.current = JSON.stringify([data, pubConfig]);
+      setGeneration((g) => g + 1);
+      setFresh(true);
+      setTimeout(() => setFresh(false), 2500);
+      try {
+        localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap }));
+      } catch {}
+      try {
+        const ch = supabase.channel(`group:${slug}`);
+        await ch.subscribe();
+        await ch.send({ type: "broadcast", event: "update", payload: { at: Date.now() } });
+        supabase.removeChannel(ch);
+      } catch {}
+    },
+    [supabase, slug, groupId, live, pubConfig]
+  );
 
   useEffect(() => {
     let alive = true;
@@ -266,6 +305,7 @@ export default function PublicApp({ slug }) {
         readOnly
         viewerAuth={viewerAuth}
         initialTab={tabRef.current}
+        onMarkPayment={markPayment}
         onTabChange={(tab) => {
           tabRef.current = tab;
           visitRef.current?.onTab?.(tab);

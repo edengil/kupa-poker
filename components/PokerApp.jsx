@@ -75,6 +75,8 @@ function App({
   initialTab = "table",
   /** { name?, full_name?, email? } מ-Google auth — לשיאים אישיים */
   viewerAuth = null,
+  /** צופה: סימון שולם דרך RPC */
+  onMarkPayment = null,
 }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
@@ -272,6 +274,8 @@ function App({
               setY={setPeriodY}
               mo={mo}
               setMo={setPeriodMo}
+              viewerName={viewerName}
+              onMarkPayment={onMarkPayment}
             />
           ) : tab === "stats" && statsPanel ? (
             statsPanel

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
-import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY } from "../lib/store";
+import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY, DB_KEY } from "../lib/store";
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
