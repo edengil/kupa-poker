@@ -64,11 +64,6 @@ export function ProfileSheet({ db, name, onClose }) {
     [db, cn, yearFilter]
   );
 
-  const yoy = useMemo(() => {
-    const y = yearFilter ?? new Date().getFullYear();
-    return yearOverYear(db, cn, y);
-  }, [db, cn, yearFilter]);
-
   const yearOptions = useMemo(() => {
     const opts = [[null, "הכל"]];
     for (const y of years) opts.push([y, String(y)]);
@@ -171,7 +166,6 @@ export function ProfileSheet({ db, name, onClose }) {
             />
           )}
         </div>
-        <YearCompareLine row={yoy} />
         <BalanceBreakdown db={db} playerName={cn} year={yearFilter} />
         <PersonalStatsCard db={db} playerName={cn} year={yearFilter} />
         {rows.length > 1 ? (
