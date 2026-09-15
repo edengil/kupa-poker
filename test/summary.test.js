@@ -50,13 +50,14 @@ describe("buildPeriodReport", () => {
     expect(text).toBeTypeOf("string");
     expect(text).toContain("יולי");
     expect(text).toContain("עדן");
-    expect(text).toContain("🥇");
+    expect(text).toContain("דירוג נטו");
     expect(text).toContain("+150₪");
+    expect(text).toMatch(/−50₪|−100₪/);
     expect(text).toContain("✨ שיאים");
     expect(text).not.toMatch(/מגיע|חייב/);
   });
 
-  it("merges short names via DEFAULT_ALIASES so one person is not both winner and debtor", () => {
+  it("lists every player who played, descending, with proper minus sign", () => {
     const text = buildPeriodReport(
       {
         aliases: {},
@@ -67,7 +68,9 @@ describe("buildPeriodReport", () => {
             d: 1,
             entries: [
               { name: "קובי", amount: 400 },
-              { name: "אורן", amount: -400 },
+              { name: "אורן", amount: -200 },
+              { name: "דן", amount: -200 },
+              { name: "איציק", amount: 0 },
             ],
           },
           {
@@ -77,17 +80,29 @@ describe("buildPeriodReport", () => {
             entries: [
               { name: "קובי סעדה", amount: -100 },
               { name: "אורן גיל", amount: 100 },
+              { name: "אופיר", amount: 0 },
             ],
           },
         ],
       },
       { kind: "m", y: 2026, mo: 8, key: "m:2026-08" }
     );
-    expect(text).toMatch(/קובי סעדה \+300₪/);
-    expect(text).toMatch(/אורן גיל -300₪/);
+    expect(text).toMatch(/1\.\s+🥇\s+קובי סעדה \+300₪/);
+    expect(text).toContain("איציק תפילין 0₪");
+    expect(text).toContain("אופיר סנה 0₪");
+    expect(text).toMatch(/אורן גיל −100₪/);
+    expect(text).toMatch(/דן ינקלויץ −200₪/);
+    /* יורד: חיובי לפני אפס לפני שלילי; שלילי פחות גרוע לפני יותר גרוע */
+    const lines = text.split("\n").filter((l) => /^\d+\./.test(l));
+    const amounts = lines.map((l) => {
+      const m = l.match(/([+−]?\d+(?:\.\d+)?)₪/);
+      const raw = m[1].replace("−", "-");
+      return Number(raw);
+    });
+    for (let i = 1; i < amounts.length; i++) {
+      expect(amounts[i - 1]).toBeGreaterThanOrEqual(amounts[i]);
+    }
     expect(text).not.toMatch(/מגיע|חייב/);
-    /* שורת דירוג אחת בלבד — השם יכול לחזור בשיאים */
-    expect(text.split("\n").filter((l) => /^\S+\s+קובי סעדה [+-]/.test(l) || /^[🥇🥈🥉•]\s+קובי סעדה/.test(l)).length).toBe(1);
   });
 
   it("falls back to iso when y/mo missing", () => {
