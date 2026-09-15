@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { buildSettlement } from "../../lib/report";
 import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
 import { C } from "./colors";
@@ -16,7 +16,7 @@ import { BackupCard } from "./BackupCard";
 import { GapsBoard } from "./GapsBoard.jsx";
 import { checkNightBalance, confirmSaveIfUnbalanced } from "./nightBalance";
 
-/* טאב הזנה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
+/* טאב הזנה — ערבים חדשים / חודש / שנתי. עריכת ערב קיים בטאב הערבים. */
 export function InputTab({ db, commit, years }) {
   const [text, setText] = useState("");
   const [kind, setKind] = useState("session");
@@ -24,18 +24,6 @@ export function InputTab({ db, commit, years }) {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [toast, setToast] = useState(null);
   const [splitShare, setSplitShare] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-
-  useEffect(() => {
-    window.__loadRaw = (r, sessionId) => {
-      setText(r);
-      setKind("session");
-      setEditingId(sessionId || null);
-    };
-    return () => {
-      delete window.__loadRaw;
-    };
-  }, []);
 
   const entries = useMemo(() => parseEntries(text), [text]);
   const bal = balance(entries);
@@ -63,7 +51,6 @@ export function InputTab({ db, commit, years }) {
 
   function save() {
     if (!canSave) return;
-    /* אזהרה רכה לפני שמירה לא־מאוזנת — לא חוסם הזנה באמצע, רק דורש אישור */
     if (kind === "session" || kind === "month") {
       const check = checkNightBalance({ entries });
       if (!confirmSaveIfUnbalanced(check)) return;
@@ -76,17 +63,7 @@ export function InputTab({ db, commit, years }) {
     const next = { ...db };
     if (kind === "session") {
       Object.assign(rec, { d: date.d, mo: date.mo, y: date.y, iso: date.iso });
-      if (editingId) {
-        const exists = db.sessions.some((s) => s.id === editingId);
-        rec.id = editingId;
-        next.sessions = exists
-          ? db.sessions.map((s) => (s.id === editingId ? { ...s, ...rec, id: editingId } : s))
-          : [...db.sessions, rec];
-        next.sessions = [...next.sessions].sort((a, b) => a.iso.localeCompare(b.iso));
-        next.deletedSessionIds = (db.deletedSessionIds || []).filter((id) => id !== editingId);
-      } else {
-        next.sessions = [...db.sessions, rec].sort((a, b) => a.iso.localeCompare(b.iso));
-      }
+      next.sessions = [...db.sessions, rec].sort((a, b) => a.iso.localeCompare(b.iso));
     } else if (kind === "month") {
       Object.assign(rec, { mo: month, y: year });
       next.monthly = [...db.monthly.filter((x) => !(x.mo === month && x.y === year)), rec];
@@ -96,7 +73,6 @@ export function InputTab({ db, commit, years }) {
     }
     commit(next);
     setText("");
-    setEditingId(null);
     setToast(
       kind === "session"
         ? `נשמר ערב ${date.d}.${date.mo}`

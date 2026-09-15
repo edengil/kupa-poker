@@ -254,14 +254,7 @@ function App({
               onPlanShared={onPlanShared}
             />
           ) : tab === "sessions" ? (
-            <SessionsTab
-              db={db}
-              commit={commit}
-              goEdit={(raw, sessionId) => {
-                setTab("input");
-                setTimeout(() => window.__loadRaw?.(raw, sessionId), 0);
-              }}
-            />
+            <SessionsTab db={db} commit={commit} />
           ) : tab === "table" ? (
             <TableTab
               db={db}

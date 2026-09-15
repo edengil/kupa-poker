@@ -3,18 +3,20 @@
 import React, { useState } from "react";
 import { C } from "./colors";
 import { fmt, fmtGap } from "./format";
-import { AL, balance, canon, toWhatsApp } from "./helpers";
+import { AL, balance, canon } from "./helpers";
 import { Empty, IconBtn } from "./ui";
 import { Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
+import { SessionEditSheet } from "./SessionEditSheet";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function SessionsTab({ db, commit, goEdit }) {
+export function SessionsTab({ db, commit }) {
   const [share, setShare] = useState(null);
   const [settlementId, setSettlementId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [editing, setEditing] = useState(null);
   const A = AL(db);
   if (!db.sessions.length) {
     return <Empty text="עדיין אין ערבים. עבור להזנה או ללייב." />;
@@ -29,13 +31,6 @@ export function SessionsTab({ db, commit, goEdit }) {
       deletedSessionIds: [...new Set([...(db.deletedSessionIds || []), drop])],
     });
     setPendingDelete(null);
-  };
-
-  const edit = (s) => {
-    /* רק פותחים הזנה עם הטקסט — בלי למחוק את הערב.
-       מחיקה לפני שמירה מחקה ערבים כשעורכים כמה ברצף. */
-    const raw = s.raw || toWhatsApp(s.entries, s, null, A);
-    goEdit(raw, s.id);
   };
 
   const openShare = (s) => {
@@ -101,7 +96,11 @@ export function SessionsTab({ db, commit, goEdit }) {
                 <IconBtn onClick={() => openShare(s)}>
                   <Share2 size={15} />
                 </IconBtn>
-                <IconBtn onClick={() => edit(s)}>
+                <IconBtn
+                  onClick={() => setEditing(s)}
+                  data-testid={`session-edit-${s.id}`}
+                  aria-label={`עריכת ערב ${s.d}.${s.mo}.${s.y}`}
+                >
                   <Pencil size={15} />
                 </IconBtn>
                 <IconBtn
@@ -142,7 +141,22 @@ export function SessionsTab({ db, commit, goEdit }) {
           </div>
         );
       })}
-      {settlementId && <SavedSettlementEditor db={db} commit={commit} sessionId={settlementId} onClose={() => setSettlementId(null)} />}
+      {settlementId && (
+        <SavedSettlementEditor
+          db={db}
+          commit={commit}
+          sessionId={settlementId}
+          onClose={() => setSettlementId(null)}
+        />
+      )}
+      {editing && (
+        <SessionEditSheet
+          db={db}
+          session={editing}
+          commit={commit}
+          onClose={() => setEditing(null)}
+        />
+      )}
       {share && (
         <ShareSheet
           title={`סיכום פוקר ${share.session.d}.${share.session.mo}`}
@@ -195,7 +209,7 @@ export function SessionsTab({ db, commit, goEdit }) {
                 style={{
                   flex: 1,
                   background: C.feltDeep,
-                  color: C.text,
+                  color: C.text || C.cream,
                   border: `1px solid ${C.line}`,
                   borderRadius: 10,
                   padding: "11px 12px",
