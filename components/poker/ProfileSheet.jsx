@@ -5,13 +5,11 @@ import { C } from "./colors";
 import { fmt } from "./format";
 import { AL, canon, r2 } from "./helpers";
 import { availableYears, playerBalanceBreakdown } from "./totals";
-import { yearOverYear } from "./yearCompare";
 import { IconBtn, Stat } from "./ui";
 import { TrendingUp, X } from "./icons";
 import { CumChart } from "./CumChart";
 import { PersonalStatsCard } from "./PersonalStatsCard";
 import { BalanceBreakdown } from "./BalanceBreakdown";
-import { YearCompareLine } from "./YearCompareLine";
 import { computePersonalStats } from "./personalStats";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */

@@ -4,7 +4,6 @@ import React, { useMemo } from "react";
 import { C } from "./colors";
 import { fmt, MONTHS } from "./format";
 import { periodTotals, yearNum } from "./totals";
-import { yearOverYearByPlayer } from "./yearCompare";
 import { NavBtn } from "./ui";
 import { Award, ChevronLeft, ChevronRight, Crown } from "./icons";
 import { festiveCardSoft } from "./festive";
@@ -25,10 +24,6 @@ export function Banner({ db, onPlayer, scope, setScope, y, setY, mo, setMo }) {
   if (idx < 0) idx = Math.max(0, periods.length - 1);
   const { totals, official } = useMemo(
     () => periodTotals(db, scope, y, mo),
-    [db, scope, y, mo]
-  );
-  const yoyMap = useMemo(
-    () => yearOverYearByPlayer(db, scope, y, mo),
     [db, scope, y, mo]
   );
   const label =
@@ -161,7 +156,6 @@ export function Banner({ db, onPlayer, scope, setScope, y, setY, mo, setMo }) {
             className="hscroll"
           >
             {totals.map((t, i) => {
-              const yoy = yoyMap[t.name];
               return (
                 <button
                   key={t.name}
@@ -202,24 +196,6 @@ export function Banner({ db, onPlayer, scope, setScope, y, setY, mo, setMo }) {
                   >
                     {fmt(t.amount)}
                   </b>
-                  {yoy && (
-                    <span
-                      style={{
-                        fontSize: 9.5,
-                        color: yoy.delta >= 0 ? C.win : C.loss,
-                        fontVariantNumeric: "tabular-nums",
-                        opacity: 0.9,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      מול אשתקד{" "}
-                      {(yoy.delta > 0 ? "+" : yoy.delta < 0 ? "−" : "") +
-                        Math.abs(yoy.delta).toLocaleString("en-US")}
-                      {yoy.pct != null
-                        ? ` · ${(yoy.pct > 0 ? "+" : yoy.pct < 0 ? "−" : "")}${Math.abs(Math.round(yoy.pct))}%`
-                        : ""}
-                    </span>
-                  )}
                 </button>
               );
             })}
