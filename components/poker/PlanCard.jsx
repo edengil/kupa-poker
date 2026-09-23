@@ -5,6 +5,7 @@ import { planLabel } from "../Rsvp";
 import { C } from "./colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./festive";
 import { HOSTS, wazeShortUrl } from "./hosts";
+import { isPlanStale, planTodayIso } from "../../lib/planTiming";
 
 /* תכנון ערב + בחירת מארח. הכתובות עצמן ב-hosts.js. */
 
@@ -23,14 +24,12 @@ function splitPlanFields(plan) {
 /* תכנון הערב הבא. נשמר בתוך ה-DB (db.plan) ולכן זורם לצופים דרך אותו
    snapshot — הם רואים את התאריך ועונים מגיע/לא בטבלת ה-RSVP. */
 export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
-  const todayIso = new Date().toISOString().slice(0, 10);
-  // מציגים הזמנה רק אם עוד לא עבר התאריך ואין ערב שמור לאותו יום
-  const planStale =
-    !!db.plan &&
-    (db.plan.iso < todayIso || (db.sessions || []).some((s) => s.iso === db.plan.iso));
+  const todayIso = planTodayIso();
+  // הזמנה פגה רק אחרי שהתאריך עבר (שעון ישראל) — לא בגלל ערב שמור באותו יום
+  const planStale = isPlanStale(db.plan, todayIso);
   const plan = db.plan && !planStale ? db.plan : null;
 
-  // מנקים הזמנה שפג תוקפה / שכבר נשמר עליה ערב — שלא תישאר "מחכה"
+  // מנקים הזמנה שפג תוקפה — שלא תישאר "מחכה" לימים שעברו
   useEffect(() => {
     if (planStale && db.plan) commit({ ...db, plan: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,9 +128,9 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
       >
         <div style={{ ...sectionEyebrow, marginBottom: 4 }}>
           <span style={{ fontSize: 13 }}>♠</span>
-          הערב הבא
+          הערב הבא · הזמנה לקבוצה
         </div>
-        <span style={{ color: C.dim }}>תכנן תאריך — החברים יאשרו הגעה מהלינק</span>
+        <span style={{ color: C.dim }}>תכנן תאריך להיום או להמשך — שלח לוואטסאפ לאישורי הגעה</span>
       </button>
     );
   }

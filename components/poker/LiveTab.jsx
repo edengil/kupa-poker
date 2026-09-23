@@ -462,9 +462,8 @@ export function LiveTab({
   return (
     <div style={{ marginTop: 4 }}>
       <BotToggle on={!!cfg.botOn} onChange={(v) => setConfig({ botOn: v })} />
-      {players.length === 0 && (
-        <PlanCard db={db} commit={commit} renderRsvps={renderRsvps} onPlanShared={onPlanShared} />
-      )}
+      {/* הזמנה לקבוצה (תאריך / מיקום / אישורי הגעה) — תמיד זמינה בלייב, לא תלויה בשולחן */}
+      <PlanCard db={db} commit={commit} renderRsvps={renderRsvps} onPlanShared={onPlanShared} />
       <div
         style={{
           background: `linear-gradient(165deg, ${C.cardHi} 0%, ${C.card} 100%)`,
