@@ -24,6 +24,8 @@ import { PersonalStatsCard } from "./poker/PersonalStatsCard";
 import { MonthHeroesCard } from "./poker/MonthHeroesCard";
 import { RecentFormCard } from "./poker/RecentFormCard";
 import { matchViewerToPlayer } from "./poker/personalHighlights";
+import { isGroupAdmin } from "../lib/paymentAccess";
+import { NightFocus } from "./poker/NightFocus";
 import { EGFooter } from "./Logo";
 
 const LiveTab = lazy(() =>
@@ -77,6 +79,9 @@ function App({
   viewerAuth = null,
   /** צופה: סימון שולם דרך RPC */
   onMarkPayment = null,
+  /** לינק לערב ספציפי — /g/slug/n/sessionId */
+  focusSessionId = null,
+  groupId = null,
 }) {
   const [db, setDb] = useState(null);
   const [ready, setReady] = useState(false);
@@ -163,7 +168,8 @@ function App({
     () => (db && viewerAuth ? matchViewerToPlayer(db, viewerAuth) : null),
     [db, viewerAuth]
   );
-  const showPersonal = !!viewerAuth;
+  const showPersonal = !!viewerAuth && !focusSessionId;
+  const isAdmin = !readOnly || isGroupAdmin({ email: viewerAuth?.email, name: viewerName });
 
   const dismissRecordAlert = useCallback(() => setRecordAlert(null), []);
   const handleRecords = useCallback(
@@ -220,6 +226,18 @@ function App({
           padding: "0 13px calc(90px + env(safe-area-inset-bottom))",
         }}
       >
+        {focusSessionId && (
+          <NightFocus
+            db={db}
+            sessionId={focusSessionId}
+            viewerName={viewerName}
+            isAdmin={isAdmin}
+            commit={commit}
+            readOnly={readOnly}
+            onMarkPayment={onMarkPayment}
+            groupId={groupId}
+          />
+        )}
         <Header />
         <Banner
           db={db}
@@ -268,7 +286,9 @@ function App({
               mo={mo}
               setMo={setPeriodMo}
               viewerName={viewerName}
+              isAdmin={isAdmin}
               onMarkPayment={onMarkPayment}
+              hideSettlement={!!focusSessionId}
             />
           ) : tab === "stats" && statsPanel ? (
             statsPanel

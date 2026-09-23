@@ -6,6 +6,9 @@ describe("settlementInvite", () => {
     expect(settlementAppUrl({ siteUrl: "https://x.com/", slug: "kupa" })).toBe(
       "https://x.com/g/kupa"
     );
+    expect(settlementAppUrl({ siteUrl: "https://x.com/", slug: "kupa", sessionId: "live_1" })).toBe(
+      "https://x.com/g/kupa/n/live_1"
+    );
   });
 
   it("invite text has link and no transfer verbs", () => {

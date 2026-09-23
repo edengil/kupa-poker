@@ -7,6 +7,10 @@ import { festiveCardSoft, festiveGlow, sectionEyebrow } from "./festive";
 import { settlementTextForSession } from "../../lib/nightShare";
 import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
 import { latestSession } from "../../lib/lastSession";
+import { allTransfersPaid } from "../../lib/settlementClosed";
+import { canMarkTransfer, couplePartner } from "../../lib/paymentAccess";
+import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
+import { flushStore } from "../../lib/store";
 import { AL, canon } from "./helpers";
 
 /**
@@ -19,6 +23,8 @@ export function LastSettlementCard({
   commit,
   readOnly = false,
   viewerName = null,
+  isAdmin = false,
+  sessionId = null,
   onMarkPayment = null,
 }) {
   const [editing, setEditing] = useState(false);
@@ -27,11 +33,13 @@ export function LastSettlementCard({
   const me = viewerName ? canon(viewerName, A) : null;
 
   const card = useMemo(() => {
-    const session = latestSession(db?.sessions);
+    const session = sessionId
+      ? (db?.sessions || []).find((s) => s.id === sessionId) || null
+      : latestSession(db?.sessions);
     if (!session) return null;
     const text = settlementTextForSession(session);
     return { session, text: text || "", ...paymentPlan(session) };
-  }, [db?.sessions]);
+  }, [db?.sessions, sessionId]);
 
   if (!card) return null;
 
@@ -39,24 +47,41 @@ export function LastSettlementCard({
   const paidCount = transfers.filter((_, i) => paid[i]).length;
   const outstanding = transfers.reduce((sum, transfer, i) => sum + (paid[i] ? 0 : transfer.amount), 0);
 
-  const isMine = (transfer) => me && canon(transfer.from, A) === me;
+  const partner = couplePartner(me, A);
+  const isMine = (transfer) => {
+    if (!me) return false;
+    const from = canon(transfer.from, A);
+    return from === me || from === partner;
+  };
+  const isSelf = (transfer) => me && canon(transfer.from, A) === me;
   const mine = me ? transfers.map((t, i) => ({ t, i })).filter(({ t }) => isMine(t)) : [];
   const others = me ? transfers.map((t, i) => ({ t, i })).filter(({ t }) => !isMine(t)) : transfers.map((t, i) => ({ t, i }));
 
   const canMark = (!readOnly && !!commit) || typeof onMarkPayment === "function";
   const canEditManual = !readOnly && !!commit;
 
+  const mayToggle = (transfer) => {
+    if (!canMark) return false;
+    if (!readOnly && commit) return true;
+    return canMarkTransfer({ viewerName, transfer, isAdmin, aliases: A });
+  };
+
   const mark = async (index, value) => {
-    if (!canMark || busy != null) return;
+    if (!mayToggle(transfers[index]) || busy != null) return;
     setBusy(index);
     try {
+      const next = markTransfer(session, index, value);
       if (typeof onMarkPayment === "function") {
         await onMarkPayment(session, index, value);
       } else if (commit) {
         commit({
           ...db,
-          sessions: db.sessions.map((s) => (s.id === session.id ? markTransfer(s, index, value) : s)),
+          sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
         });
+        await flushStore();
+      }
+      if (value && allTransfersPaid(next)) {
+        await announceSettlementClosed(session.id);
       }
     } finally {
       setBusy(null);
@@ -79,7 +104,7 @@ export function LastSettlementCard({
           paddingInline: mineRow ? 8 : 0,
         }}
       >
-        {canMark && (
+        {mayToggle(transfer) && (
           <input
             type="checkbox"
             checked={!!paid[index]}
@@ -89,9 +114,9 @@ export function LastSettlementCard({
             style={{ width: 20, height: 20, accentColor: C.win }}
           />
         )}
-        {!canMark && <span style={{ width: 20 }} />}
+        {!mayToggle(transfer) && <span style={{ width: 20 }} />}
         <span style={{ flex: 1 }}>
-          {mineRow ? (
+          {isSelf(transfer) ? (
             <>
               אתה מעביר ל־<b>{transfer.to}</b>
             </>
@@ -145,8 +170,13 @@ export function LastSettlementCard({
         >
           {transfers.length === 0
             ? "אין העברות — כולם סגורים."
-            : `${paidCount} מתוך ${transfers.length} העברות סומנו כשולמו · נותרו ${outstanding.toLocaleString("he-IL")}₪ · כולם רואים את הסטטוס`}
+            : `${paidCount} מתוך ${transfers.length} העברות סומנו כשולמו · נותרו ${outstanding.toLocaleString("he-IL")}₪ · כולם רואים מי העביר`}
         </p>
+        {canMark && (
+          <p style={{ margin: "0 0 8px", fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
+            כל אחד מסמן רק את ההעברה שלו. זוגות מסמנים אחד לשני. המנהל מסמן הכל.
+          </p>
+        )}
         {canEditManual && (
           <button
             type="button"
@@ -184,7 +214,7 @@ export function LastSettlementCard({
               {mine.length > 0 && (
                 <>
                   <div style={{ fontSize: 12, color: C.brass, marginBottom: 4, fontWeight: 700 }}>
-                    מה שאתה צריך להעביר
+                    {partner ? "ההעברות שלך ושל בן או בת הזוג" : "מה שאתה צריך להעביר"}
                   </div>
                   {mine.map(({ t, i }) => (
                     <Row key={`mine-${i}`} transfer={t} index={i} />

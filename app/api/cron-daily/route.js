@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { authorizedCron } from "@/lib/cronAuth";
 import { runPeriodReports } from "@/lib/runPeriodReports";
 import { runPaymentReminders } from "@/lib/runPaymentReminders";
+import { jerusalemHour } from "@/lib/paymentReminder";
 
 /* ============================================================================
    משימה יומית אחת (Hobby מאפשר cron פעם ביום לכל ביטוי).
 
-   ~08:00 שעון ישראל בקיץ (05:00 UTC):
+   08:00 שעון ישראל כל השנה:
+   cron ב־05:00 UTC (קיץ) וב־06:00 UTC (חורף). רץ רק כשהשעה בישראל היא 8.
    1) דוחות חודשי / רבעוני / שנתי שמגיעים + נעיצה לחודש
    2) תזכורת חלוקה אם יש ערב מאתמול ועדיין יש העברות פתוחות
 
@@ -22,6 +24,10 @@ export async function GET(request) {
 
   const forceReports = new URL(request.url).searchParams.get("force");
   const forcePay = Boolean(new URL(request.url).searchParams.get("forcePay"));
+  const hour = jerusalemHour();
+  if (hour !== 8 && !forceReports && !forcePay) {
+    return NextResponse.json({ ok: true, skipped: "not 08:00 Israel", hour });
+  }
 
   const reports = await runPeriodReports({ force: forceReports });
   const payments = await runPaymentReminders({ force: forcePay });

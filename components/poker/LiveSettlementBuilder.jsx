@@ -38,6 +38,7 @@ export function LiveSettlementBuilder({
   initialPayments = [],
   onChange,
   inviteSlug,
+  sessionId,
   dateLabel,
 }) {
   const rawOpening = useMemo(() => openingBalances(players, cps), [players, cps]);
@@ -107,7 +108,7 @@ export function LiveSettlementBuilder({
     [manualPayments, remaining, endedAt]
   );
 
-  const inviteUrl = resolveBrowserInviteUrl(inviteSlug);
+  const inviteUrl = resolveBrowserInviteUrl(inviteSlug, sessionId);
   const inviteText = useMemo(() => {
     let siteUrl;
     let slug = inviteSlug;
@@ -122,9 +123,10 @@ export function LiveSettlementBuilder({
       dateLabel,
       siteUrl,
       slug,
+      sessionId,
       headline: title || "חשבון סופי",
     });
-  }, [inviteUrl, inviteSlug, dateLabel, title]);
+  }, [inviteUrl, inviteSlug, dateLabel, title, sessionId]);
 
   const togglePrefer = (name) => {
     setPrefer((prev) =>

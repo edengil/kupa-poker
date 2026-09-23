@@ -78,6 +78,7 @@ export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
       cps={cps}
       endedAt={session.endedAt || new Date(`${session.iso}T12:00:00`).getTime()}
       title={`חלוקה ${session.d}.${session.mo}.${session.y}`}
+      sessionId={session.id}
       dateLabel={`${session.d}.${session.mo}.${session.y}`}
       summaryText={nightSummaryText(session, AL(db))}
       initialPayments={saved.manualPayments}

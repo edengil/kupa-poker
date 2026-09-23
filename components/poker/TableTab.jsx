@@ -126,7 +126,7 @@ function Ledger({ totals, official, readOnly = false }) {
 }
 
 /* טאב טבלה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function TableTab({ db, commit, years, readOnly = false, scope, setScope, y, setY, mo, setMo, viewerName = null, onMarkPayment = null }) {
+export function TableTab({ db, commit, years, readOnly = false, scope, setScope, y, setY, mo, setMo, viewerName = null, isAdmin = false, onMarkPayment = null, hideSettlement = false }) {
   const [share, setShare] = useState(false);
   const { totals, official, recCount } = useMemo(
     () => periodTotals(db, scope, y, mo),
@@ -139,13 +139,16 @@ export function TableTab({ db, commit, years, readOnly = false, scope, setScope,
 
   return (
     <div style={{ marginTop: 4 }}>
-      <LastSettlementCard
-        db={db}
-        commit={commit}
-        readOnly={readOnly}
-        viewerName={viewerName}
-        onMarkPayment={onMarkPayment}
-      />
+      {!hideSettlement && (
+        <LastSettlementCard
+          db={db}
+          commit={commit}
+          readOnly={readOnly}
+          viewerName={viewerName}
+          isAdmin={isAdmin}
+          onMarkPayment={onMarkPayment}
+        />
+      )}
       <SegBar
         value={scope}
         onChange={setScope}

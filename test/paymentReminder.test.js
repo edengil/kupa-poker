@@ -84,7 +84,7 @@ describe("buildPaymentReminderText", () => {
       slug: "kupa",
     });
     expect(text.startsWith("🤖")).toBe(true);
-    expect(text).toContain("https://example.com/g/kupa");
+    expect(text).toContain("https://example.com/g/kupa/n/s1");
     expect(text).toContain("לא כולם עדיין העבירו");
     expect(text).toContain("נא לאשר בלינק");
     expect(text).not.toMatch(/→/);
@@ -98,5 +98,12 @@ describe("isPaymentReminderWindow", () => {
 
   it("force always opens the window", () => {
     expect(isPaymentReminderWindow(new Date("2026-01-01T00:00:00Z"), { force: true })).toBe(true);
+  });
+
+  it("is only 08:00 Israel in summer and winter", () => {
+    expect(isPaymentReminderWindow(new Date("2026-07-15T05:00:00Z"))).toBe(true);
+    expect(isPaymentReminderWindow(new Date("2026-01-15T06:00:00Z"))).toBe(true);
+    expect(isPaymentReminderWindow(new Date("2026-01-15T05:00:00Z"))).toBe(false);
+    expect(isPaymentReminderWindow(new Date("2026-07-15T06:00:00Z"))).toBe(false);
   });
 });

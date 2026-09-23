@@ -32,7 +32,7 @@ function bootViewerStore(snap) {
   configureStore(makeReadOnlyStore(snapshotForViewer(snap)));
 }
 
-export default function PublicApp({ slug }) {
+export default function PublicApp({ slug, nightId = null }) {
   const supabase = getSupabase();
   const [phase, setPhase] = useState("loading"); // loading | signedOut | ready | missing
   const [groupId, setGroupId] = useState(null);
@@ -247,9 +247,10 @@ export default function PublicApp({ slug }) {
 
   const signIn = async () => {
     const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    const next = nightId ? `/g/${slug}/n/${encodeURIComponent(nightId)}` : `/g/${slug}`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${site}/auth/callback?next=/g/${slug}` },
+      options: { redirectTo: `${site}/auth/callback?next=${encodeURIComponent(next)}` },
     });
   };
 
@@ -306,6 +307,8 @@ export default function PublicApp({ slug }) {
         viewerAuth={viewerAuth}
         initialTab={tabRef.current}
         onMarkPayment={markPayment}
+        focusSessionId={nightId}
+        groupId={groupId}
         onTabChange={(tab) => {
           tabRef.current = tab;
           visitRef.current?.onTab?.(tab);
