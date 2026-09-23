@@ -235,7 +235,6 @@ function App({
             commit={commit}
             readOnly={readOnly}
             onMarkPayment={onMarkPayment}
-            groupId={groupId}
           />
         )}
         <Header />
