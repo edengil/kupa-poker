@@ -55,8 +55,9 @@ test.describe("ערב חי עד חלוקה", () => {
     await finish.click();
 
     await expect(page.getByTestId("live-settlement-builder")).toBeVisible();
-    await expect(page.getByText("חלוקה ידנית · רק אצלך")).toBeVisible();
+    await expect(page.getByText("חלוקה · עריכה אצלך · לינק לקבוצה")).toBeVisible();
     await expect(page.getByText("מי שצריך לשלם")).toBeVisible();
+    await expect(page.getByTestId("settlement-send-invite")).toContainText("אשר ושלח לינק");
     await expect(
       page.getByRole("dialog", { name: "חלוקת תשלומים" }).getByRole("button", { name: "בטה 50₪" })
     ).toBeVisible();
