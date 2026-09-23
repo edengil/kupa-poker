@@ -62,7 +62,7 @@ function Ledger({ totals, official, readOnly = false }) {
       </div>
       <b
         style={{
-          color: t.amount >= 0 ? C.win : C.loss,
+          color: t.amount > 0 ? C.win : t.amount < 0 ? C.loss : C.dim,
           fontVariantNumeric: "tabular-nums",
           fontSize: 15,
         }}
