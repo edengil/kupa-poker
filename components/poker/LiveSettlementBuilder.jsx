@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { C } from "./colors";
 import { IconBtn } from "./ui";
 import { X, Send, Copy, CheckCircle2 } from "./icons";
@@ -15,11 +15,17 @@ import {
   buildManualSettlementText,
   maxPayable,
 } from "../../lib/manualSettlement";
+import {
+  buildSettlementInviteText,
+  resolveBrowserInviteUrl,
+} from "../../lib/settlementInvite";
+import { withBotMark } from "../../lib/botMark";
 
 /**
- * חלוקה ידנית בלייב (מנהל בלבד):
- * לכל חייב — סכום (ברירת מחדל מלוא החוב) + בחירת מקבל מהזוכים.
- * החלוקה שנותרה מחושבת מחדש ואפשר לשלוח לקבוצה.
+ * חלוקה ידנית (מנהל):
+ * - העדפת זוכים כשיש חוסר
+ * - בחירת מי מעביר למי
+ * - שליחת לינק לקבוצה (לא פירוט העברות)
  */
 export function LiveSettlementBuilder({
   players,
@@ -31,11 +37,26 @@ export function LiveSettlementBuilder({
   onDone,
   initialPayments = [],
   onChange,
+  inviteSlug,
+  dateLabel,
 }) {
-  const opening = useMemo(() => openingBalances(players, cps), [players, cps]);
-  const [balances, setBalances] = useState(() =>
-    initialPayments.reduce((b, p) => applyManualPayment(b, p), opening.balances)
+  const rawOpening = useMemo(() => openingBalances(players, cps), [players, cps]);
+  const winnerNames = useMemo(
+    () =>
+      Object.entries(rawOpening.balances)
+        .filter(([, n]) => n > 0)
+        .map(([name]) => name)
+        .sort((a, b) => a.localeCompare(b, "he")),
+    [rawOpening.balances]
   );
+
+  const [prefer, setPrefer] = useState([]);
+  const opening = useMemo(
+    () => openingBalances(players, cps, { preferCreditors: prefer }),
+    [players, cps, prefer]
+  );
+
+  const [balances, setBalances] = useState(opening.balances);
   const [manualPayments, setManualPayments] = useState(initialPayments);
   const [fromName, setFromName] = useState("");
   const [toName, setToName] = useState("");
@@ -44,6 +65,34 @@ export function LiveSettlementBuilder({
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [copied, setCopied] = useState(false);
+  const preferKey = prefer.slice().sort().join("\0");
+  const lastPreferKey = React.useRef(preferKey);
+
+  useEffect(() => {
+    const preferChanged = lastPreferKey.current !== preferKey;
+    lastPreferKey.current = preferKey;
+    const seed = preferChanged ? [] : initialPayments;
+    let next = { ...opening.balances };
+    const kept = [];
+    for (const p of seed) {
+      try {
+        next = applyManualPayment(next, p);
+        kept.push(p);
+      } catch {
+        break;
+      }
+    }
+    setBalances(next);
+    setManualPayments(kept);
+    if (preferChanged) {
+      onChange?.([]);
+      setFromName("");
+      setToName("");
+      setAmount("");
+      setErr("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferKey, players, cps, opening.shortfall]);
 
   const debtors = debtorsOf(balances);
   const creditors = creditorsOf(balances);
@@ -57,6 +106,31 @@ export function LiveSettlementBuilder({
       }),
     [manualPayments, remaining, endedAt]
   );
+
+  const inviteUrl = resolveBrowserInviteUrl(inviteSlug);
+  const inviteText = useMemo(() => {
+    let siteUrl;
+    let slug = inviteSlug;
+    if (inviteUrl) {
+      const m = inviteUrl.match(/^(https?:\/\/[^/]+)\/g\/([^/?#]+)/i);
+      if (m) {
+        siteUrl = m[1];
+        slug = decodeURIComponent(m[2]);
+      }
+    }
+    return buildSettlementInviteText({
+      dateLabel,
+      siteUrl,
+      slug,
+      headline: title || "חשבון סופי",
+    });
+  }, [inviteUrl, inviteSlug, dateLabel, title]);
+
+  const togglePrefer = (name) => {
+    setPrefer((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
 
   const selectDebtor = (name) => {
     setFromName(name);
@@ -83,7 +157,10 @@ export function LiveSettlementBuilder({
         to: toName,
         amount: +amount,
       });
-      const payments = [...manualPayments, { from: fromName, to: toName, amount: Math.round(+amount), id: crypto.randomUUID() }];
+      const payments = [
+        ...manualPayments,
+        { from: fromName, to: toName, amount: Math.round(+amount), id: crypto.randomUUID() },
+      ];
       onChange?.(payments);
       setBalances(next);
       setManualPayments(payments);
@@ -105,7 +182,6 @@ export function LiveSettlementBuilder({
 
   const undoLastManual = () => {
     if (!manualPayments.length) return;
-    /* בונים מחדש מהפתיחה בלי ההעברה האחרונה */
     const kept = manualPayments.slice(0, -1);
     let next = { ...opening.balances };
     for (const p of kept) next = applyManualPayment(next, p);
@@ -192,7 +268,7 @@ export function LiveSettlementBuilder({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
-            <div style={sectionEyebrow}>חלוקה ידנית · רק אצלך</div>
+            <div style={sectionEyebrow}>חלוקה · עריכה אצלך · לינק לקבוצה</div>
             <h2 style={{ margin: "4px 0 0", fontSize: 17, color: C.cream }}>{title || "חלוקת ערב"}</h2>
           </div>
           <IconBtn onClick={onClose} aria-label="סגור" data-testid="settlement-close">
@@ -201,14 +277,62 @@ export function LiveSettlementBuilder({
         </div>
 
         <p style={{ margin: "0 0 12px", color: C.dim, fontSize: 13, lineHeight: 1.5 }}>
-          סמן מי שילם למי במציאות. כל רישום נשמר בערב ומופיע כשולם בטבלה. מה שנשאר יחושב אוטומטית לפני השליחה לקבוצה.
+          קבע מי מעביר למי, ואם יש חוסר — למי לשמור יותר. לקבוצה נשלח רק לינק: כולם נכנסים לאפליקציה,
+          רואים את החלוקה ומסמנים שולם.
         </p>
 
+        {rawOpening.shortfall > 0 && winnerNames.length > 0 && (
+          <div
+            data-testid="shortfall-prefer"
+            style={{
+              border: `1px solid ${C.brass}66`,
+              borderRadius: 14,
+              padding: 12,
+              marginBottom: 14,
+              background: `${C.brass}14`,
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: C.brass }}>
+              חוסר {rawOpening.shortfall}₪ — למי לשמור יותר?
+            </div>
+            <div style={{ fontSize: 12, color: C.dim, marginBottom: 8, lineHeight: 1.45 }}>
+              מי שמסומן ייפגע פחות מהחוסר; השאר יישאו קודם.
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {winnerNames.map((name) => {
+                const on = prefer.includes(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => togglePrefer(name)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 20,
+                      border: `1px solid ${on ? C.brass : C.line}`,
+                      background: on ? `${C.brass}33` : C.feltDeep,
+                      color: C.cream,
+                      fontFamily: "inherit",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {on ? "★ " : ""}
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {debtors.length === 0 ? (
-          <p role="status" style={{ color: C.win, fontWeight: 600 }}>הכול סגור — אין חובות פתוחים.</p>
+          <p role="status" style={{ color: C.win, fontWeight: 600 }}>
+            הכול סגור — אין חובות פתוחים.
+          </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: C.dim }}>מי שצריך לשלם</div>
+            <div style={{ fontSize: 12, color: C.dim }}>מי שצריך לשלם — בחר כדי לשייך מקבל</div>
             {debtors.map((d) => (
               <button
                 key={d.name}
@@ -247,7 +371,7 @@ export function LiveSettlementBuilder({
               gap: 10,
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{fromName} שילם למי?</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{fromName} יעביר למי?</div>
             <label style={{ fontSize: 12, color: C.dim }}>
               מקבל
               <select
@@ -258,7 +382,7 @@ export function LiveSettlementBuilder({
               >
                 {creditors.map((c) => (
                   <option key={c.name} value={c.name}>
-                    {c.name} · מגיע {c.due}₪
+                    {c.name} · נותר {c.due}₪
                   </option>
                 ))}
               </select>
@@ -286,7 +410,14 @@ export function LiveSettlementBuilder({
               <button
                 type="button"
                 onClick={undoLastManual}
-                style={{ background: "none", border: "none", color: C.brass, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: C.brass,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
               >
                 בטל אחרונה
               </button>
@@ -302,9 +433,7 @@ export function LiveSettlementBuilder({
         )}
 
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: C.dim, marginBottom: 6 }}>
-            {debtors.length ? "מה שנשאר לשלוח" : "חלוקה סופית"}
-          </div>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 6 }}>תצוגה מקדימה (רק אצלך)</div>
           <pre
             dir="rtl"
             style={{
@@ -350,15 +479,16 @@ export function LiveSettlementBuilder({
             }}
           >
             <Copy size={16} />
-            {copied ? "הועתק" : "העתק"}
+            {copied ? "הועתק" : "העתק פירוט"}
           </button>
           <button
             type="button"
             disabled={sending}
-            onClick={() => send(settlementText)}
+            data-testid="settlement-send-invite"
+            onClick={() => send(inviteText)}
             style={{
               ...brassCta,
-              flex: 1.2,
+              flex: 1.4,
               padding: 12,
               borderRadius: 12,
               opacity: sending ? 0.7 : 1,
@@ -369,9 +499,36 @@ export function LiveSettlementBuilder({
             }}
           >
             {sent ? <CheckCircle2 size={16} /> : <Send size={16} />}
-            {sent ? "נשלח" : sending ? "שולח…" : "שלח חלוקה"}
+            {sent ? "נשלח" : sending ? "שולח…" : "שלח לינק לקבוצה"}
           </button>
         </div>
+
+        <button
+          type="button"
+          disabled={sending}
+          onClick={() =>
+            send(
+              withBotMark(
+                `${title || "חלוקה"}\n\n${settlementText}\n\n📱 סימון שולם באפליקציה:\n${inviteUrl || ""}`
+              )
+            )
+          }
+          style={{
+            width: "100%",
+            marginTop: 8,
+            padding: 10,
+            borderRadius: 12,
+            border: "none",
+            background: "transparent",
+            color: C.dim,
+            fontFamily: "inherit",
+            fontSize: 12,
+            textDecoration: "underline",
+            cursor: "pointer",
+          }}
+        >
+          שלח גם פירוט מלא לקבוצה (ישן)
+        </button>
 
         {summaryText && (
           <button
@@ -379,7 +536,7 @@ export function LiveSettlementBuilder({
             onClick={() => send(summaryText)}
             style={{
               width: "100%",
-              marginTop: 8,
+              marginTop: 4,
               padding: 10,
               borderRadius: 12,
               border: "none",
@@ -391,7 +548,7 @@ export function LiveSettlementBuilder({
               cursor: "pointer",
             }}
           >
-            שלח גם סיכום נטו + טיפים
+            שלח סיכום נטו + טיפים
           </button>
         )}
       </div>

@@ -221,6 +221,29 @@ describe("settle — unfinished players", () => {
   });
 });
 
+describe("settle — preferCreditors shortfall", () => {
+  it("cuts non-preferred winners first so preferred keep more", () => {
+    // A +100, B +100, C -150 → shortfall 50 after rounding? 
+    // exact: A +100, B +100, C -150 = +50 shortfall
+    const players = [
+      { name: "A", buyin: 0, cashout: "200" },
+      { name: "B", buyin: 0, cashout: "200" },
+      { name: "C", buyin: 150, cashout: "0" },
+    ];
+    const fair = settle(players, 2);
+    expect(fair.shortfall).toBe(50);
+    const netA0 = fair.nets.find((n) => n.name === "A").net;
+    const netB0 = fair.nets.find((n) => n.name === "B").net;
+
+    const preferA = settle(players, 2, { preferCreditors: ["A"] });
+    const netA1 = preferA.nets.find((n) => n.name === "A").net;
+    const netB1 = preferA.nets.find((n) => n.name === "B").net;
+    expect(netA1).toBeGreaterThanOrEqual(netB1);
+    expect(netA1).toBeGreaterThanOrEqual(netA0);
+    expect(netB1).toBeLessThanOrEqual(netB0);
+  });
+});
+
 describe("helpers", () => {
   it("isCashOnly matches exact names only", () => {
     expect(isCashOnly("עדן")).toBe(true);

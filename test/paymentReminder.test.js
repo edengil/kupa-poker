@@ -77,7 +77,7 @@ describe("sessionsDueForPaymentReminder", () => {
 });
 
 describe("buildPaymentReminderText", () => {
-  it("includes app link and bot mark", () => {
+  it("includes app link and open count without transfer lines", () => {
     const s = session();
     const text = buildPaymentReminderText(s, unpaidTransfers(s), {
       siteUrl: "https://example.com",
@@ -86,6 +86,8 @@ describe("buildPaymentReminderText", () => {
     expect(text.startsWith("🤖")).toBe(true);
     expect(text).toContain("https://example.com/g/kupa");
     expect(text).toContain("אישור העברות");
+    expect(text).toMatch(/פתוחות \d+/);
+    expect(text).not.toMatch(/→/);
   });
 });
 

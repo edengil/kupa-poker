@@ -197,7 +197,7 @@ describe("isAllowed", () => {
 });
 
 describe("settle / end replies — app CTA", () => {
-  it("appends the app link when siteUrl+slug are on the settle command", () => {
+  it("sends invite link without net מגיע/חייב lines", () => {
     const live = {
       players: [
         { name: "א", buyin: 100, cashout: "400" },
@@ -212,10 +212,10 @@ describe("settle / end replies — app CTA", () => {
       null
     );
     expect(reply).toContain("חשבון סופי");
-    expect(reply).toContain("📱 לראות את החלוקה באפליקציה:");
+    expect(reply).toContain("📱 מי מעביר למי");
     expect(reply).toContain("https://example.com/g/kupa");
-    /* לא שולחים רשימת העברות לקבוצה — רק לינק */
     expect(reply).not.toMatch(/מעביר \d+ ל/);
+    expect(reply).not.toMatch(/מגיע \d+|חייב \d+/);
   });
 
   it("appends the app link on last cashout in closing mode", () => {
@@ -236,6 +236,10 @@ describe("settle / end replies — app CTA", () => {
     expect(reply).toContain("כולם סגורים");
     expect(reply).toContain("https://example.com/g/kupa");
     expect(reply).not.toContain("לשמירת הערב וחלוקת ההעברות — האפליקציה.");
+    /* אין טבלת נטו בגוף החשבון הסופי — רק לינק (שורת ה־ACK של היציאה יכולה להכיל חייב) */
+    const invitePart = reply.split("כולם סגורים")[1] || "";
+    expect(invitePart).not.toMatch(/🥇|🥈|🥉/);
+    expect(invitePart).not.toMatch(/מעביר \d+ ל/);
   });
 });
 

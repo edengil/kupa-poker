@@ -145,7 +145,7 @@ export function LastSettlementCard({
         >
           {transfers.length === 0
             ? "אין העברות — כולם סגורים."
-            : `${paidCount} מתוך ${transfers.length} העברות סומנו כשולמו · נותרו ${outstanding.toLocaleString("he-IL")}₪`}
+            : `${paidCount} מתוך ${transfers.length} העברות סומנו כשולמו · נותרו ${outstanding.toLocaleString("he-IL")}₪ · כולם רואים את הסטטוס`}
         </p>
         {canEditManual && (
           <button
@@ -160,7 +160,7 @@ export function LastSettlementCard({
               marginBottom: 8,
             }}
           >
-            עריכת חלוקה ידנית
+            עריכת מי מעביר למי
           </button>
         )}
         <div
