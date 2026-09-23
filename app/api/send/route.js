@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabaseServer";
 import { sendToGroup } from "@/lib/whatsapp";
 import { reportError } from "@/lib/monitor";
+import { classifyWhapiSendFailure } from "@/lib/whapiErrors";
 import {
   isNightShareText,
   nightIsoFromText,
@@ -165,17 +166,15 @@ export async function POST(request) {
   } catch (e) {
     await reportError(e, "send");
     const raw = e instanceof Error ? e.message : String(e);
-    // מצב Whapi נפוץ: 401 = טוקן מת, 404 = מזהה קבוצה לא תקין
-    let hint = "השליחה לקבוצה נכשלה";
-    if (/\(401\)/.test(raw)) hint = "טוקן הוואטסאפ לא תקף — צריך לחדש ב־Whapi";
-    else if (/\(402\)/.test(raw) || /trial version limit/i.test(raw)) {
-      hint =
-        "נגמרה מכסת הניסיון ב־Whapi (Trial). צריך לשדרג את הערוץ ל־Live או לחכות לאיפוס המכסה";
-    } else if (/\(403\)/.test(raw)) hint = "אין הרשאה לשלוח לקבוצה בוואטסאפ";
-    else if (/\(404\)/.test(raw)) hint = "מזהה הקבוצה בוואטסאפ לא נמצא";
-    else if (/\(429\)/.test(raw)) hint = "יותר מדי שליחות — נסה שוב בעוד דקה";
+    const { code, hint } = classifyWhapiSendFailure(raw);
     return NextResponse.json(
-      { error: hint, code: "whapi_send", detail: raw.slice(0, 180) },
+      {
+        error: hint,
+        code,
+        detail: raw.slice(0, 180),
+        /* ל־UI: כשמכסה נגמרה אפשר לשתף ידנית מהמכשיר */
+        shareFallback: code === "whapi_quota",
+      },
       { status: 502 }
     );
   }

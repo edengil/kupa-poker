@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { C } from "./colors";
 import { IconBtn } from "./ui";
-import { waOpen } from "./helpers";
+import { waOpen, waShare } from "./helpers";
 import { CheckCircle2, Copy, Send, Share2, X } from "./icons";
 import { sectionEyebrow } from "./festive";
 import { getSupabase } from "../../lib/supabaseClient";
@@ -21,6 +21,7 @@ export function ShareSheet({
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
+  const [quotaFallback, setQuotaFallback] = useState(false);
   const body = view === "split" && settlement ? settlement : text;
 
   const copy = async () => {
@@ -31,10 +32,15 @@ export function ShareSheet({
     } catch {}
   };
 
+  const shareDevice = async () => {
+    await waShare(body);
+  };
+
   // שליחה ישירה לקבוצה דרך הבוט. השרת מאמת שזה אתה לפני שהוא מפרסם.
   const send = async () => {
     setSending(true);
     setErr("");
+    setQuotaFallback(false);
     try {
       const supabase = getSupabase();
       const { data } = await supabase.auth.getSession();
@@ -49,6 +55,9 @@ export function ShareSheet({
       const dataRes = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg = [dataRes.error, dataRes.detail].filter(Boolean).join(" — ");
+        if (dataRes.code === "whapi_quota" || dataRes.shareFallback) {
+          setQuotaFallback(true);
+        }
         throw new Error(msg || "השליחה נכשלה");
       }
       setSent(true);
@@ -198,7 +207,10 @@ export function ShareSheet({
 
         {err && (
           <p style={{ color: C.loss, fontSize: 12.5, margin: "8px 2px 0" }}>
-            {err} — אפשר לשלוח ידנית למטה.
+            {err}
+            {quotaFallback
+              ? " — לחץ «שתף מהמכשיר» למטה כדי לשלוח לקבוצה בלי הבוט."
+              : " — אפשר לשלוח ידנית למטה."}
           </p>
         )}
 
@@ -237,6 +249,32 @@ export function ShareSheet({
           )}
         </button>
 
+        {quotaFallback && (
+          <button
+            onClick={shareDevice}
+            style={{
+              width: "100%",
+              marginTop: 8,
+              padding: 13,
+              borderRadius: 12,
+              border: `1px solid ${C.brass}`,
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: "pointer",
+              background: C.brass,
+              color: C.feltDeep,
+              fontFamily: "inherit",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            <Share2 size={18} />
+            שתף מהמכשיר לקבוצה
+          </button>
+        )}
+
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <button onClick={copy} style={{ ...ghost, color: copied ? C.win : C.cream }}>
             {copied ? (
@@ -251,9 +289,9 @@ export function ShareSheet({
               </>
             )}
           </button>
-          <button onClick={() => waOpen(body)} style={ghost}>
+          <button onClick={() => (quotaFallback ? shareDevice() : waOpen(body))} style={ghost}>
             <Share2 size={18} />
-            פתח בוואטסאפ
+            {quotaFallback ? "שתף" : "פתח בוואטסאפ"}
           </button>
         </div>
       </div>

@@ -6,6 +6,8 @@ import { C } from "./colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./festive";
 import { HOSTS, wazeShortUrl } from "./hosts";
 import { isPlanStale, planTodayIso } from "../../lib/planTiming";
+import { waShare } from "./helpers";
+import { CheckCircle2, Copy, Share2 } from "./icons";
 
 /* תכנון ערב + בחירת מארח. הכתובות עצמן ב-hosts.js. */
 
@@ -42,6 +44,9 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const [note, setNote] = useState("");
   const [sendStatus, setSendStatus] = useState(null); // null | sending | sent | error
   const [sendError, setSendError] = useState("");
+  const [inviteFallbackText, setInviteFallbackText] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
 
   const startEdit = () => {
     const fields = splitPlanFields(plan);
@@ -52,18 +57,40 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     setEditing(true);
     setSendStatus(null);
     setSendError("");
+    setInviteFallbackText("");
   };
 
   const announce = async (next, isUpdate) => {
     if (typeof onPlanShared !== "function") return;
     setSendStatus("sending");
     setSendError("");
+    setInviteFallbackText("");
+    setShared(false);
     try {
       await onPlanShared(next, { isUpdate });
       setSendStatus("sent");
     } catch (e) {
       setSendStatus("error");
       setSendError(e?.message || "השליחה לקבוצה נכשלה");
+      setInviteFallbackText(typeof e?.inviteText === "string" ? e.inviteText : "");
+    }
+  };
+
+  const copyInvite = async () => {
+    if (!inviteFallbackText) return;
+    try {
+      await navigator.clipboard.writeText(inviteFallbackText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  const shareInvite = async () => {
+    if (!inviteFallbackText) return;
+    const ok = await waShare(inviteFallbackText);
+    if (ok) {
+      setShared(true);
+      setTimeout(() => setShared(false), 3000);
     }
   };
 
@@ -87,6 +114,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     setEditing(false);
     setSendStatus(null);
     setSendError("");
+    setInviteFallbackText("");
   };
   const resend = () => {
     if (plan) announce(plan, true);
@@ -306,6 +334,72 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               >
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>ההזמנה נשמרה, אבל לא נשלחה לקבוצה</div>
                 <div style={{ color: C.dim, marginBottom: 8 }}>{sendError}</div>
+                {inviteFallbackText && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                    <button
+                      type="button"
+                      onClick={shareInvite}
+                      style={{
+                        padding: "9px 12px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#25D366",
+                        color: "#06301B",
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                      }}
+                    >
+                      {shared ? (
+                        <>
+                          <CheckCircle2 size={16} />
+                          מוכן — שלח לקבוצה בוואטסאפ
+                        </>
+                      ) : (
+                        <>
+                          <Share2 size={16} />
+                          שתף הזמנה מהמכשיר
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={copyInvite}
+                      style={{
+                        padding: "7px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${C.line}`,
+                        background: "transparent",
+                        color: copied ? C.win : C.cream,
+                        fontFamily: "inherit",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                      }}
+                    >
+                      {copied ? (
+                        <>
+                          <CheckCircle2 size={15} />
+                          הועתק — הדבק בקבוצה
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={15} />
+                          העתק טקסט הזמנה
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
                 <button
                   onClick={resend}
                   style={{
@@ -320,7 +414,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
                     cursor: "pointer",
                   }}
                 >
-                  שלח שוב לקבוצה
+                  שלח שוב דרך הבוט
                 </button>
               </div>
             )}

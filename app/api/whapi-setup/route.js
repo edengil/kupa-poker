@@ -41,8 +41,8 @@ export async function GET(request) {
       throw new Error(`settings patch failed (${patch.status}): ${detail.slice(0, 200)}`);
     }
 
-    // מאפסים גם את הנוכחות הנוכחית, שההתראות יחזרו עוד לפני החיבור מחדש
-    await setPresenceOffline(token);
+    // מאפסים גם את הנוכחות הנוכחית (force — דילוג על throttle)
+    await setPresenceOffline(token, { force: true });
 
     const after = await fetch(`${WHAPI_BASE}/settings`, { headers }).then((r) => r.json());
 

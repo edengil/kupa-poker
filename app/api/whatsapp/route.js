@@ -31,11 +31,6 @@ export const dynamic = "force-dynamic";
 
 const ok = (extra = {}) => NextResponse.json({ ok: true, ...extra });
 
-/* משתנה מודול — שורד בין הפעלות חמות של הפונקציה. אחרי cold start הוא
-   מתאפס וזה בסדר: המחיר הוא איפוס נוכחות אחד מיותר. */
-let lastPresenceReset = 0;
-const PRESENCE_THROTTLE_MS = 5 * 60 * 1000;
-
 function guard(request) {
   const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
   const given = new URL(request.url).searchParams.get("secret");
@@ -107,12 +102,9 @@ export async function POST(request) {
     isAllowed(msg, ownerPhone, "");
   if (groupId && msg.chatId !== groupId && !isOwnerDm) return ok({ skipped: "other chat" });
 
-  /* הודעה שעדן שלח מהטלפון = הוא היה "מחובר", ווואטסאפ יעצור את ההתראות
-     שלו עד שהנוכחות תתאפס. מאפסים אחרי שימוש בטלפון — ההמלצה הרשמית של
-     Whapi — אבל לכל היותר פעם בכמה דקות: התוכנית החינמית מוגבלת
-     ל-1,000 קריאות API בחודש, וכל איפוס נספר. */
-  if (isAllowed(msg, process.env.WHATSAPP_OWNER, "") && Date.now() - lastPresenceReset > PRESENCE_THROTTLE_MS) {
-    lastPresenceReset = Date.now();
+  /* הודעה שעדן שלח מהטלפון = הוא היה "מחובר". איפוס נוכחות עם throttle
+     גלובלי ב־setPresenceOffline — Sandbox מוגבל ל־~1,000 קריאות API/חודש. */
+  if (isAllowed(msg, process.env.WHATSAPP_OWNER, "")) {
     await setPresenceOffline(process.env.WHAPI_TOKEN);
   }
 

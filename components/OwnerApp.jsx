@@ -9,12 +9,12 @@ import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import InstallButton from "./InstallButton";
-import { RsvpList, planLabel } from "./Rsvp";
+import { RsvpList } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "./poker/festive";
 import { C as festiveC } from "./poker/colors";
-import { planShareLocationLines } from "./poker/hosts";
 import { getConfig, onConfig, setConfig } from "./poker/config";
+import { buildPlanInviteText } from "../lib/planInvite";
 
 const C = {
   feltDeep: festiveC.feltDeep,
@@ -418,7 +418,10 @@ export default function OwnerApp() {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = [body.error, body.detail].filter(Boolean).join(" — ");
-      throw new Error(msg || "השליחה לקבוצה נכשלה");
+      const err = new Error(msg || "השליחה לקבוצה נכשלה");
+      err.code = body.code || "whapi_send";
+      err.shareFallback = Boolean(body.shareFallback);
+      throw err;
     }
     return body;
   }, [supabase]);
@@ -438,19 +441,14 @@ export default function OwnerApp() {
     const slug = groupRef.current?.slug;
     if (!slug) throw new Error("אין קישור קבוצה — רענן את העמוד");
     const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-    const head = isUpdate ? "עדכון לערב הפוקר! ♠" : "ערב פוקר מתוכנן! ♠";
-    const location = plan.location || "";
-    const note = plan.note || "";
-    const text = [
-      `🤖 ${head}`,
-      planLabel(plan),
-      ...planShareLocationLines(location),
-      ...(note ? [`📝 הערות: ${note}`] : []),
-      "",
-      "מגיעים? מאשרים הגעה כאן:",
-      `${base}/g/${slug}`,
-    ].join("\n");
-    await sendToWhatsAppGroup(text);
+    const text = buildPlanInviteText(plan, { isUpdate, baseUrl: base, slug });
+    try {
+      await sendToWhatsAppGroup(text);
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      err.inviteText = text;
+      throw err;
+    }
   }, [sendToWhatsAppGroup]);
 
   const signIn = useCallback(async () => {
