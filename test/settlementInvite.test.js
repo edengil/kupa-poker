@@ -17,9 +17,9 @@ describe("settlementInvite", () => {
       tipText: "💸 טיפים הערב\nא · כל הכבוד",
     });
     expect(text).toContain("קופה 500₪");
+    expect(text).toContain("החלוקה אושרה");
     expect(text).toContain("https://example.com/g/kupa");
-    expect(text).toContain("טיפים הערב");
-    expect(text).toContain("סימון");
-    expect(text).not.toMatch(/מעביר \d+/);
+    expect(text).toContain("💸 טיפים הערב");
+    expect(text).not.toMatch(/→/);
   });
 });

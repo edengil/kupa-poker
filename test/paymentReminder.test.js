@@ -85,15 +85,15 @@ describe("buildPaymentReminderText", () => {
     });
     expect(text.startsWith("🤖")).toBe(true);
     expect(text).toContain("https://example.com/g/kupa");
-    expect(text).toContain("אישור העברות");
-    expect(text).toMatch(/פתוחות \d+/);
+    expect(text).toContain("לא כולם עדיין העבירו");
+    expect(text).toContain("נא לאשר בלינק");
     expect(text).not.toMatch(/→/);
   });
 });
 
 describe("isPaymentReminderWindow", () => {
-  it("defaults to 10:00 Israel", () => {
-    expect(PAYMENT_REMINDER_HOUR).toBe(10);
+  it("defaults to 8:00 Israel", () => {
+    expect(PAYMENT_REMINDER_HOUR).toBe(8);
   });
 
   it("force always opens the window", () => {

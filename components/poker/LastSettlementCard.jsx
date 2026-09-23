@@ -79,7 +79,7 @@ export function LastSettlementCard({
           paddingInline: mineRow ? 8 : 0,
         }}
       >
-        {canMark && (mineRow || !readOnly || !me) && (
+        {canMark && (
           <input
             type="checkbox"
             checked={!!paid[index]}
@@ -89,7 +89,7 @@ export function LastSettlementCard({
             style={{ width: 20, height: 20, accentColor: C.win }}
           />
         )}
-        {readOnly && me && !mineRow && <span style={{ width: 20 }} />}
+        {!canMark && <span style={{ width: 20 }} />}
         <span style={{ flex: 1 }}>
           {mineRow ? (
             <>

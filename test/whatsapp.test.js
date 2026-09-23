@@ -212,7 +212,7 @@ describe("settle / end replies — app CTA", () => {
       null
     );
     expect(reply).toContain("חשבון סופי");
-    expect(reply).toContain("📱 מי מעביר למי");
+    expect(reply).toContain("החלוקה אושרה");
     expect(reply).toContain("https://example.com/g/kupa");
     expect(reply).not.toMatch(/מעביר \d+ ל/);
     expect(reply).not.toMatch(/מגיע \d+|חייב \d+/);

@@ -212,9 +212,14 @@ export function LiveSettlementBuilder({
       }
       setSent(true);
       onDone?.({ manualPayments, settlementText: text });
-      setTimeout(() => setSent(false), 3500);
+      setTimeout(() => {
+        setSent(false);
+        onClose?.();
+      }, 900);
+      return true;
     } catch (e) {
       setErr(e.message);
+      return false;
     } finally {
       setSending(false);
     }
@@ -277,8 +282,8 @@ export function LiveSettlementBuilder({
         </div>
 
         <p style={{ margin: "0 0 12px", color: C.dim, fontSize: 13, lineHeight: 1.5 }}>
-          קבע מי מעביר למי, ואם יש חוסר — למי לשמור יותר. לקבוצה נשלח רק לינק: כולם נכנסים לאפליקציה,
-          רואים את החלוקה ומסמנים שולם.
+          ערוך מי מעביר למי (ואם יש חוסר — למי לשמור יותר). לחיצה על «אשר ושלח לינק» שולחת לקבוצה רק
+          לינק: כולם נכנסים, רואים את החלוקה ומסמנים שולם. אפשר לחזור ולערוך מאוחר יותר מכרטיס החלוקה.
         </p>
 
         {rawOpening.shortfall > 0 && winnerNames.length > 0 && (
@@ -485,10 +490,12 @@ export function LiveSettlementBuilder({
             type="button"
             disabled={sending}
             data-testid="settlement-send-invite"
-            onClick={() => send(inviteText)}
+            onClick={async () => {
+              await send(inviteText);
+            }}
             style={{
               ...brassCta,
-              flex: 1.4,
+              flex: 1.6,
               padding: 12,
               borderRadius: 12,
               opacity: sending ? 0.7 : 1,
@@ -499,7 +506,7 @@ export function LiveSettlementBuilder({
             }}
           >
             {sent ? <CheckCircle2 size={16} /> : <Send size={16} />}
-            {sent ? "נשלח" : sending ? "שולח…" : "שלח לינק לקבוצה"}
+            {sent ? "אושר ונשלח" : sending ? "שולח…" : "אשר ושלח לינק"}
           </button>
         </div>
 
