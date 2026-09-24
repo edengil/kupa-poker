@@ -77,6 +77,32 @@ describe("matchViewerToPlayer", () => {
     expect(matchViewerToPlayer(crowded, { full_name: "Eden Gil" })).toBe("עדן גיל");
   });
 
+  it("links Eden's three Google accounts to players already in the table", () => {
+    const linked = miniDb({
+      roster: ["נתנאל כהן", "דן ינקלויץ", "רוי סנדרוביץ"],
+      sessions: [
+        {
+          iso: "2026-08-01",
+          d: 1,
+          mo: 8,
+          y: 2026,
+          entries: [
+            { name: "נתנאל", amount: 10 },
+            { name: "דן", amount: -5 },
+            { name: "רוי", amount: -5 },
+          ],
+        },
+      ],
+    });
+    expect(matchViewerToPlayer(linked, { full_name: "נתי כהן" })).toBe("נתנאל כהן");
+    expect(matchViewerToPlayer(linked, { full_name: "דן יענקילביץ אורן" })).toBe("דן ינקלויץ");
+    expect(matchViewerToPlayer(linked, { full_name: "Royses1" })).toBe("רוי סנדרוביץ");
+    const names = knownPlayerNames(linked);
+    expect(names).not.toContain("נתי כהן");
+    expect(names).not.toContain("דן יענקילביץ אורן");
+    expect(names).not.toContain("Royses1");
+  });
+
   it("returns null for unknown guest", () => {
     expect(matchViewerToPlayer(db, { full_name: "Random Guest" })).toBeNull();
     expect(matchViewerToPlayer(db, {})).toBeNull();
