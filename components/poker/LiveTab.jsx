@@ -5,8 +5,8 @@ import { store, flushStore } from "../../lib/store";
 import { buildReport, partitionByNet } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "../../lib/poker/colors";
-import { fmt, fmtGap } from "../../lib/poker/format";
-import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "../../lib/poker/helpers";
+import { fmt } from "../../lib/poker/format";
+import { r2, AL, canon, waSend } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "../../lib/poker/config";
@@ -22,15 +22,15 @@ import {
   shortCoupleName,
 } from "../../lib/poker/coupleFills";
 import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
-import { ShareSheet } from "./ShareSheet";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
+import { LiveExitField } from "./live/LiveExitField";
+import { LiveDistributionPanel } from "./live/LiveDistributionPanel";
+import { LiveBitShare, LiveShareSheet, LiveSendPrompt } from "./live/LiveShare";
 import { PlanCard } from "./PlanCard";
 import { BotToggle } from "./BotToggle";
 import { PokerTable } from "./PokerTable";
-import {
-  AlertTriangle, CheckCircle2, Plus, Minus, Send, UserPlus, Coins, X,
-} from "./icons";
-import { brassCta, brassCtaMuted, sectionEyebrow, sectionTitle } from "../../lib/poker/festive";
+import { Plus, Minus, UserPlus, Coins, X } from "./icons";
+import { brassCta, sectionEyebrow, sectionTitle } from "../../lib/poker/festive";
 import { checkNightBalance, confirmSaveIfUnbalanced } from "../../lib/poker/nightBalance";
 
 /* טאב לייב — חולץ מ-PokerApp.jsx כ-JSX נקי. */
@@ -823,37 +823,19 @@ export function LiveTab({
                         <Plus size={14} />
                       </RoundBtn>
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        marginRight: "auto",
+                    <LiveExitField
+                      name={p.name}
+                      cashout={p.cashout}
+                      onFocus={() => {
+                        cashoutDraftRef.current[p.name] = p.cashout;
                       }}
-                    >
-                      <span style={{ fontSize: 11.5, color: C.dim }}>יצא (ג&apos;יטונים)</span>
-                      <input
-                        value={p.cashout}
-                        onFocus={() => {
-                          cashoutDraftRef.current[p.name] = p.cashout;
-                        }}
-                        onChange={(e) =>
-                          setField(i, {
-                            cashout: e.target.value.replace(/\D/g, ""),
-                          })
-                        }
-                        onBlur={(e) => commitCashout(i, e.target.value.replace(/\D/g, ""))}
-                        placeholder="—"
-                        aria-label={`יציאה ${p.name}`}
-                        data-testid={`live-cashout-${p.name}`}
-                        style={{
-                          ...inputStyle,
-                          width: 66,
-                          textAlign: "center",
-                          padding: "7px 4px",
-                        }}
-                      />
-                    </div>
+                      onChange={(e) =>
+                        setField(i, {
+                          cashout: e.target.value.replace(/\D/g, ""),
+                        })
+                      }
+                      onBlur={(e) => commitCashout(i, e.target.value.replace(/\D/g, ""))}
+                    />
                   </div>
                 </div>
                 </React.Fragment>
@@ -919,184 +901,32 @@ export function LiveTab({
                 בחוץ
               </div>
             </div>
-            <button
-              onClick={() => waSend(bitReport)}
-              style={{
-                width: "100%",
-                padding: 12,
-                borderRadius: 10,
-                border: "none",
-                fontSize: 14.5,
-                fontWeight: 700,
-                cursor: "pointer",
-                background: "#25D366",
-                color: "#06301B",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-              }}
-            >
-              <Send size={17} />
-              שלח עדכון ביט לוואטסאפ
-            </button>
-            <button
-              onClick={() => setShare({ raw: bitReport })}
-              style={{
-                width: "100%",
-                marginTop: 7,
-                padding: 9,
-                borderRadius: 10,
-                border: `1px solid ${C.line}`,
-                background: "transparent",
-                color: C.dim,
-                fontSize: 12.5,
-                cursor: "pointer",
-              }}
-            >
-              תצוגה מקדימה של הדוח
-            </button>
+            <LiveBitShare
+              onSendUpdate={() => waSend(bitReport)}
+              onPreview={() => setShare({ raw: bitReport })}
+            />
           </div>
 
-          {anyCash && (
-            <div
-              style={{
-                marginTop: 10,
-                background: C.card,
-                border: `1px solid ${netSum === 0 && cashSumChips === potChips ? C.line : C.brass}`,
-                borderRadius: 12,
-                padding: 13,
-                fontSize: 13.5,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 6,
-                }}
-              >
-                <span style={{ color: C.dim }}>יצא (ג&apos;יטונים)</span>
-                <b
-                  style={{
-                    fontVariantNumeric: "tabular-nums",
-                    color: cashSumChips === potChips ? C.cream : C.brass,
-                  }}
-                >
-                  {cashSumChips} / {potChips}
-                </b>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 7,
-                  color: netSum === 0 && cashSumChips === potChips ? C.win : C.brass,
-                  fontWeight: 600,
-                }}
-              >
-                {netSum === 0 && cashSumChips === potChips ? (
-                  <CheckCircle2 size={16} />
-                ) : (
-                  <AlertTriangle size={16} />
-                )}
-                {cashSumChips !== potChips
-                  ? `הג'יטונים לא תואמים לקופה — פער ${fmtGap(r2((cashSumChips - potChips) / cps))}₪`
-                  : netSum === 0
-                    ? "מאוזן"
-                    : `פער ${fmtGap(netSum)}₪`}
-              </div>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={saveNight}
-            disabled={!canFinish}
-            data-testid="live-finish"
-            aria-label="סיים ערב"
-            style={{
-              ...(canFinish ? brassCta : brassCtaMuted),
-              width: "100%",
-              marginTop: 12,
-              padding: 14,
-              borderRadius: 12,
-              fontSize: 16,
-              cursor: canFinish ? "pointer" : "not-allowed",
+          <LiveDistributionPanel
+            anyCash={anyCash}
+            netSum={netSum}
+            cashSumChips={cashSumChips}
+            potChips={potChips}
+            cps={cps}
+            canFinish={canFinish}
+            onFinish={saveNight}
+            actionLog={actionLog}
+            onUndo={undoAction}
+            onCancelGame={() => {
+              if (confirm("לבטל את המשחק הפעיל? הנתונים שלו יימחקו.")) {
+                setPlayers([]);
+                setTips([]);
+                setCoupleFills([]);
+                setActionLog([]);
+                setMenuIdx(null);
+              }
             }}
-          >
-            סיים · שמור · שלח סיכום
-          </button>
-          {!canFinish && <p role="status" style={{ color: C.dim, fontSize: 13 }}>יש להשלים ג׳יטונים ביציאה לכל השחקנים, כולל 0 למי שהפסיד הכול.</p>}
-          {actionLog.length > 0 && (
-            <details style={{ marginTop: 10, color: C.dim, fontSize: 12 }}>
-              <summary style={{ cursor: "pointer" }}>יומן פעולות ({actionLog.length})</summary>
-              <ul style={{ margin: "8px 0 0", paddingInlineStart: 18, lineHeight: 1.7 }}>
-                {[...actionLog].reverse().slice(0, 8).map((a) => (
-                  <li key={a.id}>{labelAction(a)}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-          <div
-            style={{
-              marginTop: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              fontSize: 11.5,
-              color: C.dim,
-            }}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <CheckCircle2 size={13} color={C.win} />
-              המשחק נשמר אוטומטית
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {actionLog.length > 0 && (
-                <button
-                  type="button"
-                  onClick={undoAction}
-                  title={labelAction(actionLog[actionLog.length - 1])}
-                  data-testid="live-undo"
-                  aria-label="בטל אחרון"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: C.brass,
-                    fontSize: 11.5,
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  בטל אחרון
-                </button>
-              )}
-            <button
-              onClick={() => {
-                if (confirm("לבטל את המשחק הפעיל? הנתונים שלו יימחקו.")) {
-                  setPlayers([]);
-                  setTips([]);
-                  setCoupleFills([]);
-                  setActionLog([]);
-                  setMenuIdx(null);
-                }
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: C.loss,
-                fontSize: 11.5,
-                cursor: "pointer",
-                textDecoration: "underline",
-                fontFamily: "inherit",
-              }}
-            >
-              בטל משחק
-            </button>
-            </span>
-          </div>
+          />
         </>
       )}
 
@@ -1107,90 +937,17 @@ export function LiveTab({
         />
       )}
 
-      {share && (
-        <ShareSheet
-          title={share.final ? `סיכום פוקר ${share.d}.${share.mo}` : `עדכון ביט ${dLbl}`}
-          text={share.raw !== undefined ? share.raw : toWhatsApp(share.entries, share, null, A)}
-          settlement={share.settlement}
-          onClose={() => setShare(null)}
-        />
-      )}
-
-      {prompt && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 76,
-            left: 12,
-            right: 12,
-            zIndex: 30,
-            maxWidth: 616,
-            margin: "0 auto",
-            background: C.card,
-            border: `1px solid ${C.brass}`,
-            borderRadius: 14,
-            padding: "11px 13px",
-            boxShadow: "0 6px 24px rgba(0,0,0,.5)",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 13.5,
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {prompt.name} נכנס עוד {prompt.amt}₪
-            </div>
-            <div style={{ fontSize: 11.5, color: C.dim }}>לשלוח עדכון לקבוצה?</div>
-          </div>
-          <button
-            onClick={() => {
-              waOpen(bitReport);
-              setPrompt(null);
-            }}
-            style={{
-              flexShrink: 0,
-              background: "#25D366",
-              color: "#06301B",
-              border: "none",
-              borderRadius: 10,
-              padding: "9px 14px",
-              fontWeight: 700,
-              fontSize: 13.5,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <Send size={15} />
-            שלח
-          </button>
-          <button
-            onClick={() => setPrompt(null)}
-            style={{
-              flexShrink: 0,
-              background: C.feltDeep,
-              border: `1px solid ${C.line}`,
-              borderRadius: 10,
-              padding: 9,
-              color: C.dim,
-              cursor: "pointer",
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
-            <X size={15} />
-          </button>
-        </div>
-      )}
+      <LiveShareSheet
+        share={share}
+        dLbl={dLbl}
+        aliases={A}
+        onClose={() => setShare(null)}
+      />
+      <LiveSendPrompt
+        prompt={prompt}
+        bitReport={bitReport}
+        onDismiss={() => setPrompt(null)}
+      />
     </div>
   );
 }

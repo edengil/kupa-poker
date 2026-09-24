@@ -32,6 +32,11 @@ describe("parseCommands", () => {
     expect(cmds).toHaveLength(2);
   });
 
+  it("parses a buy-in, a tip, and an entries top-up from one message", () => {
+    const cmds = parseCommands("קובי 50\nאופיר 5 טיפ\nעוד 5 כניסות", 50, true);
+    expect(cmds.map((c) => c.kind)).toEqual(["add", "tip", "entries_add"]);
+  });
+
   it("parses settle phrases including שלח סיכום", () => {
     for (const phrase of ["סיכום", "סיום", "סיום משחק", "חלוקה", "שלח סיכום", "שלח חלוקה"]) {
       expect(parseCommands(phrase, 50, true)).toEqual([{ kind: "settle" }]);
@@ -145,6 +150,28 @@ describe("applyCommands", () => {
   it("returns help text for the help command", () => {
     const { reply } = applyCommands(null, [{ kind: "help" }], null);
     expect(reply.startsWith(BOT_MARK)).toBe(true);
+  });
+
+  it("applies every line and folds them into one reply", () => {
+    const seated = {
+      players: [
+        { name: "קובי סעדה", buyin: 100, cashout: "" },
+        { name: "אופיר סנה", buyin: 100, cashout: "" },
+      ],
+      entriesCount: "10",
+      startedAt: 1_700_000_000_000,
+    };
+    const cmds = parseCommands("קובי 50\nאופיר 5 טיפ\nעוד 5 כניסות", 50, true);
+    const { live, reply } = applyCommands(seated, cmds, "batch-1");
+    expect(typeof reply).toBe("string");
+    expect(reply).toContain("קובי סעדה");
+    expect(reply).toContain("+50₪");
+    expect(reply).toContain("אופיר");
+    expect(reply).toContain("נוספו 5 כניסות");
+    expect(reply.split(BOT_MARK).length - 1).toBeGreaterThanOrEqual(3);
+    expect(live.players.find((p) => p.name === "קובי סעדה").buyin).toBe(150);
+    expect(live.players.find((p) => p.name === "אופיר סנה").tipsGiven).toBe(5);
+    expect(String(live.entriesCount)).toBe("15");
   });
 });
 
