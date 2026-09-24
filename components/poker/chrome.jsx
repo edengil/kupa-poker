@@ -2,8 +2,8 @@
 
 import React from "react";
 import { EGMark } from "../Logo";
-import { C } from "./colors";
-import { fmtGap } from "./format";
+import { C } from "../../lib/poker/colors";
+import { fmtGap } from "../../lib/poker/format";
 import {
   AlertTriangle,
   BarChart3,

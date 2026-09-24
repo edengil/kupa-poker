@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { applyTipBackfill, TIP_BACKFILL } from "../components/poker/tipBackfill.js";
+import { applyTipBackfill, TIP_BACKFILL } from "../lib/poker/tipBackfill.js";
 import { tipSummaryForSession } from "../lib/nightShare.js";
-import { sessionTips } from "../components/poker/tipRecords.js";
+import { sessionTips } from "../lib/poker/tipRecords.js";
 
 describe("tip backfill Eden → Oren 30 on 2026-08-23", () => {
   it("defines the one-shot Eden tip for 23.8.2026", () => {

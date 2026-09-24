@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { C } from "./colors";
-import { fmt, MONTHS } from "./format";
-import { periodTotals, yearNum } from "./totals";
+import { C } from "../../lib/poker/colors";
+import { fmt, MONTHS } from "../../lib/poker/format";
+import { periodTotals, yearNum } from "../../lib/poker/totals";
 import { NavBtn } from "./ui";
 import { Award, ChevronLeft, ChevronRight, Crown } from "./icons";
-import { festiveCardSoft } from "./festive";
+import { festiveCardSoft } from "../../lib/poker/festive";
 
 /* באנר דירוג עליון — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function Banner({ db, onPlayer, scope, setScope, y, setY, mo, setMo }) {

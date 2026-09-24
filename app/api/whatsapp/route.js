@@ -7,9 +7,9 @@ import {
   sendToGroup, listGroups, BOT_MARK, setPresenceOffline,
   maybeRemindPending, maybeRemindBitIdle,
 } from "@/lib/whatsapp";
-import { knownPlayerNames } from "@/components/poker/personalHighlights";
-import { AL, canon } from "@/components/poker/helpers";
-import { normalize } from "@/components/poker/db";
+import { knownPlayerNames } from "@/lib/poker/personalHighlights";
+import { AL, canon } from "@/lib/poker/helpers";
+import { normalize } from "@/lib/poker/db";
 import {
   isNightShareText,
   nightIsoFromText,

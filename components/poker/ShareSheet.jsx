@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { C } from "./colors";
+import { C } from "../../lib/poker/colors";
 import { IconBtn } from "./ui";
-import { waOpen, waShare } from "./helpers";
+import { waOpen, waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Send, Share2, X } from "./icons";
-import { sectionEyebrow } from "./festive";
+import { sectionEyebrow } from "../../lib/poker/festive";
 import { getSupabase } from "../../lib/supabaseClient";
 
 /* גיליון שיתוף לסיכום / חלוקה — חולץ מ-PokerApp.jsx כ-JSX נקי. */

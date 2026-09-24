@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { planLabel } from "../Rsvp";
-import { C } from "./colors";
-import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./festive";
-import { HOSTS, wazeShortUrl } from "./hosts";
+import { C } from "../../lib/poker/colors";
+import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "../../lib/poker/festive";
+import { HOSTS, wazeShortUrl } from "../../lib/poker/hosts";
 import { isPlanStale, planTodayIso } from "../../lib/planTiming";
-import { waShare } from "./helpers";
+import { waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Share2 } from "./icons";
 
 /* תכנון ערב + בחירת מארח. הכתובות עצמן ב-hosts.js. */

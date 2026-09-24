@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "./colors";
-import { fmt, MONTHS } from "./format";
-import { AL, canon, r2 } from "./helpers";
-import { periodTotals, yearNum } from "./totals";
+import { C } from "../../lib/poker/colors";
+import { fmt, MONTHS } from "../../lib/poker/format";
+import { AL, canon, r2 } from "../../lib/poker/helpers";
+import { periodTotals, yearNum } from "../../lib/poker/totals";
 import { Empty } from "./ui";
 import { ChevronLeft, Crown } from "./icons";
 

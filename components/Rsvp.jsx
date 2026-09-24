@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { C } from "./poker/colors";
-import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "./poker/festive";
-import { wazeShortUrl } from "./poker/hosts";
+import { C } from "../lib/poker/colors";
+import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "../lib/poker/festive";
+import { wazeShortUrl } from "../lib/poker/hosts";
 
 /* ============================================================================
    אישורי הגעה לערב מתוכנן.

@@ -2,9 +2,9 @@ import fs from "fs";
 import { execSync } from "child_process";
 import {
   r2, AL, balance, canon, DEFAULT_ALIASES, FEMALE, toWhatsApp, hhmm, dur, durWords,
-} from "../components/poker/helpers.js";
-import { fmt, MONTHS } from "../components/poker/format.js";
-import { C } from "../components/poker/colors.js";
+} from "../lib/poker/helpers.js";
+import { fmt, MONTHS } from "../lib/poker/format.js";
+import { C } from "../lib/poker/colors.js";
 
 let failed = 0;
 const ok = (name, cond, detail = "") => {
@@ -16,7 +16,7 @@ const ok = (name, cond, detail = "") => {
 };
 
 const app = fs.readFileSync("components/PokerApp.jsx", "utf8");
-const helpers = fs.readFileSync("components/poker/helpers.js", "utf8");
+const helpers = fs.readFileSync("lib/poker/helpers.js", "utf8");
 
 // --- structural: no leaked defs ---
 const leaks = [
@@ -84,25 +84,25 @@ for (const pat of leaks) ok(`no leak ${pat}`, !app.includes(pat));
 for (const imp of [
   "./poker/SessionsTab",
   "./poker/chrome",
-  "./poker/colors",
+  "../lib/poker/colors",
   "./poker/Banner",
   "./poker/TableTab",
   "./poker/InputTab",
-  "./poker/db",
-  "./poker/brokenRecords",
+  "../lib/poker/db",
+  "../lib/poker/brokenRecords",
   "./poker/RecordsTab",
   "./poker/PlayersTab",
   "./poker/ProfileSheet",
   "./poker/LiveTab",
   "./poker/PokerTable",
-  "./poker/config",
-  "./poker/seed",
+  "../lib/poker/config",
+  "../lib/poker/seed",
 ]) {
   ok(`import ${imp}`, app.includes(imp));
 }
 
-ok("seed.js exists", fs.existsSync("components/poker/seed.js"));
-ok("seed.js exports SEED", fs.readFileSync("components/poker/seed.js", "utf8").includes("export const SEED ="));
+ok("seed.js exists", fs.existsSync("lib/poker/seed.js"));
+ok("seed.js exports SEED", fs.readFileSync("lib/poker/seed.js", "utf8").includes("export const SEED ="));
 
 // --- exports still available for PublicApp/OwnerApp ---
 ok("export brokenRecords", /export\s*\{[^}]*brokenRecords/.test(app) || app.includes("export function brokenRecords"));
@@ -176,7 +176,7 @@ for (const k of ["felt", "feltDeep", "card", "brass", "cream", "win", "loss"]) {
 }
 
 // --- every imported symbol from poker modules is referenced ---
-const importRe = /import\s+(?:\{([^}]+)\}|(\w+))\s+from\s+"(\.\/poker\/[^"]+)"/g;
+const importRe = /import\s+(?:\{([^}]+)\}|(\w+))\s+from\s+"((?:\.\.\/lib\/poker|\.\/poker)\/[^"]+)"/g;
 let m;
 while ((m = importRe.exec(app))) {
   const mod = m[3];
@@ -192,6 +192,19 @@ while ((m = importRe.exec(app))) {
     ok(`used ${name} from ${mod}`, count >= 2, `refs=${count}`);
   }
 }
+
+function listJs(dir, acc = []) {
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = `${dir}/${ent.name}`;
+    if (ent.isDirectory()) listJs(p, acc);
+    else if (/\.(js|mjs)$/.test(ent.name)) acc.push(p);
+  }
+  return acc;
+}
+const badLib = listJs("lib").filter((f) => /from\s+["'][^"']*components\//.test(fs.readFileSync(f, "utf8")));
+ok("lib does not import components", badLib.length === 0, badLib.join(","));
+const uiStray = fs.readdirSync("components/poker").filter((f) => f.endsWith(".js"));
+ok("components/poker is screens only", uiStray.length === 0, uiStray.join(","));
 
 console.log("\n" + (failed ? `${failed} FAILURES` : "ALL CHECKS PASSED"));
 process.exit(failed ? 1 : 0);

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { C } from "./colors";
-import { fmt } from "./format";
-import { playerBalanceBreakdown } from "./totals";
+import { C } from "../../lib/poker/colors";
+import { fmt } from "../../lib/poker/format";
+import { playerBalanceBreakdown } from "../../lib/poker/totals";
 
 function signed(n) {
   if (n > 0) return `+${fmt(n)}`;

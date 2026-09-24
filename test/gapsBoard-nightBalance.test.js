@@ -5,12 +5,12 @@ import {
   suspiciousAliases,
   buildGapsReport,
   DEFAULT_LARGE_GAP,
-} from "../components/poker/gapsBoard.js";
+} from "../lib/poker/gapsBoard.js";
 import {
   checkNightBalance,
   confirmSaveIfUnbalanced,
   unbalancedSaveConfirmMessage,
-} from "../components/poker/nightBalance.js";
+} from "../lib/poker/nightBalance.js";
 
 describe("gapsBoard helpers", () => {
   const dbWithGap = {

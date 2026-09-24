@@ -5,9 +5,9 @@ import {
   resolveEntryChips,
   chipReconstructionCoverage,
   MAX_RECOVERABLE_BUYIN,
-} from "../components/poker/reconstructChips.js";
-import { computeChipRecords } from "../components/poker/chipRecords.js";
-import { buildSeedDb } from "../components/poker/seed.js";
+} from "../lib/poker/reconstructChips.js";
+import { computeChipRecords } from "../lib/poker/chipRecords.js";
+import { buildSeedDb } from "../lib/poker/seed.js";
 
 describe("reconstructedChips formula", () => {
   it("matches Eden 18.7: buyin 300 + net 185 at cps 2 → 970 chips", () => {

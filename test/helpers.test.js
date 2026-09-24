@@ -10,17 +10,17 @@ import {
   hhmm,
   dur,
   durWords,
-} from "../components/poker/helpers.js";
-import { fmt, fmtGap, MONTHS } from "../components/poker/format.js";
+} from "../lib/poker/helpers.js";
+import { fmt, fmtGap, MONTHS } from "../lib/poker/format.js";
 import {
   aggregate,
   yearTotals,
   monthTotals,
   allTimeTotals,
   periodTotals,
-} from "../components/poker/totals.js";
-import { parseEntries, parseDate } from "../components/poker/parse.js";
-import { normalize } from "../components/poker/db.js";
+} from "../lib/poker/totals.js";
+import { parseEntries, parseDate } from "../lib/poker/parse.js";
+import { normalize } from "../lib/poker/db.js";
 import { BOT_MARK } from "../lib/botMark.js";
 
 describe("helpers — numeric", () => {
@@ -237,7 +237,7 @@ describe("totals — period aggregation", () => {
   });
 
   it("playerBalanceBreakdown explains official yearly gap", async () => {
-    const { playerBalanceBreakdown } = await import("../components/poker/totals.js");
+    const { playerBalanceBreakdown } = await import("../lib/poker/totals.js");
     const withOfficial = {
       aliases: {},
       sessions: [

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hostBySlug, wazeNavigateUrl } from "@/components/poker/hosts";
+import { hostBySlug, wazeNavigateUrl } from "@/lib/poker/hosts";
 
 /** קיצור ניווט: /w/itzik → ווייז עם כתובת המארח. */
 export function GET(_request, { params }) {

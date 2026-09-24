@@ -5,8 +5,8 @@ import { playersFromSession, sessionHasBuyinChips, nightSummaryText } from "../.
 import { savedSettlement } from "../../lib/savedSettlement";
 import { paymentPlan, saveManualPayments } from "../../lib/paymentTracking";
 import { flushStore } from "../../lib/store";
-import { AL } from "./helpers";
-import { C } from "./colors";
+import { AL } from "../../lib/poker/helpers";
+import { C } from "../../lib/poker/colors";
 
 /**
  * עריכת חלוקה ידנית לערב שמור — נשמרת ב־session.manualSettlement

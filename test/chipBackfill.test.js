@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { applyChipBackfill, lookupChips, CHIP_BACKFILL } from "../components/poker/chipBackfill.js";
-import { DEFAULT_ALIASES } from "../components/poker/helpers.js";
+import { applyChipBackfill, lookupChips, CHIP_BACKFILL } from "../lib/poker/chipBackfill.js";
+import { DEFAULT_ALIASES } from "../lib/poker/helpers.js";
 
 describe("chip backfill from WhatsApp August 2026", () => {
   it("has four nights from the closing bot", () => {

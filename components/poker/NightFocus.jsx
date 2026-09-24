@@ -4,8 +4,8 @@ import React from "react";
 import { LastSettlementCard } from "./LastSettlementCard";
 import { PersonalStatsCard } from "./PersonalStatsCard";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
-import { festiveCardSoft } from "./festive";
-import { C } from "./colors";
+import { festiveCardSoft } from "../../lib/poker/festive";
+import { C } from "../../lib/poker/colors";
 
 /**
  * לינק חלוקה לערב ספציפי: העברות + סימון שולם, ואז שיאים אישיים.

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { C } from "./colors";
-import { festiveCardSoft, sectionEyebrow } from "./festive";
-import { groupHotForm, playerRecentForm, formatFormNet } from "./recentForm";
+import { C } from "../../lib/poker/colors";
+import { festiveCardSoft, sectionEyebrow } from "../../lib/poker/festive";
+import { groupHotForm, playerRecentForm, formatFormNet } from "../../lib/poker/recentForm";
 
 function Dot({ result, title }) {
   const bg =

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import PokerApp from "./PokerApp";
 import { configureStore } from "../lib/store";
-import { buildSeedDb } from "./poker/seed";
+import { buildSeedDb } from "../lib/poker/seed";
 
 const PREFIX = "poker:preview:";
 

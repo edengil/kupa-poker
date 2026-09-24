@@ -4,13 +4,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store, flushStore } from "../../lib/store";
 import { buildReport, partitionByNet } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
-import { C } from "./colors";
-import { fmt, fmtGap } from "./format";
-import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "./helpers";
+import { C } from "../../lib/poker/colors";
+import { fmt, fmtGap } from "../../lib/poker/format";
+import { r2, AL, canon, toWhatsApp, waOpen, waSend } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
-import { getConfig, onConfig, setConfig, LIVE_KEY } from "./config";
-import { brokenRecords } from "./brokenRecords";
+import { getConfig, onConfig, setConfig, LIVE_KEY } from "../../lib/poker/config";
+import { brokenRecords } from "../../lib/poker/brokenRecords";
 import {
   partnerOf,
   applyCoupleFill,
@@ -20,7 +20,7 @@ import {
   summarizeCoupleFills,
   formatFillBadge,
   shortCoupleName,
-} from "./coupleFills";
+} from "../../lib/poker/coupleFills";
 import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { ShareSheet } from "./ShareSheet";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
@@ -30,8 +30,8 @@ import { PokerTable } from "./PokerTable";
 import {
   AlertTriangle, CheckCircle2, Plus, Minus, Send, UserPlus, Coins, X,
 } from "./icons";
-import { brassCta, brassCtaMuted, sectionEyebrow, sectionTitle } from "./festive";
-import { checkNightBalance, confirmSaveIfUnbalanced } from "./nightBalance";
+import { brassCta, brassCtaMuted, sectionEyebrow, sectionTitle } from "../../lib/poker/festive";
+import { checkNightBalance, confirmSaveIfUnbalanced } from "../../lib/poker/nightBalance";
 
 /* טאב לייב — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function LiveTab({

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "./colors";
-import { fmt } from "./format";
-import { AL, balance, canon, toWhatsApp } from "./helpers";
-import { parseDate, parseEntries } from "./parse";
+import { C } from "../../lib/poker/colors";
+import { fmt } from "../../lib/poker/format";
+import { AL, balance, canon, toWhatsApp } from "../../lib/poker/helpers";
+import { parseDate, parseEntries } from "../../lib/poker/parse";
 import { BalanceMeter } from "./chrome";
 import { Tag } from "./ui";
-import { checkNightBalance, confirmSaveIfUnbalanced } from "./nightBalance";
+import { checkNightBalance, confirmSaveIfUnbalanced } from "../../lib/poker/nightBalance";
 import { applySessionEdit } from "../../lib/sessionEdit";
 
 /**

@@ -2,8 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
-import { C } from "./colors";
-import { festiveCardSoft, festiveGlow, sectionEyebrow } from "./festive";
+import { C } from "../../lib/poker/colors";
+import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
 import { settlementTextForSession } from "../../lib/nightShare";
 import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
 import { latestSession } from "../../lib/lastSession";
@@ -11,7 +11,7 @@ import { allTransfersPaid } from "../../lib/settlementClosed";
 import { canMarkTransfer, couplePartner } from "../../lib/paymentAccess";
 import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
 import { flushStore } from "../../lib/store";
-import { AL, canon } from "./helpers";
+import { AL, canon } from "../../lib/poker/helpers";
 
 /**
  * כרטיס «חלוקה אחרונה» בראש טאב הטבלה — מי מעביר למי.

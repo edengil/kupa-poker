@@ -3,8 +3,8 @@ import {
   matchViewerToPlayer,
   computePersonalHighlights,
   knownPlayerNames,
-} from "../components/poker/personalHighlights.js";
-import { computeRecords } from "../components/poker/computeRecords.js";
+} from "../lib/poker/personalHighlights.js";
+import { computeRecords } from "../lib/poker/computeRecords.js";
 
 function miniDb(extra = {}) {
   return {

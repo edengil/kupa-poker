@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { validateImport } from "../components/poker/db.js";
-import { buildSeedDb } from "../components/poker/seed.js";
+import { validateImport } from "../lib/poker/db.js";
+import { buildSeedDb } from "../lib/poker/seed.js";
 
 describe("backup validation", () => {
   it("accepts the existing seed backup unchanged", () => {

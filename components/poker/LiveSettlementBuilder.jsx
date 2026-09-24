@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { C } from "./colors";
+import { C } from "../../lib/poker/colors";
 import { IconBtn } from "./ui";
 import { X, Send, Copy, CheckCircle2 } from "./icons";
-import { brassCta, sectionEyebrow } from "./festive";
+import { brassCta, sectionEyebrow } from "../../lib/poker/festive";
 import { getSupabase } from "../../lib/supabaseClient";
 import {
   openingBalances,

@@ -3,27 +3,27 @@
    קופה — פוקר · רכיב האפליקציה
    הועבר אוטומטית מ-index.html המקורי. הלוגיקה לא שונתה.
    שינויים: שכבת האחסון הוחלפה ב-lib/store, ונוסף מצב readOnly.
-   המודולים חולצו ל-components/poker/*; כאן נשארת רק מעטפת ה-App.
+   לוגיקה ב-lib/poker, ומסכים ב-components/poker. כאן נשארת רק מעטפת ה-App.
    טאבים כבדים נטענים lazy כדי שהמסך הראשון (טבלה) יעלה מהר.
    ============================================================================ */
 import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback } from "react";
 import { store } from "../lib/store";
-import { C } from "./poker/colors";
+import { C } from "../lib/poker/colors";
 import { Header, TabBar, Style } from "./poker/chrome";
 import { Banner } from "./poker/Banner";
 import { TableTab } from "./poker/TableTab";
-import { normalize } from "./poker/db";
-import { brokenRecords } from "./poker/brokenRecords";
+import { normalize } from "../lib/poker/db";
+import { brokenRecords } from "../lib/poker/brokenRecords";
 import { RecordsAlert } from "./poker/RecordsAlert.jsx";
-import { normalizeRecordAlertLines } from "./poker/recordsAlert";
-import { DB_KEY, loadConfig } from "./poker/config";
-import { applyChipBackfill } from "./poker/chipBackfill";
-import { applyTipBackfill } from "./poker/tipBackfill";
+import { normalizeRecordAlertLines } from "../lib/poker/recordsAlert";
+import { DB_KEY, loadConfig } from "../lib/poker/config";
+import { applyChipBackfill } from "../lib/poker/chipBackfill";
+import { applyTipBackfill } from "../lib/poker/tipBackfill";
 import { PersonalHighlightsCard } from "./poker/PersonalHighlightsCard";
 import { PersonalStatsCard } from "./poker/PersonalStatsCard";
 import { MonthHeroesCard } from "./poker/MonthHeroesCard";
 import { RecentFormCard } from "./poker/RecentFormCard";
-import { matchViewerToPlayer } from "./poker/personalHighlights";
+import { matchViewerToPlayer } from "../lib/poker/personalHighlights";
 import { isGroupAdmin } from "../lib/paymentAccess";
 import { NightFocus } from "./poker/NightFocus";
 import { EGFooter } from "./Logo";
@@ -109,7 +109,7 @@ function App({
           throw new Error("הנתונים שהתקבלו אינם תקינים. לא בוצע שינוי בהיסטוריה.");
         }
       } else {
-        const { buildSeedDb } = await import("./poker/seed");
+        const { buildSeedDb } = await import("../lib/poker/seed");
         d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
       }
       // גיבוי ג'יטונים מצ'אט אוג׳ 2026 — ממלא ערבים ישנים בלי שדה chips

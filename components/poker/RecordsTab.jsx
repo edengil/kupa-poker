@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "./colors";
-import { fmt, MONTHS } from "./format";
-import { computeRecords } from "./computeRecords";
+import { C } from "../../lib/poker/colors";
+import { fmt, MONTHS } from "../../lib/poker/format";
+import { computeRecords } from "../../lib/poker/computeRecords";
 import { Empty } from "./ui";
-import { festiveCardSoft, sectionTitle } from "./festive";
+import { festiveCardSoft, sectionTitle } from "../../lib/poker/festive";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
 import { PersonalStatsCard } from "./PersonalStatsCard";
-import { knownPlayerNames } from "./personalHighlights";
-import { formatNightClock, fmtPct } from "./extraRecords";
-import { durWords } from "./helpers";
+import { knownPlayerNames } from "../../lib/poker/personalHighlights";
+import { formatNightClock, fmtPct } from "../../lib/poker/extraRecords";
+import { durWords } from "../../lib/poker/helpers";
 
 /* טאב שיאים — חולץ מ-PokerApp.jsx. */
 export function RecordsTab({ db, viewerName = null, showMine = false, allowPick = false }) {

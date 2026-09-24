@@ -13,8 +13,8 @@ import {
   reconstructedChips,
   resolveEntryChips,
   chatBuyinFor,
-} from "../components/poker/reconstructChips.js";
-import { sessionDurationMs } from "../components/poker/durationRecords.js";
+} from "../lib/poker/reconstructChips.js";
+import { sessionDurationMs } from "../lib/poker/durationRecords.js";
 
 const JUNE10 = [
   "[10.6.2026, 20:55:43] Eden Gil: איציק 50 ביט",

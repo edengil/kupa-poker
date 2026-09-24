@@ -7,7 +7,7 @@ import {
   wazeNavigateUrl,
   wazeShortUrl,
   planShareLocationLines,
-} from "../components/poker/hosts.js";
+} from "../lib/poker/hosts.js";
 
 describe("HOSTS", () => {
   it("includes Netanel with street and door code", () => {

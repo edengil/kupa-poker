@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { parseCommands, applyCommands, BOT_MARK } from "../lib/whatsapp.js";
 import { nextTipCompliment, formatTipCompliment, TIP_COMPLIMENTS } from "../lib/tipCompliments.js";
-import { computeChipRecords, bestChipCashout } from "../components/poker/chipRecords.js";
-import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS, FILL_COUPLES } from "../components/poker/coupleFills.js";
-import { computeTipRecords } from "../components/poker/tipRecords.js";
-import { computeExtraRecords, weekdayFromStart } from "../components/poker/extraRecords.js";
+import { computeChipRecords, bestChipCashout } from "../lib/poker/chipRecords.js";
+import { applyCoupleFill, partnerOf, computeCoupleFillRecords, summarizeCoupleFills, formatFillBadge, DEFAULT_FILL_CHIPS, FILL_COUPLES } from "../lib/poker/coupleFills.js";
+import { computeTipRecords } from "../lib/poker/tipRecords.js";
+import { computeExtraRecords, weekdayFromStart } from "../lib/poker/extraRecords.js";
 import {
   sessionDurationMs,
   timedSessions,
   computeDurationRecords,
-} from "../components/poker/durationRecords.js";
+} from "../lib/poker/durationRecords.js";
 
 describe("tip commands", () => {
   it("parses אופיר טיפ 10", () => {

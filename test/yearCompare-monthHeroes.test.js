@@ -5,10 +5,10 @@ import {
   monthOverYear,
   yearOverYearByPlayer,
   formatYoyShort,
-} from "../components/poker/yearCompare.js";
-import { computeMonthHeroes, currentCalendarMonth } from "../components/poker/monthHeroes.js";
-import { playerBalanceBreakdown, availableYears } from "../components/poker/totals.js";
-import { computePersonalStats } from "../components/poker/personalStats.js";
+} from "../lib/poker/yearCompare.js";
+import { computeMonthHeroes, currentCalendarMonth } from "../lib/poker/monthHeroes.js";
+import { playerBalanceBreakdown, availableYears } from "../lib/poker/totals.js";
+import { computePersonalStats } from "../lib/poker/personalStats.js";
 
 function dbMulti() {
   return {

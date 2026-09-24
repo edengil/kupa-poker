@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { C } from "./colors";
-import { AL } from "./helpers";
+import { C } from "../../lib/poker/colors";
+import { AL } from "../../lib/poker/helpers";
 import { IconBtn, inputStyle } from "./ui";
 import { ChevronDown, Trash2, Users } from "./icons";
 

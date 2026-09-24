@@ -1,8 +1,8 @@
 "use client";
 /* באנר קצר כשנשבר שיא בסוף ערב — באפליקציה, לא רק בוואטסאפ. */
 import React, { useEffect } from "react";
-import { C } from "./colors";
-import { normalizeRecordAlertLines } from "./recordsAlert.js";
+import { C } from "../../lib/poker/colors";
+import { normalizeRecordAlertLines } from "../../lib/poker/recordsAlert.js";
 
 const AUTO_DISMISS_MS = 12_000;
 

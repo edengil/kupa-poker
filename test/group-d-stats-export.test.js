@@ -4,12 +4,12 @@ import {
   computePartnerEdges,
   formatNightClock,
   nightMinutes,
-} from "../components/poker/extraRecords.js";
+} from "../lib/poker/extraRecords.js";
 import {
   computePersonalStats,
   personalStatRows,
-} from "../components/poker/personalStats.js";
-import { sessionsToCsv, playersToCsv } from "../components/poker/csvExport.js";
+} from "../lib/poker/personalStats.js";
+import { sessionsToCsv, playersToCsv } from "../lib/poker/csvExport.js";
 
 function dbOf(sessions, aliases = {}) {
   return { aliases, roster: [], yearly: [], sessions };

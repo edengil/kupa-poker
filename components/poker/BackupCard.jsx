@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { C } from "./colors";
-import { exportDb, validateImport } from "./db";
-import { exportSessionsCsv } from "./csvExport";
+import { C } from "../../lib/poker/colors";
+import { exportDb, validateImport } from "../../lib/poker/db";
+import { exportSessionsCsv } from "../../lib/poker/csvExport";
 import { Download, Upload } from "./icons";
 
 const btn = {

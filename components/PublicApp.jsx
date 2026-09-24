@@ -11,8 +11,8 @@ import { paymentPlan, markPaymentViaRpc } from "../lib/paymentTracking";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
-import { authShell, brassCta } from "./poker/festive";
-import { C as festiveC } from "./poker/colors";
+import { authShell, brassCta } from "../lib/poker/festive";
+import { C as festiveC } from "../lib/poker/colors";
 
 const C = {
   feltDeep: festiveC.feltDeep,

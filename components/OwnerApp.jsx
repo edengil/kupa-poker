@@ -11,9 +11,9 @@ import ViewerStats from "./ViewerStats";
 import InstallButton from "./InstallButton";
 import { RsvpList } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
-import { authShell, brassCta } from "./poker/festive";
-import { C as festiveC } from "./poker/colors";
-import { getConfig, onConfig, setConfig } from "./poker/config";
+import { authShell, brassCta } from "../lib/poker/festive";
+import { C as festiveC } from "../lib/poker/colors";
+import { getConfig, onConfig, setConfig } from "../lib/poker/config";
 import { buildPlanInviteText } from "../lib/planInvite";
 
 const C = {

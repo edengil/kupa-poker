@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { C } from "./colors";
-import { fmt } from "./format";
-import { formatYoyShort } from "./yearCompare";
+import { C } from "../../lib/poker/colors";
+import { fmt } from "../../lib/poker/format";
+import { formatYoyShort } from "../../lib/poker/yearCompare";
 
 /**
  * שורת «מול אשתקד» — סכום ו-% קצרים.

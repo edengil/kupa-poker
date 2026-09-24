@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { C } from "./colors";
+import { C } from "../../lib/poker/colors";
 import { ChevronDown } from "./icons";
 
 /* ============================================================================

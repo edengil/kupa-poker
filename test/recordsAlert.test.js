@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeRecordAlertLines } from "../components/poker/recordsAlert.js";
+import { normalizeRecordAlertLines } from "../lib/poker/recordsAlert.js";
 
 describe("normalizeRecordAlertLines", () => {
   it("returns null for empty / invalid", () => {

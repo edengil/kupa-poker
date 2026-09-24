@@ -8,8 +8,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { DEFAULT_ALIASES, r2 } from "../components/poker/helpers.js";
-import { hostPlayerFromLocation } from "../components/poker/hosts.js";
+import { DEFAULT_ALIASES, r2 } from "../lib/poker/helpers.js";
+import { hostPlayerFromLocation } from "../lib/poker/hosts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");

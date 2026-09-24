@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { C } from "./colors";
-import { fmt, fmtGap } from "./format";
-import { AL, balance, canon } from "./helpers";
+import { C } from "../../lib/poker/colors";
+import { fmt, fmtGap } from "../../lib/poker/format";
+import { AL, balance, canon } from "../../lib/poker/helpers";
 import { Empty, IconBtn } from "./ui";
 import { Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";

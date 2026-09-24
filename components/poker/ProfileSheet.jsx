@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "./colors";
-import { fmt } from "./format";
-import { AL, canon, r2 } from "./helpers";
-import { availableYears, playerBalanceBreakdown } from "./totals";
+import { C } from "../../lib/poker/colors";
+import { fmt } from "../../lib/poker/format";
+import { AL, canon, r2 } from "../../lib/poker/helpers";
+import { availableYears, playerBalanceBreakdown } from "../../lib/poker/totals";
 import { IconBtn, Stat } from "./ui";
 import { TrendingUp, X } from "./icons";
 import { CumChart } from "./CumChart";
 import { PersonalStatsCard } from "./PersonalStatsCard";
 import { BalanceBreakdown } from "./BalanceBreakdown";
-import { computePersonalStats } from "./personalStats";
+import { computePersonalStats } from "../../lib/poker/personalStats";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ProfileSheet({ db, name, onClose }) {

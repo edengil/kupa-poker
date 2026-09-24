@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "./colors";
-import { fmt } from "./format";
+import { C } from "../../lib/poker/colors";
+import { fmt } from "../../lib/poker/format";
 import { ChevronDown, AlertTriangle } from "./icons";
-import { buildGapsReport, DEFAULT_LARGE_GAP } from "./gapsBoard.js";
+import { buildGapsReport, DEFAULT_LARGE_GAP } from "../../lib/poker/gapsBoard.js";
 
 function fmtIsoHe(iso) {
   if (!iso || typeof iso !== "string") return iso || "";
