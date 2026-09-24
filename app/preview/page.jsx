@@ -9,5 +9,6 @@ export default function PreviewPage({ searchParams }) {
     notFound();
   }
   const failFlush = searchParams?.failFlush === "1";
-  return <PreviewApp failFlush={failFlush} />;
+  const viewerName = typeof searchParams?.as === "string" ? searchParams.as : "";
+  return <PreviewApp failFlush={failFlush} viewerName={viewerName} />;
 }

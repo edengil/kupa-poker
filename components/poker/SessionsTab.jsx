@@ -10,6 +10,11 @@ import { ShareSheet } from "./ShareSheet";
 import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SessionEditSheet } from "./SessionEditSheet";
+import { latestNightConfirmations } from "../../lib/nightConfirmations";
+import { markTransfer } from "../../lib/paymentTracking";
+import { allTransfersPaid } from "../../lib/settlementClosed";
+import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
+import { flushStore } from "../../lib/store";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function SessionsTab({ db, commit }) {
@@ -17,7 +22,27 @@ export function SessionsTab({ db, commit }) {
   const [settlementId, setSettlementId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [busyPay, setBusyPay] = useState(null);
   const A = AL(db);
+  const latestView = latestNightConfirmations(db.sessions);
+  const latestId = latestView?.session?.id ?? null;
+
+  const markLatest = async (index, value) => {
+    if (!latestView || !commit || busyPay != null) return;
+    const session = latestView.session;
+    setBusyPay(index);
+    try {
+      const next = markTransfer(session, index, value);
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
+      });
+      await flushStore();
+      if (value && allTransfersPaid(next)) await announceSettlementClosed(session.id);
+    } finally {
+      setBusyPay(null);
+    }
+  };
   if (!db.sessions.length) {
     return <Empty text="עדיין אין ערבים. עבור להזנה או ללייב." />;
   }
@@ -41,7 +66,10 @@ export function SessionsTab({ db, commit }) {
     });
   };
 
-  const list = [...db.sessions].sort((a, b) => b.iso.localeCompare(a.iso));
+  const byDate = [...db.sessions].sort((a, b) => b.iso.localeCompare(a.iso));
+  const list = latestId
+    ? [latestView.session, ...byDate.filter((s) => s.id !== latestId)]
+    : byDate;
 
   return (
     <div
@@ -147,6 +175,53 @@ export function SessionsTab({ db, commit }) {
               {b.gap === 0 ? "✓ מאוזן" : `⚠ פער ${fmtGap(b.gap)}`}
               {even.length > 0 ? ` · ${even.length} סגרו באפס` : ""}
             </div>
+            {s.id === latestId && latestView && (
+              <div
+                data-testid="latest-night-confirmations"
+                aria-label={`אישורי העברה בערב ${s.d}.${s.mo}.${s.y}`}
+                style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 800, color: C.brass, marginBottom: 4 }}>
+                  אישורי העברה · ערב אחרון · {s.d}.{s.mo}.{s.y}
+                </div>
+                <p style={{ margin: "0 0 8px", fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
+                  {latestView.rows.length === 0
+                    ? "אין העברות — כולם סגורים."
+                    : `${latestView.confirmedCount} מתוך ${latestView.rows.length} העברות סומנו כשולמו`}
+                </p>
+                {latestView.rows.map((row) => (
+                  <label
+                    key={row.index}
+                    data-testid={`night-confirm-row-${row.index}`}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      padding: "8px 0",
+                      borderBottom: `1px solid ${C.line}`,
+                      fontSize: 13.5,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={row.confirmed}
+                      disabled={busyPay === row.index}
+                      onChange={(e) => markLatest(row.index, e.target.checked)}
+                      aria-label={`שולם: ${row.from} אל ${row.to}, ${row.amount} שקלים`}
+                      data-testid={`night-confirm-paid-${row.index}`}
+                      style={{ width: 20, height: 20, accentColor: C.win }}
+                    />
+                    <span style={{ flex: 1 }}>
+                      {row.from} אל {row.to}
+                    </span>
+                    <b>{row.amount}₪</b>
+                    <span style={{ color: row.confirmed ? C.win : C.dim, fontSize: 12, minWidth: 48 }}>
+                      {row.confirmed ? "שולם" : "ממתין"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}

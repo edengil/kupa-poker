@@ -11,7 +11,7 @@ const PREFIX = "poker:preview:";
  * סביבת בדיקה מקומית.
  * ?failFlush=1 — set מצליח מקומית אבל flush נכשל (סימולציית ניתוק מהשרת).
  */
-export default function PreviewApp({ failFlush = false }) {
+export default function PreviewApp({ failFlush = false, viewerName = "" }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const defaults = {
@@ -49,7 +49,9 @@ export default function PreviewApp({ failFlush = false }) {
         סביבת בדיקה מקומית · השינויים נשמרים בדפדפן בלבד · אין לשלוח הודעות לקבוצה
         {failFlush ? " · סימולציית כשל שמירה לשרת" : ""}
       </div>
-      {ready && <PokerApp />}
+      {ready && (
+        <PokerApp viewerAuth={viewerName ? { full_name: viewerName } : null} />
+      )}
     </>
   );
 }
