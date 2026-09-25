@@ -127,6 +127,27 @@ describe("matchViewerToPlayer", () => {
     expect(names).not.toContain("יצחק תפילין");
   });
 
+  it("links אורן מלאך to the existing player אורן גיל", () => {
+    const linked = miniDb({
+      roster: ["אורן גיל", "אורן אחר"],
+      sessions: [
+        {
+          iso: "2026-09-01",
+          d: 1,
+          mo: 9,
+          y: 2026,
+          entries: [
+            { name: "אורן גיל", amount: 10 },
+            { name: "אורן אחר", amount: -10 },
+          ],
+        },
+      ],
+    });
+    expect(matchViewerToPlayer(linked, { full_name: "אורן מלאך" })).toBe("אורן גיל");
+    expect(knownPlayerNames(linked)).toContain("אורן גיל");
+    expect(knownPlayerNames(linked)).not.toContain("אורן מלאך");
+  });
+
   it("returns null for unknown guest", () => {
     expect(matchViewerToPlayer(db, { full_name: "Random Guest" })).toBeNull();
     expect(matchViewerToPlayer(db, {})).toBeNull();

@@ -281,13 +281,16 @@ revoke all on function public.public_group_v2(text) from public, anon;
 grant execute on function public.public_group_v2(text) to authenticated;
 
 -- Viewers mark settlement transfers paid without full group write access.
+drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text);
+drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text, text);
 create or replace function public.mark_group_payment(
   p_slug text,
   p_session_id text,
   p_fingerprint text,
   p_index integer,
   p_paid boolean,
-  p_field text default 'paid'
+  p_field text default 'paid',
+  p_by text default null
 )
 returns jsonb
 language plpgsql
@@ -302,6 +305,7 @@ declare
   sid text;
   payments jsonb;
   paid_map jsonb;
+  conf jsonb;
   out_sessions jsonb := '[]'::jsonb;
   session_found boolean := false;
 begin
@@ -333,13 +337,23 @@ begin
       end if;
       paid_map := coalesce(payments->p_field, '{}'::jsonb);
       paid_map := jsonb_set(paid_map, array[p_index::text], to_jsonb(p_paid), true);
+      conf := coalesce(payments->'confirmations', '[]'::jsonb);
+      if p_paid is true and coalesce(btrim(p_by), '') <> '' then
+        conf := conf || jsonb_build_array(jsonb_build_object(
+          'index', p_index,
+          'action', p_field,
+          'by', btrim(p_by),
+          'at', to_char(clock_timestamp() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+        ));
+      end if;
       sess := jsonb_set(
         sess,
         '{payments}',
         jsonb_build_object(
           'plan', p_fingerprint,
           'paid', case when p_field = 'paid' then paid_map else coalesce(payments->'paid', '{}'::jsonb) end,
-          'received', case when p_field = 'received' then paid_map else coalesce(payments->'received', '{}'::jsonb) end
+          'received', case when p_field = 'received' then paid_map else coalesce(payments->'received', '{}'::jsonb) end,
+          'confirmations', conf
         ),
         true
       );
@@ -361,5 +375,5 @@ begin
 end;
 $$;
 
-revoke all on function public.mark_group_payment(text, text, text, integer, boolean, text) from public, anon;
-grant execute on function public.mark_group_payment(text, text, text, integer, boolean, text) to authenticated;
+revoke all on function public.mark_group_payment(text, text, text, integer, boolean, text, text) from public, anon;
+grant execute on function public.mark_group_payment(text, text, text, integer, boolean, text, text) to authenticated;

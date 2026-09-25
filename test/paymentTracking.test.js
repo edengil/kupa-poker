@@ -16,6 +16,17 @@ describe("payment tracking", () => {
     const next = paymentPlan({ ...paid, entries: [{ name: "א", amount: 50 }, { name: "ב", amount: -50 }] });
     expect(next.paid).toEqual({});
     expect(next.received).toEqual({});
+    expect(next.confirmations).toEqual([]);
+  });
+  it("stores who confirmed on the same payments object and skips a name when none was given", () => {
+    const paid = markTransfer(session, 0, true, "אורן גיל");
+    expect(paymentPlan(paid).confirmations[0]).toMatchObject({ index: 0, action: "paid", by: "אורן גיל" });
+    expect(paymentPlan(markTransfer(session, 0, true)).confirmations).toEqual([]);
+    expect(paymentPlan(markReceipt(session, 0, true, "קובי סעדה")).confirmations[0]).toMatchObject({
+      index: 0,
+      action: "received",
+      by: "קובי סעדה",
+    });
   });
   it("keeps payer and receiver marks on the same payment plan", () => {
     const both = markReceipt(markTransfer(session, 0, true), 0, true);

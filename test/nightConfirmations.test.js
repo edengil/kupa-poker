@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { markReceipt, markTransfer } from "../lib/paymentTracking.js";
 import {
+  confirmationStatusText,
   latestNightConfirmations,
   receiptConfirmPrompt,
   transferConfirmPrompt,
@@ -171,6 +172,20 @@ describe("receiver confirmation", () => {
 
     expect(transferConfirmPrompt([latest], "אופיר")).not.toBeNull();
     expect(receiptConfirmPrompt([latest], "קובי")).not.toBeNull();
+  });
+
+  it("shows one closed state and who confirmed, without inventing a name for an older mark", () => {
+    const paid = markTransfer(latest, 0, true, "אופיר סנה");
+    const view = latestNightConfirmations([paid]);
+    expect(view.rows[0].action).toBe("paid");
+    expect(view.rows[0].by).toBe("אופיר סנה");
+    expect(confirmationStatusText(view.rows[0])).toBe("שולם · אופיר סנה");
+    const got = markReceipt(latest, 0, true, "קובי סעדה");
+    expect(confirmationStatusText(latestNightConfirmations([got]).rows[0])).toBe("התקבל · קובי סעדה");
+    const legacy = latestNightConfirmations([markTransfer(latest, 0, true)]);
+    expect(legacy.rows[0].closed).toBe(true);
+    expect(legacy.rows[0].by).toBeNull();
+    expect(confirmationStatusText(legacy.rows[0])).toBe("שולם");
   });
 
   it("lets a couple partner confirm receipt", () => {

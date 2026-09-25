@@ -10,11 +10,7 @@ import { ShareSheet } from "./ShareSheet";
 import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SessionEditSheet } from "./SessionEditSheet";
-import { latestNightConfirmations } from "../../lib/nightConfirmations";
-import { markReceipt, markTransfer } from "../../lib/paymentTracking";
-import { allTransfersPaid } from "../../lib/settlementClosed";
-import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
-import { flushStore } from "../../lib/store";
+import { confirmationStatusText, latestNightConfirmations } from "../../lib/nightConfirmations";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function SessionsTab({ db, commit }) {
@@ -22,28 +18,10 @@ export function SessionsTab({ db, commit }) {
   const [settlementId, setSettlementId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [editing, setEditing] = useState(null);
-  const [busyPay, setBusyPay] = useState(null);
   const A = AL(db);
   const latestView = latestNightConfirmations(db.sessions);
   const latestId = latestView?.session?.id ?? null;
 
-  const markLatest = async (index, value, side) => {
-    if (!latestView || !commit || busyPay != null) return;
-    const session = latestView.session;
-    setBusyPay(`${side}-${index}`);
-    try {
-      const next =
-        side === "received" ? markReceipt(session, index, value) : markTransfer(session, index, value);
-      commit({
-        ...db,
-        sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
-      });
-      await flushStore();
-      if (value && allTransfersPaid(next)) await announceSettlementClosed(session.id);
-    } finally {
-      setBusyPay(null);
-    }
-  };
   if (!db.sessions.length) {
     return <Empty text="עדיין אין ערבים. עבור להזנה או ללייב." />;
   }
@@ -207,35 +185,11 @@ export function SessionsTab({ db, commit }) {
                       {row.from} אל {row.to}
                     </span>
                     <b>{row.amount}₪</b>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <input
-                        type="checkbox"
-                        checked={row.confirmed}
-                        disabled={busyPay != null}
-                        onChange={(e) => markLatest(row.index, e.target.checked, "paid")}
-                        aria-label={`שולם: ${row.from} אל ${row.to}, ${row.amount} שקלים`}
-                        data-testid={`night-confirm-paid-${row.index}`}
-                        style={{ width: 18, height: 18, accentColor: C.win }}
-                      />
-                    </label>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <input
-                        type="checkbox"
-                        checked={row.received}
-                        disabled={busyPay != null || row.manual}
-                        onChange={(e) => markLatest(row.index, e.target.checked, "received")}
-                        aria-label={`התקבל: ${row.from} אל ${row.to}, ${row.amount} שקלים`}
-                        data-testid={`night-confirm-received-${row.index}`}
-                        style={{ width: 18, height: 18, accentColor: C.win }}
-                      />
-                    </label>
                     <span
                       data-testid={`night-confirm-state-${row.index}`}
-                      style={{ color: row.closed ? C.win : C.dim, fontSize: 12, minWidth: 72 }}
+                      style={{ color: row.closed ? C.win : C.dim, fontSize: 12 }}
                     >
-                      {row.closed
-                        ? [row.confirmed ? "שולם" : null, row.received ? "התקבל" : null].filter(Boolean).join(" · ")
-                        : "ממתין"}
+                      {confirmationStatusText(row)}
                     </span>
                   </div>
                 ))}

@@ -27,8 +27,8 @@ test.describe("אישור העברה", () => {
     await expect(panel.getByText("ממתין").first()).toBeVisible();
     await expect(panel.getByText("שולם")).toHaveCount(0);
     await expect(panel.getByText("התקבל")).toHaveCount(0);
-    await expect(panel.getByTestId("night-confirm-paid-0")).toBeVisible();
-    await expect(panel.getByTestId("night-confirm-received-0")).toBeVisible();
+    await expect(panel.locator("input[type=checkbox]")).toHaveCount(0);
+    await expect(panel.getByTestId("night-confirm-state-0")).toBeVisible();
     await expect(panel.getByText(/אל /).first()).toBeVisible();
   });
 
@@ -57,7 +57,7 @@ test.describe("אישור העברה", () => {
     await page.getByTestId("tab-sessions").click();
     const panel = page.getByTestId("latest-night-confirmations");
     const row = panel.locator("[data-testid^='night-confirm-row-']", { hasText: "אופיר" });
-    await expect(row.getByText("שולם")).toBeVisible();
+    await expect(row.getByText(/שולם ·/)).toBeVisible();
     await expect(row.getByText("ממתין")).toHaveCount(0);
   });
 
@@ -87,7 +87,7 @@ test.describe("אישור העברה", () => {
     await page.getByTestId("tab-sessions").click();
     const panel = page.getByTestId("latest-night-confirmations");
     const row = panel.locator("[data-testid^='night-confirm-row-']", { hasText: "קובי" }).first();
-    await expect(row.getByText("התקבל")).toBeVisible();
+    await expect(row.getByText(/התקבל ·/)).toBeVisible();
     await expect(row.getByText("ממתין")).toHaveCount(0);
   });
 });

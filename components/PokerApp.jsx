@@ -192,11 +192,11 @@ function App({
     if (!transferPrompt || !db) return;
     let next = transferPrompt.session;
     for (const row of transferPrompt.rows) {
-      next = markTransfer(next, row.index, true);
+      next = markTransfer(next, row.index, true, viewerName);
     }
     if (typeof onMarkPayment === "function") {
       for (const row of transferPrompt.rows) {
-        await onMarkPayment(transferPrompt.session, row.index, true);
+        await onMarkPayment(transferPrompt.session, row.index, true, "paid", viewerName);
       }
     } else if (!readOnly) {
       commit({
@@ -207,16 +207,16 @@ function App({
     }
     if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setTransferPromptDismissed(true);
-  }, [transferPrompt, db, onMarkPayment, readOnly]);
+  }, [transferPrompt, db, onMarkPayment, readOnly, viewerName]);
   const confirmOwnReceipts = useCallback(async () => {
     if (!receiptPrompt || !db) return;
     let next = receiptPrompt.session;
     for (const row of receiptPrompt.rows) {
-      next = markReceipt(next, row.index, true);
+      next = markReceipt(next, row.index, true, viewerName);
     }
     if (typeof onMarkPayment === "function") {
       for (const row of receiptPrompt.rows) {
-        await onMarkPayment(receiptPrompt.session, row.index, true, "received");
+        await onMarkPayment(receiptPrompt.session, row.index, true, "received", viewerName);
       }
     } else if (!readOnly) {
       commit({
@@ -227,7 +227,7 @@ function App({
     }
     if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setReceiptPromptDismissed(true);
-  }, [receiptPrompt, db, onMarkPayment, readOnly]);
+  }, [receiptPrompt, db, onMarkPayment, readOnly, viewerName]);
 
   const dismissRecordAlert = useCallback(() => setRecordAlert(null), []);
   const handleRecords = useCallback(

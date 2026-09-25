@@ -70,9 +70,9 @@ export function LastSettlementCard({
     if (!mayToggle(transfers[index]) || busy != null) return;
     setBusy(index);
     try {
-      const next = markTransfer(session, index, value);
+      const next = markTransfer(session, index, value, viewerName);
       if (typeof onMarkPayment === "function") {
-        await onMarkPayment(session, index, value);
+        await onMarkPayment(session, index, value, "paid", viewerName);
       } else if (commit) {
         commit({
           ...db,

@@ -33,6 +33,9 @@ describe("public history SQL enforcement", () => {
     const receipt = readFileSync(new URL("../supabase/migrations/202609250001_receipt_confirmation.sql", import.meta.url), "utf8");
     await db.exec(receipt);
     await db.exec(receipt);
+    const history = readFileSync(new URL("../supabase/migrations/202609250002_confirmation_history.sql", import.meta.url), "utf8");
+    await db.exec(history);
+    await db.exec(history);
   }, 30000);
   afterAll(async () => { await db?.close(); });
 
@@ -69,6 +72,18 @@ describe("public history SQL enforcement", () => {
       const marked = again.rows[0].data.sessions.find((s) => s.id === "latest");
       expect(marked.payments.paid["0"]).toBe(true);
       expect(marked.payments.received["0"]).toBe(true);
+      expect(marked.payments.confirmations).toEqual([]);
+      const named = await db.query(
+        `select mark_group_payment('secret-link','latest',$1,0,true,'paid','אורן גיל') as data`,
+        [JSON.stringify([{ from: "א", to: "ב", amount: 50 }])]
+      );
+      const withName = named.rows[0].data.sessions.find((s) => s.id === "latest");
+      expect(withName.payments.confirmations[0]).toMatchObject({
+        index: 0,
+        action: "paid",
+        by: "אורן גיל",
+      });
+      expect(withName.payments.paid["0"]).toBe(true);
     } finally { await db.exec("reset role"); }
   });
 
