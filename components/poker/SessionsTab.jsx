@@ -11,7 +11,7 @@ import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SessionEditSheet } from "./SessionEditSheet";
 import { latestNightConfirmations } from "../../lib/nightConfirmations";
-import { markTransfer } from "../../lib/paymentTracking";
+import { markReceipt, markTransfer } from "../../lib/paymentTracking";
 import { allTransfersPaid } from "../../lib/settlementClosed";
 import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
 import { flushStore } from "../../lib/store";
@@ -27,18 +27,19 @@ export function SessionsTab({ db, commit }) {
   const latestView = latestNightConfirmations(db.sessions);
   const latestId = latestView?.session?.id ?? null;
 
-  const markLatest = async (index, value) => {
+  const markLatest = async (index, value, side) => {
     if (!latestView || !commit || busyPay != null) return;
     const session = latestView.session;
-    setBusyPay(index);
+    setBusyPay(`${side}-${index}`);
     try {
-      const next = markTransfer(session, index, value);
+      const next =
+        side === "received" ? markReceipt(session, index, value) : markTransfer(session, index, value);
       commit({
         ...db,
         sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
       });
       await flushStore();
-      if (value && allTransfersPaid(next)) await announceSettlementClosed(session.id);
+      if (side === "paid" && value && allTransfersPaid(next)) await announceSettlementClosed(session.id);
     } finally {
       setBusyPay(null);
     }
@@ -187,10 +188,10 @@ export function SessionsTab({ db, commit }) {
                 <p style={{ margin: "0 0 8px", fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
                   {latestView.rows.length === 0
                     ? "אין העברות — כולם סגורים."
-                    : `${latestView.confirmedCount} מתוך ${latestView.rows.length} העברות סומנו כשולמו`}
+                    : `מעבירים ${latestView.confirmedCount} מתוך ${latestView.rows.length} · מקבלים ${latestView.receivedCount} מתוך ${latestView.rows.length}`}
                 </p>
                 {latestView.rows.map((row) => (
-                  <label
+                  <div
                     key={row.index}
                     data-testid={`night-confirm-row-${row.index}`}
                     style={{
@@ -202,23 +203,39 @@ export function SessionsTab({ db, commit }) {
                       fontSize: 13.5,
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={row.confirmed}
-                      disabled={busyPay === row.index}
-                      onChange={(e) => markLatest(row.index, e.target.checked)}
-                      aria-label={`שולם: ${row.from} אל ${row.to}, ${row.amount} שקלים`}
-                      data-testid={`night-confirm-paid-${row.index}`}
-                      style={{ width: 20, height: 20, accentColor: C.win }}
-                    />
                     <span style={{ flex: 1 }}>
                       {row.from} אל {row.to}
                     </span>
                     <b>{row.amount}₪</b>
-                    <span style={{ color: row.confirmed ? C.win : C.dim, fontSize: 12, minWidth: 48 }}>
-                      {row.confirmed ? "שולם" : "ממתין"}
-                    </span>
-                  </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 72 }}>
+                      <input
+                        type="checkbox"
+                        checked={row.confirmed}
+                        disabled={busyPay != null}
+                        onChange={(e) => markLatest(row.index, e.target.checked, "paid")}
+                        aria-label={`שולם: ${row.from} אל ${row.to}, ${row.amount} שקלים`}
+                        data-testid={`night-confirm-paid-${row.index}`}
+                        style={{ width: 18, height: 18, accentColor: C.win }}
+                      />
+                      <span style={{ color: row.confirmed ? C.win : C.dim, fontSize: 12 }}>
+                        {row.confirmed ? "שולם" : "ממתין"}
+                      </span>
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 78 }}>
+                      <input
+                        type="checkbox"
+                        checked={row.received}
+                        disabled={busyPay != null || row.manual}
+                        onChange={(e) => markLatest(row.index, e.target.checked, "received")}
+                        aria-label={`התקבל: ${row.from} אל ${row.to}, ${row.amount} שקלים`}
+                        data-testid={`night-confirm-received-${row.index}`}
+                        style={{ width: 18, height: 18, accentColor: C.win }}
+                      />
+                      <span style={{ color: row.received ? C.win : C.dim, fontSize: 12 }}>
+                        {row.received ? "התקבל" : "ממתין"}
+                      </span>
+                    </label>
+                  </div>
                 ))}
               </div>
             )}

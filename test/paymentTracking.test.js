@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markTransfer, paymentPlan } from "../lib/paymentTracking.js";
+import { markReceipt, markTransfer, paymentPlan } from "../lib/paymentTracking.js";
 import { settlementTextForSession } from "../lib/nightShare.js";
 
 const session = { iso: "2026-07-26", entries: [{ name: "א", amount: 25 }, { name: "ב", amount: -25 }] };
@@ -12,8 +12,18 @@ describe("payment tracking", () => {
     expect(paymentPlan(markTransfer(paid, 0, false)).paid[0]).toBe(false);
   });
   it("invalidates checkmarks when the transfer plan changes", () => {
-    const paid = markTransfer(session, 0, true);
-    expect(paymentPlan({ ...paid, entries: [{ name: "א", amount: 50 }, { name: "ב", amount: -50 }] }).paid).toEqual({});
+    const paid = markReceipt(markTransfer(session, 0, true), 0, true);
+    const next = paymentPlan({ ...paid, entries: [{ name: "א", amount: 50 }, { name: "ב", amount: -50 }] });
+    expect(next.paid).toEqual({});
+    expect(next.received).toEqual({});
+  });
+  it("keeps payer and receiver marks on the same payment plan", () => {
+    const both = markReceipt(markTransfer(session, 0, true), 0, true);
+    const plan = paymentPlan(both);
+    expect(plan.paid[0]).toBe(true);
+    expect(plan.received[0]).toBe(true);
+    expect(paymentPlan(markTransfer(both, 0, false)).received[0]).toBe(true);
+    expect(paymentPlan(markReceipt(both, 0, false)).paid[0]).toBe(true);
   });
   it("uses the saved chip ratio and original date", () => {
     const custom = { ...session, cps: 4, entries: [{ name: "א", amount: 25, buyin: 50, chips: 300 }, { name: "ב", amount: -25, buyin: 50, chips: 100 }] };

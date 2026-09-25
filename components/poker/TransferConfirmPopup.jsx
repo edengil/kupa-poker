@@ -5,8 +5,31 @@ import { C } from "../../lib/poker/colors";
 import { canon, DEFAULT_ALIASES } from "../../lib/poker/helpers";
 import { brassCta } from "../../lib/poker/festive";
 
+const COPY = {
+  paid: {
+    testId: "transfer-confirm-popup",
+    titleId: "transfer-confirm-title",
+    title: "צריך לאשר שהעברת",
+    body: (dateLabel) => `פתחת את האפליקציה שוב, ועדיין לא סומן שהכסף הועבר בערב ${dateLabel}.`,
+    yes: "אישרתי שהעברתי",
+    laterId: "transfer-confirm-later",
+    yesId: "transfer-confirm-yes",
+    rowId: (index) => `transfer-confirm-row-${index}`,
+  },
+  received: {
+    testId: "receipt-confirm-popup",
+    titleId: "receipt-confirm-title",
+    title: "צריך לאשר שקיבלת",
+    body: (dateLabel) => `פתחת את האפליקציה שוב, ועדיין לא סומן שהכסף התקבל בערב ${dateLabel}.`,
+    yes: "אישרתי שקיבלתי",
+    laterId: "receipt-confirm-later",
+    yesId: "receipt-confirm-yes",
+    rowId: (index) => `receipt-confirm-row-${index}`,
+  },
+};
+
 /**
- * חלון למי שחוזר לאפליקציה ועדיין לא סימן שהעביר.
+ * חלון למי שחוזר לאפליקציה ועדיין לא סימן שהעביר, או שקיבל.
  * האישור עצמו נשמר ב־payments של הערב, לא בדגל נפרד.
  */
 export function TransferConfirmPopup({
@@ -15,9 +38,11 @@ export function TransferConfirmPopup({
   viewerName,
   aliases = DEFAULT_ALIASES,
   busy = false,
+  kind = "paid",
   onConfirm,
   onLater,
 }) {
+  const copy = COPY[kind] || COPY.paid;
   const me = viewerName ? canon(viewerName, aliases) : null;
   const dateLabel = `${session.d}.${session.mo}.${session.y}`;
 
@@ -25,8 +50,8 @@ export function TransferConfirmPopup({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="transfer-confirm-title"
-      data-testid="transfer-confirm-popup"
+      aria-labelledby={copy.titleId}
+      data-testid={copy.testId}
       style={{
         position: "fixed",
         inset: 0,
@@ -50,19 +75,20 @@ export function TransferConfirmPopup({
           color: C.cream,
         }}
       >
-        <div id="transfer-confirm-title" style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>
-          צריך לאשר שהעברת
+        <div id={copy.titleId} style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>
+          {copy.title}
         </div>
         <p style={{ margin: "0 0 12px", fontSize: 14, color: C.dim, lineHeight: 1.5 }}>
-          פתחת את האפליקציה שוב, ועדיין לא סומן שהכסף הועבר בערב {dateLabel}.
+          {copy.body(dateLabel)}
         </p>
         <ul style={{ listStyle: "none", margin: "0 0 16px", padding: 0 }}>
           {rows.map((row) => {
-            const self = me && canon(row.from, aliases) === me;
+            const self =
+              me && canon(kind === "received" ? row.to : row.from, aliases) === me;
             return (
               <li
                 key={row.index}
-                data-testid={`transfer-confirm-row-${row.index}`}
+                data-testid={copy.rowId(row.index)}
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
@@ -73,7 +99,17 @@ export function TransferConfirmPopup({
                 }}
               >
                 <span>
-                  {self ? (
+                  {kind === "received" ? (
+                    self ? (
+                      <>
+                        אתה אמור לקבל מ־<b>{row.from}</b>
+                      </>
+                    ) : (
+                      <>
+                        {row.from} אל {row.to}
+                      </>
+                    )
+                  ) : self ? (
                     <>
                       אתה מעביר ל־<b>{row.to}</b>
                     </>
@@ -95,7 +131,7 @@ export function TransferConfirmPopup({
             type="button"
             onClick={onLater}
             disabled={busy}
-            data-testid="transfer-confirm-later"
+            data-testid={copy.laterId}
             style={{
               flex: 1,
               background: C.feltDeep,
@@ -115,7 +151,7 @@ export function TransferConfirmPopup({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            data-testid="transfer-confirm-yes"
+            data-testid={copy.yesId}
             style={{
               ...brassCta,
               flex: 1.2,
@@ -124,7 +160,7 @@ export function TransferConfirmPopup({
               fontSize: 14,
             }}
           >
-            אישרתי שהעברתי
+            {copy.yes}
           </button>
         </div>
       </div>

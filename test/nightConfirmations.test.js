@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { markTransfer } from "../lib/paymentTracking.js";
+import { markReceipt, markTransfer } from "../lib/paymentTracking.js";
 import {
   latestNightConfirmations,
+  receiptConfirmPrompt,
   transferConfirmPrompt,
   unconfirmedOwnTransfers,
 } from "../lib/nightConfirmations.js";
@@ -97,9 +98,56 @@ describe("transfer confirm popup", () => {
     expect(prompt).not.toBeNull();
     expect(prompt.session.iso).toBe("2026-07-26");
     expect(prompt.rows.every((row) => row.confirmed === false)).toBe(true);
+    expect(prompt.rows.every((row) => row.received === false)).toBe(true);
     const view = latestNightConfirmations(db.sessions);
     expect(view.session.iso).toBe("2026-07-26");
     expect(view.pendingCount).toBe(view.rows.length);
     expect(view.rows.length).toBeGreaterThan(0);
+    expect(view.receivedCount).toBe(0);
+    expect(view.rows.every((row) => row.received === false)).toBe(true);
+  });
+});
+
+describe("receiver confirmation", () => {
+  it("shows payer and receiver flags independently on the latest night", () => {
+    const paidOnly = markTransfer(latest, 0, true);
+    const both = markReceipt(paidOnly, 0, true);
+    const view = latestNightConfirmations([both]);
+    expect(view.rows[0]).toEqual(
+      expect.objectContaining({
+        from: "אופיר",
+        to: "קובי",
+        confirmed: true,
+        received: true,
+      })
+    );
+    expect(view.confirmedCount).toBe(1);
+    expect(view.receivedCount).toBe(1);
+    const payerOnly = latestNightConfirmations([paidOnly]);
+    expect(payerOnly.rows[0].confirmed).toBe(true);
+    expect(payerOnly.rows[0].received).toBe(false);
+    expect(payerOnly.receivedCount).toBe(0);
+  });
+
+  it("prompts the receiver until they confirm, and not the payer", () => {
+    const prompt = receiptConfirmPrompt([latest], "קובי");
+    expect(prompt.session.id).toBe("new");
+    expect(prompt.rows.map((row) => row.to)).toEqual(["קובי"]);
+    expect(receiptConfirmPrompt([latest], "אופיר")).toBeNull();
+    const received = markReceipt(latest, 0, true);
+    expect(receiptConfirmPrompt([received], "קובי")).toBeNull();
+  });
+
+  it("lets a couple partner confirm receipt", () => {
+    const coupleNight = night("couple-in", "2026-08-02", [
+      { name: "שגיא", amount: -20 },
+      { name: "אורן", amount: 20 },
+    ]);
+    const prompt = receiptConfirmPrompt([coupleNight], "עדן גיל");
+    expect(prompt.rows.map((row) => row.to)).toEqual(["אורן"]);
+  });
+
+  it("does not prompt the admin about other people's receipts", () => {
+    expect(receiptConfirmPrompt([latest], "עדן גיל")).toBeNull();
   });
 });

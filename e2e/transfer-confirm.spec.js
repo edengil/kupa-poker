@@ -26,6 +26,9 @@ test.describe("אישור העברה", () => {
     await expect(panel).toContainText("26.7.2026");
     await expect(panel.getByText("ממתין").first()).toBeVisible();
     await expect(panel.getByText("שולם")).toHaveCount(0);
+    await expect(panel.getByText("התקבל")).toHaveCount(0);
+    await expect(panel.getByTestId("night-confirm-paid-0")).toBeVisible();
+    await expect(panel.getByTestId("night-confirm-received-0")).toBeVisible();
     await expect(panel.getByText(/אל /).first()).toBeVisible();
   });
 
@@ -54,5 +57,33 @@ test.describe("אישור העברה", () => {
     await page.getByTestId("tab-sessions").click();
     const panel = page.getByTestId("latest-night-confirmations");
     await expect(panel.getByText("שולם").first()).toBeVisible();
+  });
+
+  test("מקבל שחוזר בלי לאשר קבלה רואה חלון, ואחרי אישור הוא נעלם", async ({ page }) => {
+    await openAs(page, "קובי");
+    await expect(page.getByTestId("transfer-confirm-popup")).toHaveCount(0);
+    const popup = page.getByTestId("receipt-confirm-popup");
+    await expect(popup).toBeVisible();
+    await expect(popup).toContainText("צריך לאשר שקיבלת");
+    await expect(popup).toContainText("עדיין לא סומן שהכסף התקבל");
+    await expect(popup.getByText("ממתין").first()).toBeVisible();
+
+    await page.getByTestId("receipt-confirm-later").click();
+    await expect(popup).toHaveCount(0);
+
+    await page.reload();
+    await page.getByTestId("preview-banner").waitFor({ state: "visible" });
+    await expect(page.getByTestId("receipt-confirm-popup")).toBeVisible();
+
+    await page.getByTestId("receipt-confirm-yes").click();
+    await expect(page.getByTestId("receipt-confirm-popup")).toHaveCount(0);
+
+    await page.reload();
+    await page.getByTestId("preview-banner").waitFor({ state: "visible" });
+    await expect(page.getByTestId("receipt-confirm-popup")).toHaveCount(0);
+
+    await page.getByTestId("tab-sessions").click();
+    const panel = page.getByTestId("latest-night-confirmations");
+    await expect(panel.getByText("התקבל").first()).toBeVisible();
   });
 });

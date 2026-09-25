@@ -28,8 +28,8 @@ import { AL } from "../lib/poker/helpers";
 import { isGroupAdmin } from "../lib/paymentAccess";
 import { NightFocus } from "./poker/NightFocus";
 import { TransferConfirmPopup } from "./poker/TransferConfirmPopup";
-import { transferConfirmPrompt } from "../lib/nightConfirmations";
-import { markTransfer } from "../lib/paymentTracking";
+import { receiptConfirmPrompt, transferConfirmPrompt } from "../lib/nightConfirmations";
+import { markReceipt, markTransfer } from "../lib/paymentTracking";
 import { allTransfersPaid } from "../lib/settlementClosed";
 import { announceSettlementClosed } from "../lib/announceSettlementClosed";
 import { flushStore } from "../lib/store";
@@ -95,6 +95,7 @@ function App({
   const [loadError, setLoadError] = useState("");
   const [recordAlert, setRecordAlert] = useState(null);
   const [transferPromptDismissed, setTransferPromptDismissed] = useState(false);
+  const [receiptPromptDismissed, setReceiptPromptDismissed] = useState(false);
   // initialTab מאפשר לרענון מבחוץ (remount אחרי פינג מהבוט) לא לזרוק
   // את המשתמש בחזרה לטבלה
   const [tab, setTabState] = useState(initialTab);
@@ -183,6 +184,10 @@ function App({
     () => (db && viewerName ? transferConfirmPrompt(db.sessions, viewerName, aliases) : null),
     [db, viewerName, aliases]
   );
+  const receiptPrompt = useMemo(
+    () => (db && viewerName ? receiptConfirmPrompt(db.sessions, viewerName, aliases) : null),
+    [db, viewerName, aliases]
+  );
   const confirmOwnTransfers = useCallback(async () => {
     if (!transferPrompt || !db) return;
     let next = transferPrompt.session;
@@ -203,6 +208,25 @@ function App({
     if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setTransferPromptDismissed(true);
   }, [transferPrompt, db, onMarkPayment, readOnly]);
+  const confirmOwnReceipts = useCallback(async () => {
+    if (!receiptPrompt || !db) return;
+    let next = receiptPrompt.session;
+    for (const row of receiptPrompt.rows) {
+      next = markReceipt(next, row.index, true);
+    }
+    if (typeof onMarkPayment === "function") {
+      for (const row of receiptPrompt.rows) {
+        await onMarkPayment(receiptPrompt.session, row.index, true, "received");
+      }
+    } else if (!readOnly) {
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) => (s.id === next.id ? next : s)),
+      });
+      await flushStore();
+    }
+    setReceiptPromptDismissed(true);
+  }, [receiptPrompt, db, onMarkPayment, readOnly]);
 
   const dismissRecordAlert = useCallback(() => setRecordAlert(null), []);
   const handleRecords = useCallback(
@@ -252,7 +276,7 @@ function App({
     >
       <Style />
       <RecordsAlert lines={recordAlert} onDismiss={dismissRecordAlert} />
-      {transferPrompt && !transferPromptDismissed && (
+      {transferPrompt && !transferPromptDismissed ? (
         <TransferConfirmPopup
           session={transferPrompt.session}
           rows={transferPrompt.rows}
@@ -261,7 +285,17 @@ function App({
           onConfirm={confirmOwnTransfers}
           onLater={() => setTransferPromptDismissed(true)}
         />
-      )}
+      ) : receiptPrompt && !receiptPromptDismissed ? (
+        <TransferConfirmPopup
+          kind="received"
+          session={receiptPrompt.session}
+          rows={receiptPrompt.rows}
+          viewerName={viewerName}
+          aliases={aliases}
+          onConfirm={confirmOwnReceipts}
+          onLater={() => setReceiptPromptDismissed(true)}
+        />
+      ) : null}
       <div
         style={{
           maxWidth: 640,

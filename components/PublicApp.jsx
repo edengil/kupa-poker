@@ -96,7 +96,7 @@ export default function PublicApp({ slug, nightId = null }) {
   }, [supabase, slug]);
 
   const markPayment = useCallback(
-    async (session, index, paid) => {
+    async (session, index, paid, field = "paid") => {
       const { fingerprint } = paymentPlan(session);
       const data = await markPaymentViaRpc(supabase, {
         slug,
@@ -104,6 +104,7 @@ export default function PublicApp({ slug, nightId = null }) {
         fingerprint,
         index,
         paid,
+        field,
       });
       if (!data) {
         alert("לא הצלחתי לשמור את הסימון. רענן ונסה שוב.");

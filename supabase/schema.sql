@@ -286,7 +286,8 @@ create or replace function public.mark_group_payment(
   p_session_id text,
   p_fingerprint text,
   p_index integer,
-  p_paid boolean
+  p_paid boolean,
+  p_field text default 'paid'
 )
 returns jsonb
 language plpgsql
@@ -327,12 +328,19 @@ begin
       if payments ? 'plan' and payments->>'plan' is distinct from p_fingerprint then
         raise exception 'fingerprint mismatch';
       end if;
-      paid_map := coalesce(payments->'paid', '{}'::jsonb);
+      if p_field is distinct from 'paid' and p_field is distinct from 'received' then
+        raise exception 'invalid field';
+      end if;
+      paid_map := coalesce(payments->p_field, '{}'::jsonb);
       paid_map := jsonb_set(paid_map, array[p_index::text], to_jsonb(p_paid), true);
       sess := jsonb_set(
         sess,
         '{payments}',
-        jsonb_build_object('plan', p_fingerprint, 'paid', paid_map),
+        jsonb_build_object(
+          'plan', p_fingerprint,
+          'paid', case when p_field = 'paid' then paid_map else coalesce(payments->'paid', '{}'::jsonb) end,
+          'received', case when p_field = 'received' then paid_map else coalesce(payments->'received', '{}'::jsonb) end
+        ),
         true
       );
     end if;
@@ -353,5 +361,5 @@ begin
 end;
 $$;
 
-revoke all on function public.mark_group_payment(text, text, text, integer, boolean) from public, anon;
-grant execute on function public.mark_group_payment(text, text, text, integer, boolean) to authenticated;
+revoke all on function public.mark_group_payment(text, text, text, integer, boolean, text) from public, anon;
+grant execute on function public.mark_group_payment(text, text, text, integer, boolean, text) to authenticated;

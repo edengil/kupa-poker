@@ -30,6 +30,9 @@ describe("public history SQL enforcement", () => {
     const migration = readFileSync(new URL("../supabase/migrations/202609150001_last_settlement_payments.sql", import.meta.url), "utf8");
     await db.exec(migration);
     await db.exec(migration); // Safe to apply twice.
+    const receipt = readFileSync(new URL("../supabase/migrations/202609250001_receipt_confirmation.sql", import.meta.url), "utf8");
+    await db.exec(receipt);
+    await db.exec(receipt);
   }, 30000);
   afterAll(async () => { await db?.close(); });
 
@@ -59,6 +62,13 @@ describe("public history SQL enforcement", () => {
       );
       const sess = rows[0].data.sessions.find((s) => s.id === "latest");
       expect(sess.payments.paid["0"]).toBe(true);
+      const again = await db.query(
+        `select mark_group_payment('secret-link','latest',$1,0,true,'received') as data`,
+        [JSON.stringify([{ from: "א", to: "ב", amount: 50 }])]
+      );
+      const marked = again.rows[0].data.sessions.find((s) => s.id === "latest");
+      expect(marked.payments.paid["0"]).toBe(true);
+      expect(marked.payments.received["0"]).toBe(true);
     } finally { await db.exec("reset role"); }
   });
 
