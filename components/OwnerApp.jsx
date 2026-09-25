@@ -9,6 +9,7 @@ import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import InstallButton from "./InstallButton";
+import { PushPrompt } from "./PushPrompt";
 import { RsvpList } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "../lib/poker/festive";
@@ -500,6 +501,7 @@ export default function OwnerApp() {
       )}
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 13px" }}>
         <InstallButton />
+        <PushPrompt supabase={supabase} groupId={group?.id} db={group?.data} viewerAuth={viewerAuth} />
         <Viewers supabase={supabase} online={online} groupId={group.id} />
       </div>
       <PokerApp

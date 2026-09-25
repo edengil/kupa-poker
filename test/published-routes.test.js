@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   runPeriodReports: vi.fn(async () => ({ ok: true, due: ["month"] })),
   runPaymentReminders: vi.fn(async () => ({ ok: true, results: ["night"] })),
   runNoticeEmails: vi.fn(async () => ({ ok: true, due: 0, results: [] })),
+  runNoticePushes: vi.fn(async () => ({ ok: true, due: 0, results: [] })),
   hour: 8,
   writes: [],
   row: null,
@@ -64,6 +65,9 @@ vi.mock("@/lib/runPaymentReminders", () => ({
 }));
 vi.mock("@/lib/runNoticeEmails", () => ({
   runNoticeEmails: (...args) => h.runNoticeEmails(...args),
+}));
+vi.mock("@/lib/runNoticePushes", () => ({
+  runNoticePushes: (...args) => h.runNoticePushes(...args),
 }));
 vi.mock("@/lib/paymentReminder", () => ({
   jerusalemHour: () => h.hour,
@@ -159,6 +163,7 @@ describe("published daily cron", () => {
     h.runPeriodReports.mockClear();
     h.runPaymentReminders.mockClear();
     h.runNoticeEmails.mockClear();
+    h.runNoticePushes.mockClear();
     h.hour = 8;
     process.env.WHATSAPP_WEBHOOK_SECRET = "s3cret";
     delete process.env.CRON_SECRET;
@@ -170,6 +175,7 @@ describe("published daily cron", () => {
     expect(h.runPeriodReports).not.toHaveBeenCalled();
     expect(h.runPaymentReminders).not.toHaveBeenCalled();
     expect(h.runNoticeEmails).not.toHaveBeenCalled();
+    expect(h.runNoticePushes).not.toHaveBeenCalled();
   });
 
   it("skips before 08:00 Israel and does not send reports or reminders", async () => {
@@ -183,6 +189,7 @@ describe("published daily cron", () => {
     expect(h.runPeriodReports).not.toHaveBeenCalled();
     expect(h.runPaymentReminders).not.toHaveBeenCalled();
     expect(h.runNoticeEmails).not.toHaveBeenCalled();
+    expect(h.runNoticePushes).not.toHaveBeenCalled();
   });
 
   it("runs reports and payment reminders on the morning cron", async () => {
@@ -195,6 +202,7 @@ describe("published daily cron", () => {
     expect(h.runPeriodReports).toHaveBeenCalledTimes(1);
     expect(h.runPaymentReminders).toHaveBeenCalledTimes(1);
     expect(h.runNoticeEmails).toHaveBeenCalledTimes(1);
+    expect(h.runNoticePushes).toHaveBeenCalledTimes(1);
     expect(body.reports.due).toEqual(["month"]);
     expect(body.payments.results).toEqual(["night"]);
   });

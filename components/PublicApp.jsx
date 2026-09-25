@@ -6,7 +6,7 @@ import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
-import { getPushSupport, getPushSubscription, subscribePush, unsubscribePush } from "../lib/pushClient";
+import { PushPrompt } from "./PushPrompt";
 import { paymentPlan, markPaymentViaRpc } from "../lib/paymentTracking";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
@@ -42,6 +42,7 @@ export default function PublicApp({ slug, nightId = null }) {
   const [now, setNow] = useState(() => Date.now());
   const [generation, setGeneration] = useState(0);
   const [viewerAuth, setViewerAuth] = useState(null);
+  const [groupData, setGroupData] = useState(null);
   const [pubConfig, setPubConfig] = useState({});
   const dataRef = useRef(null);
   const loggedRef = useRef(false);
@@ -55,6 +56,7 @@ export default function PublicApp({ slug, nightId = null }) {
       bootViewerStore(snap);
       dataRef.current = JSON.stringify([snap.data, snap.config]);
       setGroupId(snap.id);
+      setGroupData(snap.data ?? null);
       setLive(snap.live ?? null);
       setPlan(snap.data?.plan ?? null);
       setPubConfig(snap.config || {});
@@ -282,7 +284,7 @@ export default function PublicApp({ slug, nightId = null }) {
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "10px 13px 0" }}>
         <InstallButton />
-        <NotifyBell supabase={supabase} groupId={groupId} />
+        <PushPrompt supabase={supabase} groupId={groupId} db={groupData} viewerAuth={viewerAuth} />
         {plan?.iso >= new Date().toISOString().slice(0, 10) && !running && (
           <RsvpCard supabase={supabase} groupId={groupId} plan={plan} />
         )}
@@ -317,91 +319,6 @@ export default function PublicApp({ slug, nightId = null }) {
         }}
       />
     </>
-  );
-}
-
-/* ========================= התראות "המשחק התחיל" ========================= */
-function NotifyBell({ supabase, groupId }) {
-  const [state, setState] = useState("checking");
-  // checking | off | on | busy | denied | needs-install | unsupported
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const support = getPushSupport();
-      if (support !== "supported") {
-        if (alive) setState(support === "needs-install" ? "needs-install" : "unsupported");
-        return;
-      }
-      const sub = await getPushSubscription();
-      if (alive) setState(sub ? "on" : "off");
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  if (state === "checking" || state === "unsupported" || !groupId) return null;
-
-  if (state === "needs-install") {
-    return (
-      <p style={{ margin: 0, fontSize: 12, color: C.dim, textAlign: "center", lineHeight: 1.6 }}>
-        רוצה התראה כשמתחיל משחק? הוסף את האתר למסך הבית
-        (שיתוף ← הוסף למסך הבית) ואז הפעל התראות מכאן.
-      </p>
-    );
-  }
-
-  const toggle = async () => {
-    if (state === "busy") return;
-    const was = state;
-    setState("busy");
-    if (was === "on") {
-      await unsubscribePush(supabase);
-      setState("off");
-      return;
-    }
-    const { data } = await supabase.auth.getSession();
-    const user = data.session?.user;
-    if (!user) {
-      setState("off");
-      return;
-    }
-    const result = await subscribePush(supabase, groupId, user);
-    setState(result === "subscribed" ? "on" : result === "denied" ? "denied" : "off");
-  };
-
-  if (state === "denied") {
-    return (
-      <p style={{ margin: 0, fontSize: 12, color: C.dim, textAlign: "center" }}>
-        ההתראות חסומות בדפדפן — אפשר לאפשר אותן בהגדרות האתר.
-      </p>
-    );
-  }
-
-  return (
-    <button
-      onClick={toggle}
-      disabled={state === "busy"}
-      style={{
-        width: "100%",
-        padding: "9px 12px",
-        borderRadius: 11,
-        border: `1px solid ${state === "on" ? C.win : C.line}`,
-        background: "transparent",
-        color: state === "on" ? C.win : C.dim,
-        fontFamily: "inherit",
-        fontSize: 12.5,
-        fontWeight: 600,
-        cursor: "pointer",
-      }}
-    >
-      {state === "busy"
-        ? "רגע…"
-        : state === "on"
-        ? "🔔 תקבל התראה כשמתחיל משחק · לחץ לביטול"
-        : "🔕 עדכן אותי כשמתחיל משחק"}
-    </button>
   );
 }
 

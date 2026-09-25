@@ -210,10 +210,15 @@ create table if not exists public.push_subscriptions (
   p256dh     text not null,
   auth       text not null,
   name       text,
+  email      text,
+  player_name text,
   created_at timestamptz not null default now()
 );
 
 create index if not exists push_subs_group_idx on public.push_subscriptions (group_id);
+
+alter table public.push_subscriptions add column if not exists email text;
+alter table public.push_subscriptions add column if not exists player_name text;
 
 alter table public.push_subscriptions enable row level security;
 
