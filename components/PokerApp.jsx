@@ -225,6 +225,7 @@ function App({
       });
       await flushStore();
     }
+    if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setReceiptPromptDismissed(true);
   }, [receiptPrompt, db, onMarkPayment, readOnly]);
 

@@ -8,7 +8,7 @@ import {
   isPaymentReminderWindow,
   PAYMENT_REMINDER_HOUR,
 } from "../lib/paymentReminder";
-import { paymentPlan } from "../lib/paymentTracking";
+import { markReceipt, paymentPlan } from "../lib/paymentTracking";
 
 function session({ id = "s1", iso = "2026-09-14", d = 14, mo = 9, entries, payments } = {}) {
   return {
@@ -64,6 +64,12 @@ describe("paymentReminderDue", () => {
     });
     const paidSession = { ...s, payments: { plan: plan.fingerprint, paid } };
     expect(paymentReminderDue(paidSession, "2026-09-15").reason).toBe("nothing open");
+  });
+
+  it("skips when the receiver confirmed and the payer did not", () => {
+    const closed = markReceipt(session(), 0, true);
+    expect(unpaidTransfers(closed)).toEqual([]);
+    expect(paymentReminderDue(closed, "2026-09-15").reason).toBe("nothing open");
   });
 
   it("force ignores date but not empty unpaid", () => {

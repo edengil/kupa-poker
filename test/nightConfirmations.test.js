@@ -90,6 +90,19 @@ describe("transfer confirm popup", () => {
     expect(transferConfirmPrompt([latest], null)).toBeNull();
   });
 
+  it("prompts יצחק תפילין for איציק's open transfer", () => {
+    const owed = night("itzik", "2026-09-23", [
+      { name: "איציק", amount: -100 },
+      { name: "אופיר", amount: 100 },
+    ]);
+    const db = { aliases: {}, roster: ["איציק תפילין", "אופיר סנה"], yearly: [], sessions: [owed] };
+    const viewer = matchViewerToPlayer(db, { full_name: "יצחק תפילין" });
+    const prompt = transferConfirmPrompt(db.sessions, viewer);
+    expect(viewer).toBe("איציק תפילין");
+    expect(prompt).not.toBeNull();
+    expect(prompt.rows).toHaveLength(1);
+  });
+
   it("prompts a known player on the seeded latest night", () => {
     const db = buildSeedDb();
     const viewer = matchViewerToPlayer(db, { full_name: "אופיר" });
@@ -129,13 +142,35 @@ describe("receiver confirmation", () => {
     expect(payerOnly.receivedCount).toBe(0);
   });
 
-  it("prompts the receiver until they confirm, and not the payer", () => {
+  it("prompts the receiver until someone confirms, and not the payer", () => {
     const prompt = receiptConfirmPrompt([latest], "קובי");
     expect(prompt.session.id).toBe("new");
     expect(prompt.rows.map((row) => row.to)).toEqual(["קובי"]);
     expect(receiptConfirmPrompt([latest], "אופיר")).toBeNull();
     const received = markReceipt(latest, 0, true);
     expect(receiptConfirmPrompt([received], "קובי")).toBeNull();
+  });
+
+  it("closes the transfer when either side confirms", () => {
+    const paidOnly = markTransfer(latest, 0, true);
+    const paidView = latestNightConfirmations([paidOnly]);
+    expect(paidView.rows[0].closed).toBe(true);
+    expect(paidView.rows[0].received).toBe(false);
+    expect(paidView.pendingCount).toBe(0);
+    expect(paidView.closedCount).toBe(1);
+    expect(transferConfirmPrompt([paidOnly], "אופיר")).toBeNull();
+    expect(receiptConfirmPrompt([paidOnly], "קובי")).toBeNull();
+
+    const gotOnly = markReceipt(latest, 0, true);
+    const gotView = latestNightConfirmations([gotOnly]);
+    expect(gotView.rows[0].closed).toBe(true);
+    expect(gotView.rows[0].confirmed).toBe(false);
+    expect(gotView.pendingCount).toBe(0);
+    expect(transferConfirmPrompt([gotOnly], "אופיר")).toBeNull();
+    expect(receiptConfirmPrompt([gotOnly], "קובי")).toBeNull();
+
+    expect(transferConfirmPrompt([latest], "אופיר")).not.toBeNull();
+    expect(receiptConfirmPrompt([latest], "קובי")).not.toBeNull();
   });
 
   it("lets a couple partner confirm receipt", () => {

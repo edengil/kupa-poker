@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { allTransfersPaid, buildSettlementClosedText } from "../lib/settlementClosed";
+import { markReceipt } from "../lib/paymentTracking";
 
 function session(paid = false) {
   return {
@@ -26,6 +27,7 @@ describe("settlement closed", () => {
   it("is closed only when every transfer is marked", () => {
     expect(allTransfersPaid(session(false))).toBe(false);
     expect(allTransfersPaid(session(true))).toBe(true);
+    expect(allTransfersPaid(markReceipt(session(false), 0, true))).toBe(true);
   });
 
   it("announces with the night link", () => {

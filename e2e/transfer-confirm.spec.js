@@ -56,7 +56,9 @@ test.describe("אישור העברה", () => {
 
     await page.getByTestId("tab-sessions").click();
     const panel = page.getByTestId("latest-night-confirmations");
-    await expect(panel.getByText("שולם").first()).toBeVisible();
+    const row = panel.locator("[data-testid^='night-confirm-row-']", { hasText: "אופיר" });
+    await expect(row.getByText("שולם")).toBeVisible();
+    await expect(row.getByText("ממתין")).toHaveCount(0);
   });
 
   test("מקבל שחוזר בלי לאשר קבלה רואה חלון, ואחרי אישור הוא נעלם", async ({ page }) => {
@@ -84,6 +86,8 @@ test.describe("אישור העברה", () => {
 
     await page.getByTestId("tab-sessions").click();
     const panel = page.getByTestId("latest-night-confirmations");
-    await expect(panel.getByText("התקבל").first()).toBeVisible();
+    const row = panel.locator("[data-testid^='night-confirm-row-']", { hasText: "קובי" }).first();
+    await expect(row.getByText("התקבל")).toBeVisible();
+    await expect(row.getByText("ממתין")).toHaveCount(0);
   });
 });

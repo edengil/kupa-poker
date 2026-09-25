@@ -103,6 +103,30 @@ describe("matchViewerToPlayer", () => {
     expect(names).not.toContain("Royses1");
   });
 
+  it("links יצחק תפילין to the existing player איציק תפילין", () => {
+    const linked = miniDb({
+      roster: ["איציק תפילין", "אופיר סנה", "נתנאל כהן"],
+      sessions: [
+        {
+          iso: "2026-09-23",
+          d: 23,
+          mo: 9,
+          y: 2026,
+          entries: [
+            { name: "איציק", amount: -100 },
+            { name: "אופיר", amount: 59 },
+            { name: "נתנאל", amount: 41 },
+          ],
+        },
+      ],
+    });
+    expect(matchViewerToPlayer(linked, { full_name: "יצחק תפילין" })).toBe("איציק תפילין");
+    expect(matchViewerToPlayer(linked, { name: "יצחק תפילין" })).toBe("איציק תפילין");
+    const names = knownPlayerNames(linked);
+    expect(names).toContain("איציק תפילין");
+    expect(names).not.toContain("יצחק תפילין");
+  });
+
   it("returns null for unknown guest", () => {
     expect(matchViewerToPlayer(db, { full_name: "Random Guest" })).toBeNull();
     expect(matchViewerToPlayer(db, {})).toBeNull();
