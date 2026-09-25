@@ -40,14 +40,19 @@ describe("paymentReminderDue", () => {
     expect(r.unpaid.length).toBe(1);
   });
 
-  it("skips other days", () => {
-    expect(paymentReminderDue(session(), "2026-09-14").due).toBe(false);
-    expect(paymentReminderDue(session(), "2026-09-16").due).toBe(false);
+  it("skips the night itself and sends on a later morning", () => {
+    expect(paymentReminderDue(session(), "2026-09-14").reason).toBe("not morning after");
+    const later = paymentReminderDue(session(), "2026-09-16");
+    expect(later.due).toBe(true);
+    expect(later.unpaid.length).toBe(1);
   });
 
-  it("skips when already sent", () => {
+  it("skips a successful send from this morning and sends again the next morning", () => {
     const s = session();
-    expect(paymentReminderDue(s, "2026-09-15", { alreadySent: { s1: true } }).due).toBe(false);
+    expect(paymentReminderDue(s, "2026-09-15", { alreadySent: { s1: "2026-09-15" } }).reason).toBe(
+      "already sent"
+    );
+    expect(paymentReminderDue(s, "2026-09-16", { alreadySent: { s1: "2026-09-15" } }).due).toBe(true);
   });
 
   it("skips when all paid", () => {
@@ -67,12 +72,50 @@ describe("paymentReminderDue", () => {
 });
 
 describe("sessionsDueForPaymentReminder", () => {
-  it("picks matching sessions", () => {
+  it("picks the latest night on the morning after", () => {
     const list = sessionsDueForPaymentReminder(
       [session({ id: "a", iso: "2026-09-14" }), session({ id: "b", iso: "2026-09-10", d: 10 })],
       "2026-09-15"
     );
     expect(list.map((x) => x.session.id)).toEqual(["a"]);
+  });
+
+  it("keeps reminding the latest night on a later morning while transfers are open", () => {
+    const list = sessionsDueForPaymentReminder(
+      [session({ id: "a", iso: "2026-09-14" }), session({ id: "b", iso: "2026-09-10", d: 10 })],
+      "2026-09-20"
+    );
+    expect(list.map((x) => x.session.id)).toEqual(["a"]);
+  });
+
+  it("does not send once the latest night is fully paid", () => {
+    const s = session();
+    const plan = paymentPlan(s);
+    const paid = {};
+    plan.transfers.forEach((_, i) => {
+      paid[i] = true;
+    });
+    const list = sessionsDueForPaymentReminder(
+      [{ ...s, payments: { plan: plan.fingerprint, paid } }],
+      "2026-09-16"
+    );
+    expect(list).toEqual([]);
+  });
+
+  it("does not send again the same morning after a successful send", () => {
+    const list = sessionsDueForPaymentReminder([session()], "2026-09-16", {
+      alreadySent: { s1: "2026-09-16" },
+    });
+    expect(list).toEqual([]);
+  });
+
+  it("continues an older night that already started reminders until it is paid", () => {
+    const list = sessionsDueForPaymentReminder(
+      [session({ id: "a", iso: "2026-09-14" }), session({ id: "b", iso: "2026-09-10", d: 10 })],
+      "2026-09-20",
+      { alreadySent: { b: "2026-09-19" } }
+    );
+    expect(list.map((x) => x.session.id).sort()).toEqual(["a", "b"]);
   });
 });
 
