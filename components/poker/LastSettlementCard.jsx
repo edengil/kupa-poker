@@ -6,6 +6,7 @@ import { C } from "../../lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
 import { settlementTextForSession } from "../../lib/nightShare";
 import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
+import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "../../lib/nightConfirmations";
 import { latestSession } from "../../lib/lastSession";
 import { allTransfersPaid } from "../../lib/settlementClosed";
 import { canMarkTransfer, couplePartner } from "../../lib/paymentAccess";
@@ -43,9 +44,9 @@ export function LastSettlementCard({
 
   if (!card) return null;
 
-  const { session, text, transfers, paid } = card;
-  const paidCount = transfers.filter((_, i) => paid[i]).length;
-  const outstanding = transfers.reduce((sum, transfer, i) => sum + (paid[i] ? 0 : transfer.amount), 0);
+  const { session, text, transfers } = card;
+  const confirmations = sessionConfirmations(session);
+  const summary = settlementLinkSummary(confirmations?.rows);
 
   const partner = couplePartner(me, A);
   const isMine = (transfer) => {
@@ -90,6 +91,8 @@ export function LastSettlementCard({
 
   const Row = ({ transfer, index }) => {
     const mineRow = isMine(transfer);
+    const statusRow = confirmations?.rows[index];
+    const closed = !!statusRow?.closed;
     return (
       <label
         key={index}
@@ -107,10 +110,10 @@ export function LastSettlementCard({
         {mayToggle(transfer) && (
           <input
             type="checkbox"
-            checked={!!paid[index]}
-            disabled={busy === index}
+            checked={closed}
+            disabled={busy === index || (closed && !statusRow.confirmed)}
             onChange={(e) => mark(index, e.target.checked)}
-            aria-label={`שולם: ${transfer.from} אל ${transfer.to}, ${transfer.amount} שקלים`}
+            aria-label={`${confirmationStatusText(statusRow)}: ${transfer.from} אל ${transfer.to}, ${transfer.amount} שקלים`}
             style={{ width: 20, height: 20, accentColor: C.win }}
           />
         )}
@@ -127,8 +130,8 @@ export function LastSettlementCard({
           )}
         </span>
         <b>{transfer.amount}₪</b>
-        <span style={{ color: paid[index] ? C.win : C.dim, fontSize: 12 }}>
-          {paid[index] ? "שולם" : "ממתין"}
+        <span style={{ color: closed ? C.win : C.dim, fontSize: 12 }}>
+          {confirmationStatusText(statusRow)}
         </span>
       </label>
     );
@@ -168,9 +171,7 @@ export function LastSettlementCard({
             lineHeight: 1.5,
           }}
         >
-          {transfers.length === 0
-            ? "אין העברות — כולם סגורים."
-            : `${paidCount} מתוך ${transfers.length} העברות סומנו כשולמו · נותרו ${outstanding.toLocaleString("he-IL")}₪ · כולם רואים מי העביר`}
+          {summary}
         </p>
         {canMark && (
           <p style={{ margin: "0 0 8px", fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>

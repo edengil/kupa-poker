@@ -3,20 +3,17 @@ import { collectNotices, planNoticePushes } from "../lib/notifications.js";
 import { nextPushPrompt } from "../lib/pushPrompt.js";
 
 describe("outside-app permission prompt", () => {
-  it("asks once on the next open, and stays quiet after that", () => {
+  it("asks on this open, and stays quiet on later opens", () => {
     const first = nextPushPrompt(null, { visitId: "open-1", permission: "default", support: "supported" });
-    expect(first.show).toBe(false);
-    expect(first.visits).toBe(1);
+    expect(first.show).toBe(true);
+    expect(first.mode).toBe("allow");
+    expect(first.asked).toBe(true);
 
     const refresh = nextPushPrompt(first, { visitId: "open-1", permission: "default", support: "supported" });
     expect(refresh.show).toBe(false);
     expect(refresh.visits).toBe(1);
 
-    const next = nextPushPrompt(first, { visitId: "open-2", permission: "default", support: "supported" });
-    expect(next.show).toBe(true);
-    expect(next.mode).toBe("allow");
-
-    const later = nextPushPrompt(next, { visitId: "open-3", permission: "default", support: "supported" });
+    const later = nextPushPrompt(first, { visitId: "open-2", permission: "default", support: "supported" });
     expect(later.show).toBe(false);
   });
 
@@ -29,17 +26,19 @@ describe("outside-app permission prompt", () => {
     expect(denied.choice).toBe("denied");
   });
 
-  it("explains the home-screen step once on iPhone, then asks when the app itself opens", () => {
-    const first = nextPushPrompt(null, { visitId: "tab-1", support: "needs-install" });
-    const hint = nextPushPrompt(first, { visitId: "tab-2", support: "needs-install" });
-    expect(hint.show).toBe(true);
-    expect(hint.mode).toBe("install");
-    expect(hint.asked).toBe(false);
-    const repeat = nextPushPrompt(hint, { visitId: "tab-3", support: "needs-install" });
-    expect(repeat.show).toBe(false);
-    const installed = nextPushPrompt(repeat, { visitId: "home-1", support: "supported" });
+  it("keeps the allow option in iPhone Safari until they answer from the home screen", () => {
+    const stored = { visits: 1, asked: false, installHint: true, choice: null, lastVisitId: "old" };
+    const first = nextPushPrompt(stored, { visitId: "tab-1", support: "needs-install" });
+    expect(first.show).toBe(true);
+    expect(first.mode).toBe("install");
+    const again = nextPushPrompt(first, { visitId: "tab-2", support: "needs-install" });
+    expect(again.show).toBe(true);
+    expect(again.mode).toBe("install");
+    const installed = nextPushPrompt(again, { visitId: "home-1", support: "supported" });
     expect(installed.show).toBe(true);
     expect(installed.mode).toBe("allow");
+    const after = nextPushPrompt(installed, { visitId: "home-2", permission: "denied", support: "supported" });
+    expect(after.show).toBe(false);
   });
 });
 

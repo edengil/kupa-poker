@@ -26,8 +26,9 @@ function writePrompt(state) {
 }
 
 /**
- * בקשה אחת, בפתיחה הבאה של האפליקציה.
- * הלחיצה פותחת את חלון ההרשאה של הדפדפן. סירוב משאיר את הרשימה שבפנים.
+ * «אפשר התראות» למי שעוד לא נשאל, כולל הפתיחה הראשונה.
+ * בספארי רגיל באייפון הכפתור נשאר ומסביר שהחלון נפתח מהאייקון.
+ * מהאייקון, או בדפדפן שתומך, הלחיצה פותחת את חלון ההרשאה.
  */
 export function PushPrompt({ supabase, groupId, db, viewerAuth }) {
   const [view, setView] = useState(null);
@@ -73,13 +74,7 @@ export function PushPrompt({ supabase, groupId, db, viewerAuth }) {
     setView(next);
   };
 
-  if (view.mode === "install") {
-    return (
-      <p data-testid="push-prompt-install" style={hintStyle}>
-        באייפון ההתראה שמחוץ לאפליקציה מופיעה אחרי שהאתר במסך הבית. שיתוף, ואז הוסף למסך הבית. בפתיחה משם תופיע בקשת האישור.
-      </p>
-    );
-  }
+  const install = view.mode === "install";
 
   return (
     <div data-testid="push-prompt" style={cardStyle}>
@@ -87,7 +82,17 @@ export function PushPrompt({ supabase, groupId, db, viewerAuth }) {
       <p style={{ margin: "0 0 12px", color: C.dim, lineHeight: 1.5 }}>
         אפשר התראות כדי שיופיעו גם מחוץ לאפליקציה, גם כשהאתר סגור.
       </p>
-      <button type="button" data-testid="push-prompt-allow" onClick={allow} style={{ ...brassCta, borderRadius: 12, padding: "10px 14px", fontWeight: 800, cursor: "pointer" }}>
+      {install && (
+        <p data-testid="push-prompt-install" style={{ margin: "0 0 12px", color: C.dim, lineHeight: 1.5 }}>
+          באייפון חלון האישור של הטלפון נפתח אחרי שמוסיפים את האתר למסך הבית ופותחים אותו משם.
+        </p>
+      )}
+      <button
+        type="button"
+        data-testid="push-prompt-allow"
+        onClick={install ? undefined : allow}
+        style={{ ...brassCta, borderRadius: 12, padding: "10px 14px", fontWeight: 800, cursor: "pointer" }}
+      >
         אפשר התראות
       </button>
     </div>
@@ -106,12 +111,4 @@ const cardStyle = {
   border: `1px solid ${C.brass}`,
   background: C.card,
   color: C.cream,
-};
-
-const hintStyle = {
-  margin: "8px 0 0",
-  fontSize: 13,
-  color: C.dim,
-  textAlign: "center",
-  lineHeight: 1.6,
 };

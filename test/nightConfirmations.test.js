@@ -4,6 +4,8 @@ import {
   confirmationStatusText,
   confirmationsStartOpen,
   latestNightConfirmations,
+  sessionConfirmations,
+  settlementLinkSummary,
   receiptConfirmPrompt,
   transferConfirmPrompt,
   unconfirmedOwnTransfers,
@@ -190,6 +192,18 @@ describe("receiver confirmation", () => {
     expect(confirmationsStartOpen(legacy)).toBe(false);
     expect(confirmationsStartOpen(view)).toBe(false);
     expect(confirmationsStartOpen(latestNightConfirmations([latest]))).toBe(true);
+  });
+
+  it("counts a receiver confirmation as closed on the shared link", () => {
+    const got = markReceipt(latest, 0, true, "קובי סעדה");
+    const rows = sessionConfirmations(got).rows;
+    expect(rows[0].closed).toBe(true);
+    expect(rows[0].confirmed).toBe(false);
+    expect(confirmationStatusText(rows[0])).toBe("התקבל · קובי סעדה");
+    expect(settlementLinkSummary(rows)).toBe("נסגרו 1 מתוך 1");
+    const waiting = settlementLinkSummary(sessionConfirmations(latest).rows);
+    expect(waiting).toContain("נסגרו 0 מתוך 1");
+    expect(waiting).toContain("נותרו");
   });
 
   it("lets a couple partner confirm receipt", () => {
