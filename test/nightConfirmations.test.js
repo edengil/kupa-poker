@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { markReceipt, markTransfer } from "../lib/paymentTracking.js";
 import {
   confirmationStatusText,
+  confirmationsStartOpen,
   latestNightConfirmations,
   receiptConfirmPrompt,
   transferConfirmPrompt,
@@ -185,7 +186,10 @@ describe("receiver confirmation", () => {
     const legacy = latestNightConfirmations([markTransfer(latest, 0, true)]);
     expect(legacy.rows[0].closed).toBe(true);
     expect(legacy.rows[0].by).toBeNull();
-    expect(confirmationStatusText(legacy.rows[0])).toBe("שולם");
+    expect(confirmationStatusText(legacy.rows[0])).toBe("נסגר");
+    expect(confirmationsStartOpen(legacy)).toBe(false);
+    expect(confirmationsStartOpen(view)).toBe(false);
+    expect(confirmationsStartOpen(latestNightConfirmations([latest]))).toBe(true);
   });
 
   it("lets a couple partner confirm receipt", () => {

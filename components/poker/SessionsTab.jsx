@@ -5,12 +5,12 @@ import { C } from "../../lib/poker/colors";
 import { fmt, fmtGap } from "../../lib/poker/format";
 import { AL, balance, canon } from "../../lib/poker/helpers";
 import { Empty, IconBtn } from "./ui";
-import { Pencil, Share2, Trash2 } from "./icons";
+import { ChevronDown, Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SessionEditSheet } from "./SessionEditSheet";
-import { confirmationStatusText, latestNightConfirmations } from "../../lib/nightConfirmations";
+import { confirmationStatusText, confirmationsStartOpen, latestNightConfirmations } from "../../lib/nightConfirmations";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function SessionsTab({ db, commit }) {
@@ -18,6 +18,7 @@ export function SessionsTab({ db, commit }) {
   const [settlementId, setSettlementId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(() => confirmationsStartOpen(latestNightConfirmations(db.sessions)));
   const A = AL(db);
   const latestView = latestNightConfirmations(db.sessions);
   const latestId = latestView?.session?.id ?? null;
@@ -157,42 +158,75 @@ export function SessionsTab({ db, commit }) {
             {s.id === latestId && latestView && (
               <div
                 data-testid="latest-night-confirmations"
-                aria-label={`אישורי העברה בערב ${s.d}.${s.mo}.${s.y}`}
-                style={{ marginTop: 12, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}
+                style={{
+                  marginTop: 12,
+                  background: C.feltDeep,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                }}
               >
-                <div style={{ fontSize: 13, fontWeight: 800, color: C.brass, marginBottom: 4 }}>
-                  אישורי העברה · ערב אחרון · {s.d}.{s.mo}.{s.y}
-                </div>
-                <p style={{ margin: "0 0 8px", fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
-                  {latestView.rows.length === 0
-                    ? "אין העברות — כולם סגורים."
-                    : `נסגרו ${latestView.closedCount} מתוך ${latestView.rows.length}`}
-                </p>
-                {latestView.rows.map((row) => (
-                  <div
-                    key={row.index}
-                    data-testid={`night-confirm-row-${row.index}`}
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "center",
-                      padding: "8px 0",
-                      borderBottom: `1px solid ${C.line}`,
-                      fontSize: 13.5,
-                    }}
-                  >
-                    <span style={{ flex: 1 }}>
-                      {row.from} אל {row.to}
+                <button
+                  type="button"
+                  data-testid="night-confirm-toggle"
+                  aria-expanded={confirmOpen}
+                  aria-label={`אישורי העברה בערב ${s.d}.${s.mo}.${s.y}`}
+                  onClick={() => setConfirmOpen((open) => !open)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 12px",
+                    border: "none",
+                    background: "transparent",
+                    color: "inherit",
+                    cursor: "pointer",
+                    textAlign: "right",
+                  }}
+                >
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: C.brass }}>
+                      אישורי העברה · ערב אחרון · {s.d}.{s.mo}.{s.y}
                     </span>
-                    <b>{row.amount}₪</b>
-                    <span
-                      data-testid={`night-confirm-state-${row.index}`}
-                      style={{ color: row.closed ? C.win : C.dim, fontSize: 12 }}
+                    <span style={{ display: "block", marginTop: 3, fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
+                      {latestView.rows.length === 0
+                        ? "אין העברות — כולם סגורים."
+                        : `נסגרו ${latestView.closedCount} מתוך ${latestView.rows.length}`}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    size={18}
+                    color={C.dim}
+                    style={{ transform: confirmOpen ? "rotate(180deg)" : "none" }}
+                  />
+                </button>
+                {confirmOpen &&
+                  latestView.rows.map((row) => (
+                    <div
+                      key={row.index}
+                      data-testid={`night-confirm-row-${row.index}`}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "center",
+                        padding: "8px 12px",
+                        borderTop: `1px solid ${C.line}`,
+                        fontSize: 13.5,
+                      }}
                     >
-                      {confirmationStatusText(row)}
-                    </span>
-                  </div>
-                ))}
+                      <span style={{ flex: 1 }}>
+                        {row.from} אל {row.to}
+                      </span>
+                      <b>{row.amount}₪</b>
+                      <span
+                        data-testid={`night-confirm-state-${row.index}`}
+                        style={{ color: row.closed ? C.win : C.dim, fontSize: 12 }}
+                      >
+                        {confirmationStatusText(row)}
+                      </span>
+                    </div>
+                  ))}
               </div>
             )}
           </div>

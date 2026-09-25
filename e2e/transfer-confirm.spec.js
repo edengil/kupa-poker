@@ -28,8 +28,14 @@ test.describe("אישור העברה", () => {
     await expect(panel.getByText("שולם")).toHaveCount(0);
     await expect(panel.getByText("התקבל")).toHaveCount(0);
     await expect(panel.locator("input[type=checkbox]")).toHaveCount(0);
+    await expect(panel.getByTestId("night-confirm-toggle")).toHaveAttribute("aria-expanded", "true");
     await expect(panel.getByTestId("night-confirm-state-0")).toBeVisible();
     await expect(panel.getByText(/אל /).first()).toBeVisible();
+    await panel.getByTestId("night-confirm-toggle").click();
+    await expect(panel.getByTestId("night-confirm-row-0")).toHaveCount(0);
+    await expect(panel.getByText(/נסגרו /)).toBeVisible();
+    await panel.getByTestId("night-confirm-toggle").click();
+    await expect(panel.getByTestId("night-confirm-state-0")).toBeVisible();
 
     await page.getByTestId("notifications-button").click();
     const sheet = page.getByTestId("notifications-sheet");
