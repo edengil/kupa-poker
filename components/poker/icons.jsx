@@ -179,3 +179,10 @@ export const BarChart3 = mkIcon(
     <path d="M7 16v-5M12 16V8M17 16v-3" />
   </>
 );
+
+export const Bell = mkIcon(
+  <>
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9" />
+    <path d="M10 21a2 2 0 0 0 4 0" />
+  </>
+);

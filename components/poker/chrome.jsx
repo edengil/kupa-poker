@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ClipboardPaste,
   Eye,
+  Bell,
   PlayCircle,
   Trophy,
   Users,
@@ -21,7 +22,7 @@ import {
    חולצו מ-PokerApp.jsx כחלק מריענון הדרגתי — התנהגות ועיצוב זהים.
    ============================================================================ */
 
-export function Header() {
+export function Header({ noticeCount = 0, onOpenNotices }) {
   return (
     <header
       style={{
@@ -59,6 +60,49 @@ export function Header() {
           ♠ מאזן חי · שיתוף בווטסאפ
         </p>
       </div>
+      {onOpenNotices ? (
+        <button
+          type="button"
+          aria-label="התראות"
+          data-testid="notifications-button"
+          onClick={onOpenNotices}
+          style={{
+            position: "relative",
+            border: `1px solid ${C.line}`,
+            background: C.card,
+            color: C.cream,
+            borderRadius: 12,
+            width: 42,
+            height: 42,
+            display: "grid",
+            placeItems: "center",
+            cursor: "pointer",
+          }}
+        >
+          <Bell size={20} />
+          {noticeCount > 0 ? (
+            <span
+              data-testid="notifications-count"
+              style={{
+                position: "absolute",
+                top: -6,
+                left: -6,
+                minWidth: 18,
+                height: 18,
+                padding: "0 4px",
+                borderRadius: 9,
+                background: C.brass,
+                color: C.feltDeep,
+                fontSize: 11,
+                fontWeight: 800,
+                lineHeight: "18px",
+              }}
+            >
+              {noticeCount > 99 ? "99" : noticeCount}
+            </span>
+          ) : null}
+        </button>
+      ) : null}
     </header>
   );
 }

@@ -30,6 +30,13 @@ test.describe("אישור העברה", () => {
     await expect(panel.locator("input[type=checkbox]")).toHaveCount(0);
     await expect(panel.getByTestId("night-confirm-state-0")).toBeVisible();
     await expect(panel.getByText(/אל /).first()).toBeVisible();
+
+    await page.getByTestId("notifications-button").click();
+    const sheet = page.getByTestId("notifications-sheet");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText("מי שצריך לפעול: מעביר").first()).toBeVisible();
+    await page.getByTestId("notifications-close").click();
+    await expect(sheet).toHaveCount(0);
   });
 
   test("שחקן שחוזר בלי לאשר העברה רואה חלון, ואחרי אישור הוא נעלם", async ({ page }) => {

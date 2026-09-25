@@ -29,7 +29,9 @@ import { isGroupAdmin } from "../lib/paymentAccess";
 import { NightFocus } from "./poker/NightFocus";
 import { TransferConfirmPopup } from "./poker/TransferConfirmPopup";
 import { receiptConfirmPrompt, transferConfirmPrompt } from "../lib/nightConfirmations";
+import { collectNotices, noticesForViewer } from "../lib/notifications";
 import { markReceipt, markTransfer } from "../lib/paymentTracking";
+import { NotificationsSheet } from "./poker/NotificationsSheet";
 import { allTransfersPaid } from "../lib/settlementClosed";
 import { announceSettlementClosed } from "../lib/announceSettlementClosed";
 import { flushStore } from "../lib/store";
@@ -96,6 +98,7 @@ function App({
   const [recordAlert, setRecordAlert] = useState(null);
   const [transferPromptDismissed, setTransferPromptDismissed] = useState(false);
   const [receiptPromptDismissed, setReceiptPromptDismissed] = useState(false);
+  const [noticesOpen, setNoticesOpen] = useState(false);
   // initialTab מאפשר לרענון מבחוץ (remount אחרי פינג מהבוט) לא לזרוק
   // את המשתמש בחזרה לטבלה
   const [tab, setTabState] = useState(initialTab);
@@ -188,6 +191,29 @@ function App({
     () => (db && viewerName ? receiptConfirmPrompt(db.sessions, viewerName, aliases) : null),
     [db, viewerName, aliases]
   );
+  const notices = useMemo(
+    () => (db ? noticesForViewer(collectNotices(db), viewerName, { isAdmin, aliases }) : []),
+    [db, viewerName, isAdmin, aliases]
+  );
+  const markNotice = useCallback(async (item) => {
+    if (!db || !item?.sessionId || item.index == null) return;
+    const session = db.sessions.find((s) => s.id === item.sessionId);
+    if (!session) return;
+    const field = item.action === "received" ? "received" : "paid";
+    const next = field === "received"
+      ? markReceipt(session, item.index, true, viewerName)
+      : markTransfer(session, item.index, true, viewerName);
+    if (typeof onMarkPayment === "function") {
+      await onMarkPayment(session, item.index, true, field, viewerName);
+    } else if (!readOnly) {
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) => (s.id === next.id ? next : s)),
+      });
+      await flushStore();
+    }
+    if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
+  }, [db, onMarkPayment, readOnly, viewerName]);
   const confirmOwnTransfers = useCallback(async () => {
     if (!transferPrompt || !db) return;
     let next = transferPrompt.session;
@@ -315,7 +341,14 @@ function App({
             onMarkPayment={onMarkPayment}
           />
         )}
-        <Header />
+        <Header noticeCount={notices.length} onOpenNotices={() => setNoticesOpen(true)} />
+        {noticesOpen ? (
+          <NotificationsSheet
+            items={notices}
+            onClose={() => setNoticesOpen(false)}
+            onMark={markNotice}
+          />
+        ) : null}
         <Banner
           db={db}
           onPlayer={setProfile}
