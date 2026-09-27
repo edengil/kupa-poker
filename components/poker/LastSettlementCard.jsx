@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
+import { SendSettlementLink } from "./SendSettlementLink";
 import { C } from "../../lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
 import { settlementTextForSession } from "../../lib/nightShare";
@@ -69,6 +70,7 @@ export function LastSettlementCard({
 
   const canMark = (!readOnly && !!commit) || typeof onMarkPayment === "function";
   const canEditManual = !readOnly && !!commit;
+  const canSendLink = isAdmin || canEditManual;
 
   const mayToggle = (transfer) => {
     if (!canMark) return false;
@@ -238,6 +240,7 @@ export function LastSettlementCard({
             עריכת מי מעביר למי
           </button>
         )}
+        {canSendLink && transfers.length > 0 && <SendSettlementLink session={session} />}
         <div
           dir="rtl"
           style={{

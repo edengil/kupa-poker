@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { applyCommands, BOT_MARK } from "../lib/whatsapp.js";
 import { buildReport, settleLine, nightDateParts } from "../lib/report.js";
 import { nightSummaryText, sessionFromLive } from "../lib/nightShare.js";
-import { settlementAppUrl, withSettlementLink } from "../lib/settlementInvite.js";
+import { settlementAppUrl, settlementLinkMessage, withSettlementLink } from "../lib/settlementInvite.js";
 import { isNightShareText } from "../lib/waPins.js";
 import {
   sessionsDueForPaymentReminder,
@@ -106,5 +106,25 @@ describe("end of night — night link with the summary", () => {
     });
     expect(text).toContain("חלוקת ערב 26.9");
     expect(text).toContain("https://kupa.test/g/g1/n/live_1790462371219");
+  });
+});
+
+describe("send the night settlement link again from the night card", () => {
+  const url = settlementAppUrl({ siteUrl: "https://kupa-poker.vercel.app", slug: "kupa", sessionId: NIGHT_26_9.id });
+
+  it("is a short bot message with the night date and the /n/ link", () => {
+    const text = settlementLinkMessage(url, NIGHT_26_9);
+    expect(text.split("\n")).toEqual([
+      `${BOT_MARK} החלוקה של ערב 26.9 — מסמנים כאן מי העביר:`,
+      `https://kupa-poker.vercel.app/g/kupa/n/${NIGHT_26_9.id}`,
+    ]);
+  });
+
+  it("does not take over the night pin from the full summary", () => {
+    expect(isNightShareText(settlementLinkMessage(url, NIGHT_26_9))).toBe(false);
+  });
+
+  it("still sends something readable without a date or a slug", () => {
+    expect(settlementLinkMessage(null)).toBe(`${BOT_MARK} החלוקה של הערב — מסמנים כאן מי העביר:\n(לינק לא מוגדר)`);
   });
 });

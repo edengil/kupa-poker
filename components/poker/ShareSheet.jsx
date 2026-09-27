@@ -7,14 +7,17 @@ import { waOpen, waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Send, Share2, X } from "./icons";
 import { sectionEyebrow } from "../../lib/poker/festive";
 import { postToGroup } from "../../lib/postToGroup";
+import { SendSettlementLink } from "./SendSettlementLink";
 
-/* גיליון שיתוף לסיכום / חלוקה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
+/* גיליון שיתוף לסיכום / חלוקה — חולץ מ-PokerApp.jsx כ-JSX נקי.
+   session — ערב שמור: מוסיף כפתור לשליחת לינק החלוקה בלבד. */
 export function ShareSheet({
   title,
   text,
   settlement,
   onClose,
   initialView = "summary",
+  session = null,
 }) {
   const [copied, setCopied] = useState(false);
   const [view, setView] = useState(initialView);
@@ -258,6 +261,8 @@ export function ShareSheet({
             שתף מהמכשיר לקבוצה
           </button>
         )}
+
+        {session && <SendSettlementLink session={session} style={{ marginTop: 8, marginBottom: 0 }} />}
 
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <button onClick={copy} style={{ ...ghost, color: copied ? C.win : C.cream }}>

@@ -37,4 +37,33 @@ test.describe("חלוקה ידנית שמורה", () => {
       "הכול סגור"
     );
   });
+
+  test("מנהל שולח לינק חלוקה מכרטיס הערב; כשנגמרת המכסה נפתח שיתוף ידני", async ({ page }) => {
+    let posted = null;
+    await page.route("**/api/send", async (route) => {
+      posted = route.request().postDataJSON();
+      await route.fulfill({
+        status: 402,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "נגמרה המכסה", code: "whapi_quota", shareFallback: true }),
+      });
+    });
+
+    await page.evaluate(() => localStorage.setItem("poker:cache:group", JSON.stringify({ slug: "kupa-e2e" })));
+    await openLive(page);
+    await addPlayer(page, "לינק א");
+    await addPlayer(page, "לינק ב");
+    await setCashout(page, "לינק א", 200);
+    await setCashout(page, "לינק ב", 0);
+    await page.getByTestId("live-finish").click();
+    await expect(page.getByTestId("live-settlement-builder")).toBeVisible();
+    await page.getByTestId("settlement-close").click();
+
+    await page.getByTestId("tab-table").click();
+    const card = page.getByTestId("last-settlement-card");
+    await card.getByTestId("send-settlement-link").click();
+    await expect(card.getByTestId("send-settlement-link-fallback")).toBeVisible();
+    expect(posted?.text).toContain("מסמנים כאן מי העביר:");
+    expect(posted?.text).toMatch(/\/n\/[^/\s]+$/);
+  });
 });

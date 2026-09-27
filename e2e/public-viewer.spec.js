@@ -18,6 +18,8 @@ test.describe("צופה ציבורי", () => {
     /* ערב אחרון נשאר לסימון העברות — השם מופיע בכרטיס החלוקה */
     await expect(page.getByTestId("last-settlement-card")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("last-settlement-card").getByText("אלפא צופה").first()).toBeVisible();
+    /* שליחת לינק לקבוצה — רק למנהל; צופה רגיל רק פותח את הלינק */
+    await expect(page.getByTestId("send-settlement-link")).toHaveCount(0);
   });
 
   test("עם לייב פעיל — מוצג משחק עכשיו גם בלי היסטוריה", async ({ page }) => {

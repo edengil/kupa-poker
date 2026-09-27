@@ -254,6 +254,7 @@ export function SessionsTab({ db, commit }) {
           title={`סיכום פוקר ${share.session.d}.${share.session.mo}`}
           text={share.text}
           settlement={share.settlement}
+          session={share.session}
           onClose={() => setShare(null)}
         />
       )}
