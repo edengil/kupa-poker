@@ -8,6 +8,7 @@ import { Empty, IconBtn } from "./ui";
 import { ChevronDown, Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
+import { resolveBrowserInviteUrl, withSettlementLink } from "../../lib/settlementInvite";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SessionEditSheet } from "./SessionEditSheet";
 import { confirmationStatusText, confirmationsStartOpen, latestNightConfirmations } from "../../lib/nightConfirmations";
@@ -41,7 +42,7 @@ export function SessionsTab({ db, commit }) {
   const openShare = (s) => {
     setShare({
       session: s,
-      text: nightSummaryText(s, A),
+      text: withSettlementLink(nightSummaryText(s, A), resolveBrowserInviteUrl(null, s.id)),
       settlement: settlementTextForSession(s) || undefined,
     });
   };

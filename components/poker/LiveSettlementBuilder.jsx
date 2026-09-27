@@ -5,7 +5,7 @@ import { C } from "../../lib/poker/colors";
 import { IconBtn } from "./ui";
 import { X, Send, Copy, CheckCircle2 } from "./icons";
 import { brassCta, sectionEyebrow } from "../../lib/poker/festive";
-import { getSupabase } from "../../lib/supabaseClient";
+import { postToGroup } from "../../lib/postToGroup";
 import {
   openingBalances,
   debtorsOf,
@@ -18,6 +18,7 @@ import {
 import {
   buildSettlementInviteText,
   resolveBrowserInviteUrl,
+  withSettlementLink,
 } from "../../lib/settlementInvite";
 import { withBotMark } from "../../lib/botMark";
 
@@ -110,6 +111,7 @@ export function LiveSettlementBuilder({
 
   const inviteUrl = resolveBrowserInviteUrl(inviteSlug, sessionId);
   const inviteText = useMemo(() => {
+    if (summaryText) return withSettlementLink(summaryText, inviteUrl);
     let siteUrl;
     let slug = inviteSlug;
     if (inviteUrl) {
@@ -126,7 +128,7 @@ export function LiveSettlementBuilder({
       sessionId,
       headline: title || "חשבון סופי",
     });
-  }, [inviteUrl, inviteSlug, dateLabel, title, sessionId]);
+  }, [summaryText, inviteUrl, inviteSlug, dateLabel, title, sessionId]);
 
   const togglePrefer = (name) => {
     setPrefer((prev) =>
@@ -197,21 +199,7 @@ export function LiveSettlementBuilder({
     setSending(true);
     setErr("");
     try {
-      const supabase = getSupabase();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch("/api/send", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ text }),
-      });
-      const dataRes = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = [dataRes.error, dataRes.detail].filter(Boolean).join(" — ");
-        throw new Error(msg || "השליחה נכשלה");
-      }
+      await postToGroup(text);
       setSent(true);
       onDone?.({ manualPayments, settlementText: text });
       setTimeout(() => {
@@ -284,8 +272,9 @@ export function LiveSettlementBuilder({
         </div>
 
         <p style={{ margin: "0 0 12px", color: C.dim, fontSize: 13, lineHeight: 1.5 }}>
-          ערוך מי מעביר למי (ואם יש חוסר — למי לשמור יותר). לחיצה על «אשר ושלח לינק» שולחת לקבוצה רק
-          לינק: כולם נכנסים, רואים את החלוקה ומסמנים שולם. אפשר לחזור ולערוך מאוחר יותר מכרטיס החלוקה.
+          ערוך מי מעביר למי (ואם יש חוסר — למי לשמור יותר). לחיצה על «אשר ושלח לינק» שולחת לקבוצה
+          הודעה אחת: הסיכום המלא ומתחתיו לינק לערב — כולם נכנסים, רואים מי מעביר למי ומסמנים שולם.
+          אפשר לחזור ולערוך מאוחר יותר מכרטיס החלוקה.
         </p>
 
         {rawOpening.shortfall > 0 && winnerNames.length > 0 && (
@@ -457,6 +446,27 @@ export function LiveSettlementBuilder({
           >
             {settlementText}
           </pre>
+          <details style={{ marginTop: 8 }} data-testid="settlement-group-preview">
+            <summary style={{ cursor: "pointer", color: C.dim, fontSize: 12 }}>
+              ההודעה שתישלח לקבוצה
+            </summary>
+            <pre
+              dir="rtl"
+              style={{
+                margin: "6px 0 0",
+                whiteSpace: "pre-wrap",
+                fontFamily: "inherit",
+                fontSize: 13,
+                lineHeight: 1.6,
+                background: C.feltDeep,
+                borderRadius: 12,
+                padding: 12,
+                border: `1px solid ${C.line}`,
+              }}
+            >
+              {inviteText}
+            </pre>
+          </details>
         </div>
 
         {err && (
@@ -538,28 +548,6 @@ export function LiveSettlementBuilder({
         >
           שלח גם פירוט מלא לקבוצה (ישן)
         </button>
-
-        {summaryText && (
-          <button
-            type="button"
-            onClick={() => send(summaryText)}
-            style={{
-              width: "100%",
-              marginTop: 4,
-              padding: 10,
-              borderRadius: 12,
-              border: "none",
-              background: "transparent",
-              color: C.dim,
-              fontFamily: "inherit",
-              fontSize: 12,
-              textDecoration: "underline",
-              cursor: "pointer",
-            }}
-          >
-            שלח סיכום נטו + טיפים
-          </button>
-        )}
       </div>
     </div>
   );

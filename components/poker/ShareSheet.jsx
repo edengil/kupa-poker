@@ -6,7 +6,7 @@ import { IconBtn } from "./ui";
 import { waOpen, waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Send, Share2, X } from "./icons";
 import { sectionEyebrow } from "../../lib/poker/festive";
-import { getSupabase } from "../../lib/supabaseClient";
+import { postToGroup } from "../../lib/postToGroup";
 
 /* גיליון שיתוף לסיכום / חלוקה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ShareSheet({
@@ -42,27 +42,11 @@ export function ShareSheet({
     setErr("");
     setQuotaFallback(false);
     try {
-      const supabase = getSupabase();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch("/api/send", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ text: body }),
-      });
-      const dataRes = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = [dataRes.error, dataRes.detail].filter(Boolean).join(" — ");
-        if (dataRes.code === "whapi_quota" || dataRes.shareFallback) {
-          setQuotaFallback(true);
-        }
-        throw new Error(msg || "השליחה נכשלה");
-      }
+      await postToGroup(body);
       setSent(true);
       setTimeout(() => setSent(false), 4000);
     } catch (e) {
+      if (e.shareFallback) setQuotaFallback(true);
       setErr(e.message);
     } finally {
       setSending(false);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store, flushStore } from "../../lib/store";
-import { buildReport, partitionByNet } from "../../lib/report";
+import { buildReport, nightDateParts, partitionByNet } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
@@ -371,13 +371,9 @@ export function LiveTab({
       cps,
     });
     if (!confirmSaveIfUnbalanced(balCheck)) return;
-    /* תאריך הערב = תחילת המשחק (לא חצות אחרי סגירה מאוחרת). */
-    const when = startedAt ? new Date(startedAt) : now;
-    const d = when.getDate(),
-      mo = when.getMonth() + 1,
-      y = when.getFullYear();
-    const iso = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    /* תאריך הערב = תחילת המשחק בשעון ישראל (לא חצות אחרי סגירה מאוחרת). */
     const endedAt = Date.now();
+    const { d, mo, y, iso } = nightDateParts(startedAt, endedAt);
     const rec = {
       id: "live_" + Date.now(),
       iso,

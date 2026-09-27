@@ -75,7 +75,7 @@ describe("tip commands", () => {
     expect(reply).not.toMatch(/אופיר מגיע|דן חייב/);
   });
 
-  it("closing invite keeps tips but not מגיע/חייב nets", () => {
+  it("סיכום after everyone closed sends the same summary as the share sheet (nets + tips + link)", () => {
     const live = {
       players: [
         { name: "א", buyin: 50, cashout: "500" },
@@ -94,8 +94,9 @@ describe("tip commands", () => {
     );
     expect(reply).toContain("https://example.com/g/kupa");
     expect(reply).toContain("💸 טיפים הערב");
-    expect(reply).not.toMatch(/🥇 א מגיע/);
-    expect(reply).not.toMatch(/חייב/);
+    expect(reply).toMatch(/🥇 א מגיע 200/);
+    expect(reply).toMatch(/ה חייב 150/);
+    expect(reply).not.toMatch(/מעביר \d+ ל/);
   });
 
   it("shames a winning non-tipper", () => {

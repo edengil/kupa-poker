@@ -224,7 +224,7 @@ describe("isAllowed", () => {
 });
 
 describe("settle / end replies — app CTA", () => {
-  it("sends invite link without net מגיע/חייב lines", () => {
+  it("סיכום after everyone closed sends the share-sheet summary with the app link", () => {
     const live = {
       players: [
         { name: "א", buyin: 100, cashout: "400" },
@@ -238,14 +238,15 @@ describe("settle / end replies — app CTA", () => {
       [{ kind: "settle", siteUrl: "https://example.com", slug: "kupa" }],
       null
     );
-    expect(reply).toContain("חשבון סופי");
-    expect(reply).toContain("החלוקה אושרה");
+    expect(reply).toContain("סיכום פוקר");
+    expect(reply).toContain("סימון «שולם»");
     expect(reply).toContain("https://example.com/g/kupa");
     expect(reply).not.toMatch(/מעביר \d+ ל/);
-    expect(reply).not.toMatch(/מגיע \d+|חייב \d+/);
+    expect(reply).toMatch(/א מגיע 100/);
+    expect(reply).toMatch(/ב חייב 100/);
   });
 
-  it("appends the app link on last cashout in closing mode", () => {
+  it("last cashout in closing mode is a short ACK — the summary + link come from the app", () => {
     const live = {
       closing: true,
       players: [
@@ -261,12 +262,10 @@ describe("settle / end replies — app CTA", () => {
       "m-close"
     );
     expect(reply).toContain("כולם סגורים");
-    expect(reply).toContain("https://example.com/g/kupa");
-    expect(reply).not.toContain("לשמירת הערב וחלוקת ההעברות — האפליקציה.");
-    /* אין טבלת נטו בגוף החשבון הסופי — רק לינק (שורת ה־ACK של היציאה יכולה להכיל חייב) */
-    const invitePart = reply.split("כולם סגורים")[1] || "";
-    expect(invitePart).not.toMatch(/🥇|🥈|🥉/);
-    expect(invitePart).not.toMatch(/מעביר \d+ ל/);
+    expect(reply).toContain("קופה 200₪");
+    expect(reply).not.toContain("https://example.com/g/kupa");
+    const note = reply.split("כולם סגורים")[1] || "";
+    expect(note).not.toMatch(/🥇|🥈|🥉|מגיע|חייב|טיפים הערב/);
   });
 });
 
