@@ -10,6 +10,7 @@ import {
 import { knownPlayerNames } from "@/lib/poker/personalHighlights";
 import { AL, canon } from "@/lib/poker/helpers";
 import { normalize } from "@/lib/poker/db";
+import { latestSession } from "@/lib/lastSession";
 import {
   isNightShareText,
   nightIsoFromText,
@@ -236,6 +237,7 @@ export async function POST(request) {
   const { live: nextLive, reply, ownerDm } = applyCommands(live, cmds, msg.id, undefined, {
     knownNames,
     aliases,
+    lastSession: latestSession(db.sessions),
   });
   if (!reply) return ok({ skipped: "nothing to do" });
 
