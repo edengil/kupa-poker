@@ -7,17 +7,19 @@ import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/fe
 import { settlementTextForSession } from "../../lib/nightShare";
 import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
 import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "../../lib/nightConfirmations";
-import { latestSession } from "../../lib/lastSession";
+import { latestSession, pastSettlementSessions } from "../../lib/lastSession";
 import { allTransfersPaid } from "../../lib/settlementClosed";
 import { canMarkTransfer, couplePartner } from "../../lib/paymentAccess";
 import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
 import { flushStore } from "../../lib/store";
 import { AL, canon } from "../../lib/poker/helpers";
+import { ChevronDown } from "./icons";
 
 /**
  * כרטיס «חלוקה אחרונה» בראש טאב הטבלה — מי מעביר למי.
  * מחושב תמיד מחדש; גלוי גם לצופים ב־/g/{slug}.
  * onMarkPayment(session, index, paid) — לצופים (RPC); אחרת commit מקומי.
+ * collapsible — כותרת שפותחת וסוגרת את הכרטיס (ערבים קודמים מתחילים סגורים).
  */
 export function LastSettlementCard({
   db,
@@ -27,9 +29,12 @@ export function LastSettlementCard({
   isAdmin = false,
   sessionId = null,
   onMarkPayment = null,
+  collapsible = false,
+  defaultOpen = true,
 }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(null);
+  const [open, setOpen] = useState(defaultOpen);
   const A = useMemo(() => AL(db), [db]);
   const me = viewerName ? canon(viewerName, A) : null;
 
@@ -39,12 +44,16 @@ export function LastSettlementCard({
       : latestSession(db?.sessions);
     if (!session) return null;
     const text = settlementTextForSession(session);
-    return { session, text: text || "", ...paymentPlan(session) };
+    const isLatest = latestSession(db?.sessions)?.id === session.id;
+    return { session, isLatest, text: text || "", ...paymentPlan(session) };
   }, [db?.sessions, sessionId]);
 
   if (!card) return null;
 
-  const { session, text, transfers } = card;
+  const { session, isLatest, text, transfers } = card;
+  const dateLabel = `${session.d}.${session.mo}.${session.y}`;
+  const heading = isLatest ? `חלוקה · ערב אחרון · ${dateLabel}` : `חלוקה · ערב ${dateLabel}`;
+  const expanded = !collapsible || open;
   const confirmations = sessionConfirmations(session);
   const summary = settlementLinkSummary(confirmations?.rows);
 
@@ -146,8 +155,8 @@ export function LastSettlementCard({
         padding: "13px 14px 12px",
         marginBottom: 12,
       }}
-      aria-label={`חלוקה אחרונה ${session.d}.${session.mo}.${session.y}`}
-      data-testid="last-settlement-card"
+      aria-label={isLatest ? `חלוקה אחרונה ${dateLabel}` : `חלוקה ${dateLabel}`}
+      data-testid={isLatest ? "last-settlement-card" : `past-settlement-card-${session.id}`}
     >
       {editing && (
         <SavedSettlementEditor
@@ -159,13 +168,46 @@ export function LastSettlementCard({
       )}
       <div style={festiveGlow} aria-hidden />
       <div style={{ position: "relative" }}>
-        <div style={{ ...sectionEyebrow, marginBottom: 8 }}>
-          <span>♠</span>
-          חלוקה · ערב אחרון · {session.d}.{session.mo}.{session.y}
-        </div>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            data-testid={`settlement-toggle-${session.id}`}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: 0,
+              marginBottom: 8,
+              border: "none",
+              background: "transparent",
+              color: "inherit",
+              cursor: "pointer",
+              textAlign: "right",
+              fontFamily: "inherit",
+            }}
+          >
+            <span style={{ ...sectionEyebrow, flex: 1 }}>
+              <span>♠</span>
+              {heading}
+            </span>
+            <ChevronDown
+              size={18}
+              color={C.dim}
+              style={{ transform: open ? "rotate(180deg)" : "none" }}
+            />
+          </button>
+        ) : (
+          <div style={{ ...sectionEyebrow, marginBottom: 8 }}>
+            <span>♠</span>
+            {heading}
+          </div>
+        )}
         <p
           style={{
-            margin: "0 0 8px",
+            margin: expanded ? "0 0 8px" : 0,
             fontSize: 12.5,
             color: C.dim,
             lineHeight: 1.5,
@@ -173,6 +215,8 @@ export function LastSettlementCard({
         >
           {summary}
         </p>
+        {expanded && (
+        <>
         {canMark && (
           <p style={{ margin: "0 0 8px", fontSize: 12.5, color: C.dim, lineHeight: 1.5 }}>
             כל אחד מסמן רק את ההעברה שלו. זוגות מסמנים אחד לשני. המנהל מסמן הכל.
@@ -245,7 +289,36 @@ export function LastSettlementCard({
             </details>
           )}
         </div>
+        </>
+        )}
       </div>
     </section>
+  );
+}
+
+/**
+ * חלוקות של ערבים קודמים — כרטיס מתקפל לכל ערב, סגור כברירת מחדל,
+ * עם אותם סימוני «שולם». ערב חדש לא מעלים את החלוקה של הקודם.
+ */
+export function SettlementHistory({ db, excludeId = null, ...cardProps }) {
+  const past = useMemo(
+    () => pastSettlementSessions(db?.sessions, { excludeId }),
+    [db?.sessions, excludeId]
+  );
+  if (!past.length) return null;
+  return (
+    <div data-testid="settlement-history" style={{ marginBottom: 12 }}>
+      <div style={{ ...sectionEyebrow, color: C.dim, margin: "0 2px 8px" }}>חלוקות קודמות</div>
+      {past.map((s) => (
+        <LastSettlementCard
+          key={s.id}
+          db={db}
+          sessionId={s.id}
+          collapsible
+          defaultOpen={false}
+          {...cardProps}
+        />
+      ))}
+    </div>
   );
 }

@@ -398,7 +398,7 @@ function App({
               viewerName={viewerName}
               isAdmin={isAdmin}
               onMarkPayment={onMarkPayment}
-              hideSettlement={!!focusSessionId}
+              focusSessionId={focusSessionId}
             />
           ) : tab === "stats" && statsPanel ? (
             statsPanel

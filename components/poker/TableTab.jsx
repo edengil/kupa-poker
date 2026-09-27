@@ -8,7 +8,8 @@ import { periodTotals, yearNum } from "../../lib/poker/totals";
 import { Empty, GroupLabel, IconBtn, SegBar, Select } from "./ui";
 import { Award, Crown, Share2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
-import { LastSettlementCard } from "./LastSettlementCard";
+import { LastSettlementCard, SettlementHistory } from "./LastSettlementCard";
+import { latestSession } from "../../lib/lastSession";
 
 function Ledger({ totals, official, readOnly = false }) {
   const winners = totals.filter((t) => t.amount > 0),
@@ -126,8 +127,11 @@ function Ledger({ totals, official, readOnly = false }) {
 }
 
 /* טאב טבלה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function TableTab({ db, commit, years, readOnly = false, scope, setScope, y, setY, mo, setMo, viewerName = null, isAdmin = false, onMarkPayment = null, hideSettlement = false }) {
+export function TableTab({ db, commit, years, readOnly = false, scope, setScope, y, setY, mo, setMo, viewerName = null, isAdmin = false, onMarkPayment = null, focusSessionId = null }) {
   const [share, setShare] = useState(false);
+  /* בלינק לערב (/n/…) הכרטיס של אותו ערב כבר מוצג למעלה — לא מכפילים */
+  const showLatest = !focusSessionId || latestSession(db.sessions)?.id !== focusSessionId;
+  const cardProps = { commit, readOnly, viewerName, isAdmin, onMarkPayment };
   const { totals, official, recCount } = useMemo(
     () => periodTotals(db, scope, y, mo),
     [db, scope, y, mo]
@@ -139,16 +143,8 @@ export function TableTab({ db, commit, years, readOnly = false, scope, setScope,
 
   return (
     <div style={{ marginTop: 4 }}>
-      {!hideSettlement && (
-        <LastSettlementCard
-          db={db}
-          commit={commit}
-          readOnly={readOnly}
-          viewerName={viewerName}
-          isAdmin={isAdmin}
-          onMarkPayment={onMarkPayment}
-        />
-      )}
+      {showLatest && <LastSettlementCard db={db} collapsible {...cardProps} />}
+      <SettlementHistory db={db} excludeId={focusSessionId} {...cardProps} />
       <SegBar
         value={scope}
         onChange={setScope}
