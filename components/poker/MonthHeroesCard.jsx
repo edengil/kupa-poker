@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
 import { festiveCardSoft, sectionEyebrow } from "../../lib/poker/festive";
-import { computeMonthHeroes, currentCalendarMonth } from "../../lib/poker/monthHeroes";
+import { computeMonthHeroes, computeRollingHeroes, currentCalendarMonth } from "../../lib/poker/monthHeroes";
 
 /**
  * גיבור החודש / ירידת החודש במסך הבית.
@@ -20,6 +20,7 @@ export function MonthHeroesCard({ db, onPlayer, y, mo }) {
     () => computeMonthHeroes(db, cal.y, cal.mo),
     [db, cal.y, cal.mo]
   );
+  const rolling = useMemo(() => computeRollingHeroes(db), [db]);
 
   if (!data || (!data.hero && !data.flop)) return null;
 
@@ -98,6 +99,20 @@ export function MonthHeroesCard({ db, onPlayer, y, mo }) {
         <Cell kind="hero" row={data.hero} />
         <Cell kind="flop" row={data.flop} />
       </div>
+      {rolling?.hero && (
+        <div style={{ fontSize: 12.5, color: C.dim, marginTop: 9, lineHeight: 1.55 }}>
+          👑 אלוף {rolling.label}:{" "}
+          <b style={{ color: C.cream }}>{rolling.hero.name}</b>{" "}
+          <span style={{ color: C.win, fontVariantNumeric: "tabular-nums" }}>{fmt(rolling.hero.amount)}</span>
+          {` · ${rolling.nights} ערבים`}
+          {rolling.flop && (
+            <>
+              {" · "}הנופל: <b style={{ color: C.cream }}>{rolling.flop.name}</b>{" "}
+              <span style={{ color: C.loss, fontVariantNumeric: "tabular-nums" }}>{fmt(rolling.flop.amount)}</span>
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
 }

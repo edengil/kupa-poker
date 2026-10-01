@@ -102,8 +102,11 @@ function Groups({ rows }) {
 }
 
 /* ------------------------- צד המנהל: רק הרשימה ------------------------- */
-export function RsvpList({ supabase, groupId, planIso }) {
+export function RsvpList({ supabase, groupId, planIso, onRows }) {
   const [rows] = useRsvps(supabase, groupId, planIso);
+  useEffect(() => {
+    onRows?.(rows);
+  }, [rows, onRows]);
   return (
     <div
       style={{

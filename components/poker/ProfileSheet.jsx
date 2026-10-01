@@ -13,6 +13,7 @@ import { BalanceBreakdown } from "./BalanceBreakdown";
 import { computePersonalStats } from "../../lib/poker/personalStats";
 import { playerRivals } from "../../lib/poker/headToHead";
 import { badgesForPlayer } from "../../lib/poker/badges";
+import { playerOfNightWins } from "../../lib/poker/playerOfNight";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ProfileSheet({ db, name, onClose }) {
@@ -68,6 +69,7 @@ export function ProfileSheet({ db, name, onClose }) {
 
   const rivals = useMemo(() => playerRivals(db, cn), [db, cn]);
   const badges = useMemo(() => badgesForPlayer(db, cn), [db, cn]);
+  const potnWins = useMemo(() => playerOfNightWins(db)[cn] || 0, [db, cn]);
 
   const yearOptions = useMemo(() => {
     const opts = [[null, "הכל"]];
@@ -169,6 +171,9 @@ export function ProfileSheet({ db, name, onClose }) {
               value={`${personal.hostedCount}× · ${fmt(personal.hostedNet)}`}
               color={(personal.hostedNet ?? 0) >= 0 ? C.win : C.loss}
             />
+          )}
+          {potnWins > 0 && (
+            <Stat label="שחקן הערב" value={`⭐ ×${potnWins}`} color={C.brass} />
           )}
         </div>
         {rivals && (rivals.bestPartner || rivals.nemesis) && (

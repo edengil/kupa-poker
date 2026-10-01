@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { planLabel } from "../Rsvp";
 import { C } from "../../lib/poker/colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "../../lib/poker/festive";
 import { HOSTS, wazeShortUrl } from "../../lib/poker/hosts";
 import { isPlanStale, planTodayIso } from "../../lib/planTiming";
+import { computeNightHype } from "../../lib/poker/nightHype";
 import { waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Share2 } from "./icons";
 
@@ -38,6 +39,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   }, [planStale, db.plan?.iso]);
 
   const [editing, setEditing] = useState(false);
+  const hype = useMemo(() => (plan ? computeNightHype(db) : null), [db, plan]);
   const [iso, setIso] = useState("");
   const [time, setTime] = useState("21:00");
   const [location, setLocation] = useState("");
@@ -309,6 +311,20 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               }}>
                 <span style={{ fontWeight: 700 }}>הערות · </span>
                 {display.note}
+              </div>
+            )}
+            {hype?.text && (
+              <div style={{
+                fontSize: 12.5,
+                color: C.cream,
+                marginBottom: 8,
+                background: `${C.win}12`,
+                border: `1px solid ${C.win}33`,
+                borderRadius: 8,
+                padding: "7px 10px",
+                lineHeight: 1.5,
+              }}>
+                🔥 {hype.text}
               </div>
             )}
             {sendStatus === "sending" && (

@@ -10,6 +10,9 @@ import { r2, AL, canon, waSend } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
+import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
+import { buildAttendanceSnapshot } from "../../lib/poker/attendance";
+import { matchViewerToPlayer } from "../../lib/poker/personalHighlights";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "../../lib/poker/config";
 import { brokenRecords } from "../../lib/poker/brokenRecords";
 import {
@@ -132,6 +135,13 @@ export function LiveTab({
   const [tips, setTips] = useState([]);
   const [coupleFills, setCoupleFills] = useState([]);
   const [actionLog, setActionLog] = useState([]);
+  const [handOfNight, setHandOfNight] = useState(""); // יד הערב — טקסט חופשי, נשמר עם הערב
+  /* צילום ההזמנה ברגע פתיחת המשחק: אישורי הגעה + מיקום (התוכנית נמחקת כשהמשחק מתחיל) */
+  const [planSnap, setPlanSnap] = useState(null);
+  const rsvpRowsRef = useRef([]);
+  const handleRsvpRows = (rows) => {
+    rsvpRowsRef.current = Array.isArray(rows) ? rows : [];
+  };
   const [menuIdx, setMenuIdx] = useState(null); // תפריט עדין למילוי זוגי
   const longPressRef = useRef(null);
   /* שדות שהבוט כותב (applied/pending/closing/מחמאות) — נשמרים כדי לא לדרוס אותם */
@@ -156,6 +166,8 @@ export function LiveTab({
           if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
           if (Array.isArray(d.actionLog)) setActionLog(d.actionLog);
+          if (typeof d.handOfNight === "string") setHandOfNight(d.handOfNight);
+          if (d.planSnap && typeof d.planSnap === "object") setPlanSnap(d.planSnap);
           liveMetaRef.current = {
             applied: d.applied,
             pending: d.pending,
@@ -194,11 +206,13 @@ export function LiveTab({
         tips,
         coupleFills,
         actionLog,
+        handOfNight,
+        planSnap,
         cps,
         editedAt: Date.now(),
       })
     );
-  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, cps, hydrated]);
+  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, handOfNight, planSnap, cps, hydrated]);
 
   // ההצעה נעלמת לבד אחרי 15 שניות כדי לא להפריע
   useEffect(() => {
@@ -218,6 +232,20 @@ export function LiveTab({
   const addPlayer = (nm) => {
     nm = canon(String(nm || "").trim(), A);
     if (!nm || players.some((p) => canon(p.name, A) === nm)) return;
+    /* שחקן ראשון פותח את המשחק — מצלמים את ההזמנה ואת אישורי ההגעה
+       לפני שהתוכנית נמחקת, כדי לשמור צילום נוכחות עם הערב. */
+    if (players.length === 0 && !startedAt && !planSnap) {
+      setPlanSnap(
+        db.plan
+          ? {
+              planIso: db.plan.iso,
+              location: db.plan.location,
+              note: db.plan.note,
+              rsvpRows: rsvpRowsRef.current,
+            }
+          : null
+      );
+    }
     setPlayers((p) => {
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
@@ -342,6 +370,14 @@ export function LiveTab({
       }),
     [players, entriesCount, startedAt, nowTs, cps]
   );
+  /* קצב חי: פעולות לשעה מהיומן, וסיום משוער לפי משך הערב החציוני ההיסטורי */
+  const avgNightMs = useMemo(() => averageNightMs(db.sessions), [db]);
+  const livePace = computeLivePace({
+    startedAt,
+    actionCount: actionLog.length,
+    now: nowTs,
+    avgNightMs,
+  });
   async function saveNight() {
     if (players.some((p) => p.cashout === "")) {
       alert("יש שחקנים שעדיין לא הוזנו להם ג׳יטונים ביציאה. יש להשלים את כולם לפני סיום הערב (גם 0).");
@@ -377,6 +413,19 @@ export function LiveTab({
     /* תאריך הערב = תחילת המשחק בשעון ישראל (לא חצות אחרי סגירה מאוחרת). */
     const endedAt = Date.now();
     const { d, mo, y, iso } = nightDateParts(startedAt, endedAt);
+    /* צילום נוכחות: אישורי הגעה מול מי שבאמת ישב. שמות הצופים ממופים
+       לשמות שחקנים; מי שלא זוהה נשאר עם שם ההתחברות ופשוט לא נספר. */
+    const attendance = planSnap
+      ? buildAttendanceSnapshot({
+          rsvpRows: (planSnap.rsvpRows || []).map((r) => ({
+            status: r.status,
+            playerName:
+              matchViewerToPlayer(db, { name: r.name, email: r.email }) || r.name,
+          })),
+          actualNames: players.map((p) => p.name),
+          aliases: A,
+        })
+      : undefined;
     const rec = {
       id: "live_" + Date.now(),
       iso,
@@ -389,8 +438,12 @@ export function LiveTab({
       coupleFills: coupleFills.length ? coupleFills : undefined,
       startedAt: startedAt || null,
       endedAt,
-      location: db.plan?.location || undefined,
-      placeNote: db.plan?.note || undefined,
+      location: planSnap?.location || db.plan?.location || undefined,
+      placeNote: planSnap?.note || db.plan?.note || undefined,
+      /* יומן הפעולות נשמר עם הערב — רק ממנו מחשבים שיאי יציאה, רק לערבי לייב */
+      actionLog: actionLog.length ? actionLog : undefined,
+      handOfNight: handOfNight.trim() || undefined,
+      attendance,
     };
     const roster = [...new Set([...(db.roster || []), ...players.map((p) => p.name)])];
     // שבירת שיאים נבדקת מול ה-db שלפני ההוספה — ואם נשבר משהו, הבוט מכריז בקבוצה
@@ -422,6 +475,8 @@ export function LiveTab({
     setTips([]);
     setCoupleFills([]);
     setActionLog([]);
+    setHandOfNight("");
+    setPlanSnap(null);
     setMenuIdx(null);
     // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
     if (getConfig().botOn) setConfig({ botOn: false });
@@ -462,7 +517,14 @@ export function LiveTab({
     <div style={{ marginTop: 4 }}>
       <BotToggle on={!!cfg.botOn} onChange={(v) => setConfig({ botOn: v })} />
       {/* הזמנה לקבוצה (תאריך / מיקום / אישורי הגעה) — תמיד זמינה בלייב, לא תלויה בשולחן */}
-      <PlanCard db={db} commit={commit} renderRsvps={renderRsvps} onPlanShared={onPlanShared} />
+      <PlanCard
+        db={db}
+        commit={commit}
+        renderRsvps={
+          renderRsvps ? (iso) => renderRsvps(iso, handleRsvpRows) : renderRsvps
+        }
+        onPlanShared={onPlanShared}
+      />
       <div
         style={{
           background: `linear-gradient(165deg, ${C.cardHi} 0%, ${C.card} 100%)`,
@@ -631,6 +693,15 @@ export function LiveTab({
             startedAt={startedAt}
             elapsed={startedAt ? nowTs - startedAt : 0}
           />
+
+          {livePace && (
+            <div style={{ fontSize: 12.5, color: C.dim, textAlign: "center", margin: "6px 0 2px" }}>
+              ⏱ קצב הערב: {livePace.actionsPerHour} פעולות לשעה
+              {livePace.projectedEnd
+                ? ` · סיום משוער ${formatClock(livePace.projectedEnd)}`
+                : ""}
+            </div>
+          )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {playersView.map(({ p, index: i, group }, rowIdx) => {
@@ -908,6 +979,16 @@ export function LiveTab({
 
           <LiveRebuysBoard board={rebuyBoard} />
 
+          <label style={{ display: "block", fontSize: 12, color: C.dim, margin: "4px 0 12px" }}>
+            🃏 יד הערב (לא חובה — טקסט חופשי, יישמר עם הערב ויופיע בעמוד הערב הציבורי)
+            <input
+              value={handOfNight}
+              onChange={(e) => setHandOfNight(e.target.value)}
+              placeholder="למשל: אבי תפס סטרייט פלוש על הריבר"
+              style={{ ...inputStyle, marginTop: 4, width: "100%" }}
+            />
+          </label>
+
           <LiveDistributionPanel
             anyCash={anyCash}
             netSum={netSum}
@@ -924,6 +1005,8 @@ export function LiveTab({
                 setTips([]);
                 setCoupleFills([]);
                 setActionLog([]);
+                setHandOfNight("");
+                setPlanSnap(null);
                 setMenuIdx(null);
               }
             }}

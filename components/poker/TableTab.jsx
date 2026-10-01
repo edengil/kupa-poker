@@ -129,7 +129,7 @@ function Ledger({ totals, official, readOnly = false }) {
 }
 
 /* טאב טבלה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function TableTab({ db, commit, years, readOnly = false, scope, setScope, y, setY, mo, setMo, viewerName = null, isAdmin = false, onMarkPayment = null, focusSessionId = null }) {
+export function TableTab({ db, commit, years, readOnly = false, scope, setScope, y, setY, mo, setMo, viewerName = null, isAdmin = false, onMarkPayment = null, onVotePlayer = null, focusSessionId = null }) {
   const [share, setShare] = useState(false);
   const [wrapShare, setWrapShare] = useState(false);
   const league = useMemo(
@@ -138,7 +138,7 @@ export function TableTab({ db, commit, years, readOnly = false, scope, setScope,
   );
   /* בלינק לערב (/n/…) הכרטיס של אותו ערב כבר מוצג למעלה — לא מכפילים */
   const showLatest = !focusSessionId || latestSession(db.sessions)?.id !== focusSessionId;
-  const cardProps = { commit, readOnly, viewerName, isAdmin, onMarkPayment };
+  const cardProps = { commit, readOnly, viewerName, isAdmin, onMarkPayment, onVotePlayer };
   const { totals, official, recCount } = useMemo(
     () => periodTotals(db, scope, y, mo),
     [db, scope, y, mo]

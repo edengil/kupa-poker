@@ -5,6 +5,7 @@ import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
 import { ChevronDown, AlertTriangle } from "./icons";
 import { buildGapsReport, DEFAULT_LARGE_GAP } from "../../lib/poker/gapsBoard.js";
+import { computeOpenDebts } from "../../lib/poker/openDebts.js";
 
 function fmtIsoHe(iso) {
   if (!iso || typeof iso !== "string") return iso || "";
@@ -23,11 +24,13 @@ export function GapsBoard({ db, minAbsGap = DEFAULT_LARGE_GAP }) {
     () => buildGapsReport(db, { minAbsGap, nightLimit: 15 }),
     [db, minAbsGap]
   );
+  const openDebts = useMemo(() => computeOpenDebts(db), [db]);
 
   const badge =
     (report.playerGaps.length ? 1 : 0) +
     (report.openNightsTotal ? 1 : 0) +
-    (report.aliases.length ? 1 : 0);
+    (report.aliases.length ? 1 : 0) +
+    (openDebts.debtors.length ? 1 : 0);
 
   return (
     <div
@@ -82,6 +85,33 @@ export function GapsBoard({ db, minAbsGap = DEFAULT_LARGE_GAP }) {
             רשימה שקטה לעדכון נתונים — לא חסימה. פערים מסיכום שנתי, לילות בלי סיכום
             מהצ&apos;אט, וכינויים שכדאי ליישר.
           </p>
+
+          <Section title="חובות פתוחים מערבים קודמים">
+            {openDebts.debtors.length === 0 ? (
+              <Quiet>אין חובות פתוחים — כל חלוקות העבר סגורות.</Quiet>
+            ) : (
+              <ul style={listStyle}>
+                {openDebts.debtors.map((d) => (
+                  <li key={d.name} style={itemStyle}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <b>{d.name}</b>
+                      <span style={{ color: C.loss, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                        {fmt(d.total)}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3, lineHeight: 1.55 }}>
+                      {d.lines
+                        .map((l) => `${l.from} ← ${l.to} · ${fmt(l.amount)} · ערב ${fmtIsoHe(l.iso)}`)
+                        .join(" · ")}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.brass, marginTop: 2 }}>
+                      החוב הוותיק בן {d.ageDays} ימים · {d.nights} ערבים פתוחים
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
 
           <Section title="פער ערבים מול סיכום שנתי">
             {report.playerGaps.length === 0 ? (
