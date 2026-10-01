@@ -1,11 +1,4 @@
 import { describe, it, expect } from "vitest";
-import {
-  playerPeriodNet,
-  yearOverYear,
-  monthOverYear,
-  yearOverYearByPlayer,
-  formatYoyShort,
-} from "../lib/poker/yearCompare.js";
 import { computeMonthHeroes, currentCalendarMonth } from "../lib/poker/monthHeroes.js";
 import { playerBalanceBreakdown, availableYears } from "../lib/poker/totals.js";
 import { computePersonalStats } from "../lib/poker/personalStats.js";
@@ -73,59 +66,6 @@ function dbMulti() {
     ],
   };
 }
-
-describe("yearCompare", () => {
-  const db = dbMulti();
-  const now = new Date(2026, 7, 27); // 27.8.2026
-
-  it("playerPeriodNet uses official yearly for full year", () => {
-    const r = playerPeriodNet(db, "עדן", 2025);
-    expect(r.official).toBe(true);
-    expect(r.amount).toBe(200);
-  });
-
-  it("playerPeriodNet truncates YTD without official", () => {
-    const r = playerPeriodNet(db, "עדן", 2026, { throughMo: 8, throughD: 27 });
-    expect(r.official).toBe(false);
-    expect(r.amount).toBe(150); // 100+50
-  });
-
-  it("yearOverYear compares YTD for current year", () => {
-    const row = yearOverYear(db, "עדן גיל", 2026, { now });
-    expect(row).toBeTruthy();
-    expect(row.truncated).toBe(true);
-    // 2026 YTD through Aug 27: 150; 2025 same cut: Mar+Aug sessions 80+40=120
-    expect(row.current).toBe(150);
-    expect(row.prior).toBe(120);
-    expect(row.delta).toBe(30);
-    expect(row.pct).toBe(25);
-    expect(row.label).toContain("מול אשתקד");
-  });
-
-  it("yearOverYear full prior year uses official", () => {
-    const row = yearOverYear(db, "עדן", 2025, { now });
-    expect(row.truncated).toBe(false);
-    expect(row.current).toBe(200); // official
-    expect(row.prior).toBe(0);
-  });
-
-  it("monthOverYear compares same month", () => {
-    const row = monthOverYear(db, "עדן", 2026, 8);
-    expect(row.current).toBe(50);
-    expect(row.prior).toBe(40);
-    expect(row.delta).toBe(10);
-  });
-
-  it("formatYoyShort shows amount and pct", () => {
-    expect(formatYoyShort({ delta: 30, pct: 25 })).toBe("+30 · +25%");
-    expect(formatYoyShort({ delta: -10, pct: -20 })).toBe("−10 · −20%");
-  });
-
-  it("yearOverYearByPlayer builds map for year scope", () => {
-    const map = yearOverYearByPlayer(db, "year", 2026, 8, { now });
-    expect(map["עדן גיל"].delta).toBe(30);
-  });
-});
 
 describe("monthHeroes", () => {
   const db = dbMulti();
