@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { C } from "../../lib/poker/colors";
 import { fmt, MONTHS } from "../../lib/poker/format";
 import { computeRecords } from "../../lib/poker/computeRecords";
+import { computeHeadToHead } from "../../lib/poker/headToHead";
 import { Empty } from "./ui";
 import { festiveCardSoft, sectionTitle } from "../../lib/poker/festive";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
@@ -17,6 +18,7 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
   const [mineOnly, setMineOnly] = useState(false);
   const [picked, setPicked] = useState("");
   const recs = useMemo(() => computeRecords(db), [db]);
+  const h2h = useMemo(() => computeHeadToHead(db), [db]);
   const names = useMemo(() => knownPlayerNames(db).sort((a, b) => a.localeCompare(b, "he")), [db]);
   const personalOf = allowPick && picked ? picked : mineOnly ? viewerName : null;
 
@@ -169,6 +171,28 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
             value={fmt(recs.allKing.amount)} tone={C.win}
             runner={recs.allKing2 && `${recs.allKing2.name} · ${fmt(recs.allKing2.amount)}`}
             third={recs.allKing3 && `${recs.allKing3.name} · ${fmt(recs.allKing3.amount)}`} />
+        )}
+
+        {/* ראש־בראש: הנטו של כל שחקן בערבים שבהם היריב ישב איתו בשולחן */}
+        {h2h && h2h.topRivalries.length > 0 && (
+          <>
+            <div style={sectionTitle({ margin: "12px 2px 0" })}>
+              ⚔️ ראש בראש
+            </div>
+            <p style={{ margin: "0 2px 8px", color: C.dim, fontSize: 11.5, lineHeight: 1.6 }}>
+              היריבויות עם הכי הרבה ערבים משותפים (מינימום 3). הנטו הוא של כל שחקן באותם ערבים.
+            </p>
+            {h2h.topRivalries.map((p) => (
+              <Card
+                key={`${p.a}|${p.b}`}
+                icon="⚔️"
+                title={`${p.a} ⚔ ${p.b}`}
+                holder={p.aNet >= p.bNet ? `מוביל: ${p.a}` : `מוביל: ${p.b}`}
+                value={`${p.nights} ערבים`}
+                sub={`נטו בערבים המשותפים: ${p.a} ${fmt(p.aNet)} · ${p.b} ${fmt(p.bNet)}`}
+              />
+            ))}
+          </>
         )}
 
         {/* שיאי טיפים גבוה ברשימה — אחרי מלכי החודש/שנה/כל הזמנים — כדי לעודד טיפים */}
