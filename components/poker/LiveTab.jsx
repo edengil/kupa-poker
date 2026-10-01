@@ -11,6 +11,8 @@ import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../li
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
+import { detectLiveRecords, liveRecordAnnouncement } from "../../lib/poker/liveRecords";
+import { postToGroup } from "../../lib/postToGroup";
 import { buildAttendanceSnapshot } from "../../lib/poker/attendance";
 import { matchViewerToPlayer } from "../../lib/poker/personalHighlights";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "../../lib/poker/config";
@@ -138,6 +140,7 @@ export function LiveTab({
   const [coupleFills, setCoupleFills] = useState([]);
   const [actionLog, setActionLog] = useState([]);
   const [handOfNight, setHandOfNight] = useState(""); // יד הערב — טקסט חופשי, נשמר עם הערב
+  const [liveAnnounced, setLiveAnnounced] = useState([]); // מפתחות שיאים חיים שכבר הוכרזו הערב (דדופ)
   /* צילום ההזמנה ברגע פתיחת המשחק: אישורי הגעה + מיקום (התוכנית נמחקת כשהמשחק מתחיל) */
   const [planSnap, setPlanSnap] = useState(null);
   const rsvpRowsRef = useRef([]);
@@ -169,6 +172,7 @@ export function LiveTab({
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
           if (Array.isArray(d.actionLog)) setActionLog(d.actionLog);
           if (typeof d.handOfNight === "string") setHandOfNight(d.handOfNight);
+          if (Array.isArray(d.liveAnnounced)) setLiveAnnounced(d.liveAnnounced);
           if (d.planSnap && typeof d.planSnap === "object") setPlanSnap(d.planSnap);
           liveMetaRef.current = {
             applied: d.applied,
@@ -209,12 +213,37 @@ export function LiveTab({
         coupleFills,
         actionLog,
         handOfNight,
+        liveAnnounced,
         planSnap,
         cps,
         editedAt: Date.now(),
       })
     );
-  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, handOfNight, planSnap, cps, hydrated]);
+  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
+
+  // שיא חי נשבר באמצע הערב → הכרזה בקבוצה פעם אחת לכל שיא+שחקן.
+  // רק כשהבוט דלוק; נכשל בשקט כמו שאר ההכרזות — המשחק חשוב יותר.
+  useEffect(() => {
+    if (!hydrated || !cfg.botOn || players.length === 0) return;
+    const fresh = detectLiveRecords({
+      db,
+      players,
+      announced: liveAnnounced,
+    });
+    if (!fresh.length) return;
+    setLiveAnnounced((prev) => [...new Set([...prev, ...fresh.map((r) => r.key)])]);
+    const text = liveRecordAnnouncement(fresh);
+    if (text) {
+      postToGroup(text).catch((e) =>
+        console.warn("live record announce failed:", e.message)
+      );
+    }
+  }, [players, cfg.botOn, hydrated, db, liveAnnounced]);
+
+  // ערב חדש מתחיל מרשימת שחקנים ריקה — מאפסים את הדדופ של ההכרזות
+  useEffect(() => {
+    if (players.length === 0 && liveAnnounced.length) setLiveAnnounced([]);
+  }, [players.length, liveAnnounced]);
 
   // ההצעה נעלמת לבד אחרי 15 שניות כדי לא להפריע
   useEffect(() => {
