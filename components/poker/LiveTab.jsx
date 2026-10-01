@@ -8,6 +8,7 @@ import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
 import { r2, AL, canon, waSend } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
+import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "../../lib/poker/config";
 import { brokenRecords } from "../../lib/poker/brokenRecords";
@@ -25,6 +26,7 @@ import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { LiveExitField } from "./live/LiveExitField";
 import { LiveDistributionPanel } from "./live/LiveDistributionPanel";
+import { LiveRebuysBoard } from "./live/LiveRebuysBoard";
 import { LiveBitShare, LiveShareSheet, LiveSendPrompt } from "./live/LiveShare";
 import { PlanCard } from "./PlanCard";
 import { BotToggle } from "./BotToggle";
@@ -307,6 +309,7 @@ export function LiveTab({
     setActionLog(out.actionLog);
   };
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
+  const rebuyBoard = useMemo(() => computeLiveRebuys(players, A), [players, A]);
   const potChips = pot * cps;
   const nets = players.map((p) => ({
     name: p.name,
@@ -902,6 +905,8 @@ export function LiveTab({
               onPreview={() => setShare({ raw: bitReport })}
             />
           </div>
+
+          <LiveRebuysBoard board={rebuyBoard} />
 
           <LiveDistributionPanel
             anyCash={anyCash}
