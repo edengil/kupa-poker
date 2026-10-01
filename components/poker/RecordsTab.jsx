@@ -8,6 +8,10 @@ import { computeHeadToHead, headToHeadYears } from "../../lib/poker/headToHead";
 import { computePaymentSpeed, formatPaymentDelay } from "../../lib/poker/paymentSpeed";
 import { computeBustRecords, formatSurvivalMs } from "../../lib/poker/bustRecords";
 import { computeAttendance } from "../../lib/poker/attendance";
+import { compareSeries, COMPARE_MAX } from "../../lib/poker/compareChart";
+import { CompareChart } from "./CompareChart";
+import { SERIES_COLORS } from "../../lib/poker/colors";
+import { periodTotals } from "../../lib/poker/totals";
 import { Empty } from "./ui";
 import { festiveCardSoft, sectionTitle } from "../../lib/poker/festive";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
@@ -53,6 +57,26 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
   const paymentSpeed = useMemo(() => computePaymentSpeed(db), [db]);
   const busts = useMemo(() => computeBustRecords(db), [db]);
   const attendance = useMemo(() => computeAttendance(db), [db]);
+  /* השוואת שחקנים: עד 4 קווי מצטבר על ציר אחד; ברירת מחדל — שני המובילים במאזן */
+  const [cmpYear, setCmpYear] = useState(currentYear);
+  const [cmpPicked, setCmpPicked] = useState(null);
+  const cmpDefault = useMemo(() => {
+    const totals = periodTotals(db, "all").totals;
+    return [...totals].sort((a, b) => b.amount - a.amount).slice(0, 2).map((t) => t.name);
+  }, [db]);
+  const cmpSelection = cmpPicked ?? cmpDefault;
+  const cmp = useMemo(
+    () => compareSeries(db, cmpSelection, cmpYear === "all" ? {} : { year: cmpYear }),
+    [db, cmpSelection, cmpYear]
+  );
+  const toggleCmpPlayer = (name) => {
+    const cur = cmpPicked ?? cmpDefault;
+    if (cur.includes(name)) {
+      if (cur.length > 1) setCmpPicked(cur.filter((n) => n !== name));
+    } else if (cur.length < COMPARE_MAX) {
+      setCmpPicked([...cur, name]);
+    }
+  };
   const names = useMemo(() => knownPlayerNames(db).sort((a, b) => a.localeCompare(b, "he")), [db]);
   const personalOf = allowPick && picked ? picked : mineOnly ? viewerName : null;
 
@@ -479,6 +503,128 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
               : h2h
                 ? `אין מספיק ערבים משותפים ב־${h2hScope} — צריך לפחות 3 ערבים משותפים לאותם שני שחקנים יחד.`
                 : `אין ערבים מתועדים ב־${h2hScope}.`}
+          </div>
+        )}
+
+        {/* השוואת שחקנים — קווי מצטבר של עד 4 שחקנים על ציר ערבים אחד */}
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
+          📈 השוואת שחקנים · {cmpYear === "all" ? "כל הזמנים" : cmpYear}
+        </div>
+        <p style={{ margin: "0 2px 8px", color: C.dim, fontSize: 11.5, lineHeight: 1.6 }}>
+          בחרו עד {COMPARE_MAX} שחקנים וראו את מרוץ הרווח המצטבר ערב־ערב — מי עקף את מי ומתי.
+        </p>
+        <label style={{ display: "block", margin: "0 2px 10px" }}>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 5 }}>שנה להשוואה</div>
+          <select
+            value={String(cmpYear)}
+            onChange={(e) =>
+              setCmpYear(e.target.value === "all" ? "all" : Number(e.target.value))
+            }
+            style={{
+              width: "100%",
+              background: C.card,
+              color: C.cream,
+              border: `1px solid ${C.line}`,
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 14,
+              fontFamily: "inherit",
+            }}
+          >
+            {h2hYearOptions.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+            <option value="all">כל הזמנים</option>
+          </select>
+        </label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, margin: "0 2px 10px" }}>
+          {names.map((n) => {
+            const idx = cmpSelection.indexOf(n);
+            const active = idx >= 0;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => toggleCmpPlayer(n)}
+                aria-pressed={active}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "5px 10px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  border: `1px solid ${active ? SERIES_COLORS[idx % SERIES_COLORS.length] : C.line}`,
+                  background: active ? C.cardHi : "transparent",
+                  color: active ? C.cream : C.dim,
+                  fontWeight: active ? 700 : 400,
+                }}
+              >
+                {active && (
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: SERIES_COLORS[idx % SERIES_COLORS.length],
+                      display: "inline-block",
+                    }}
+                  />
+                )}
+                {n}
+              </button>
+            );
+          })}
+        </div>
+        {cmp.nights.length >= 2 && cmp.series.length > 0 ? (
+          <div style={{ ...festiveCardSoft, borderRadius: 14, padding: "12px 10px 6px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "0 2px 8px" }}>
+              {cmp.series.map((s, si) => (
+                <span
+                  key={s.name}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 12,
+                    color: C.cream,
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: 999,
+                      background: SERIES_COLORS[si % SERIES_COLORS.length],
+                      display: "inline-block",
+                    }}
+                  />
+                  {s.name}
+                  <b
+                    style={{
+                      color: s.final >= 0 ? C.win : C.loss,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {fmt(s.final)}
+                  </b>
+                </span>
+              ))}
+            </div>
+            <CompareChart nights={cmp.nights} series={cmp.series} />
+          </div>
+        ) : (
+          <div style={{
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            📈 אין מספיק ערבים בתקופה הזאת בשביל גרף השוואה — צריך לפחות שני ערבים.
           </div>
         )}
 
