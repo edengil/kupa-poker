@@ -8,6 +8,7 @@ import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
 import { r2, AL, canon, waSend } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
+import { applyManualTip, removeManualTip, playerTipEvents, isManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
@@ -148,6 +149,9 @@ export function LiveTab({
     rsvpRowsRef.current = Array.isArray(rows) ? rows : [];
   };
   const [menuIdx, setMenuIdx] = useState(null); // תפריט עדין למילוי זוגי
+  const [tipPickerIdx, setTipPickerIdx] = useState(null); // שורת שחקן עם בוחר טיפ פתוח
+  const [tipAmt, setTipAmt] = useState(""); // סכום (ג'יטונים) בבוחר הטיפ הידני
+  const [tipListName, setTipListName] = useState(null); // שחקן שרשימת הטיפים שלו פתוחה
   const longPressRef = useRef(null);
   /* שדות שהבוט כותב (applied/pending/closing/מחמאות) — נשמרים כדי לא לדרוס אותם */
   const liveMetaRef = useRef({});
@@ -509,6 +513,9 @@ export function LiveTab({
     setHandOfNight("");
     setPlanSnap(null);
     setMenuIdx(null);
+    setTipPickerIdx(null);
+    setTipAmt("");
+    setTipListName(null);
     // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
     if (getConfig().botOn) setConfig({ botOn: false });
     setSettleBuilder({
@@ -542,6 +549,26 @@ export function LiveTab({
       })
     );
     setMenuIdx(null);
+  }
+
+  /* הוספת טיפ ידנית מהאפליקציה — גיבוי כשהבוט נפל. אותה סמנטיקה כמו הבוט
+     (אירוע ליומן + הורדה מהיציאה אם כבר נרשמה), בלי שום הכרזה לקבוצה.
+     נשמר בנתיב מצב־הלייב הרגיל (tips שב־LIVE_KEY) ומתמזג לפי מזהה אירוע. */
+  function addManualTip(i) {
+    const p = players[i];
+    if (!p) return;
+    const res = applyManualTip({ players, tips, name: p.name, amount: tipAmt, aliases: A });
+    if (!res.ok) return;
+    setPlayers(res.players);
+    setTips(res.tips);
+    setTipPickerIdx(null);
+    setTipAmt("");
+  }
+  function deleteManualTip(tipId) {
+    const res = removeManualTip({ players, tips, tipId, aliases: A });
+    if (!res.ok) return;
+    setPlayers(res.players);
+    setTips(res.tips);
   }
 
   return (
@@ -758,10 +785,47 @@ export function LiveTab({
                         </span>
                       ))}
                       {shownTip > 0 && (
-                        <span style={{ fontSize: 11, color: C.dim }}>
+                        <button
+                          type="button"
+                          data-testid={`live-tip-label-${p.name}`}
+                          title="רשימת הטיפים של הערב"
+                          onClick={() => setTipListName(tipListName === p.name ? null : p.name)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: C.dim,
+                            fontSize: 11,
+                            padding: 0,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
                           טיפ {shownTip}
-                        </span>
+                        </button>
                       )}
+                      {/* הוספת טיפ ידנית — נראית תמיד, גם כשאין טיפים (גיבוי לנפילת הבוט) */}
+                      <button
+                        type="button"
+                        data-testid={`live-tip-open-${p.name}`}
+                        title="הוסף טיפ ידנית"
+                        onClick={() => {
+                          setTipPickerIdx(tipPickerIdx === i ? null : i);
+                          setTipAmt("");
+                        }}
+                        style={{
+                          background: "transparent",
+                          border: `1px solid ${C.line}`,
+                          color: C.dim,
+                          borderRadius: 6,
+                          fontSize: 11,
+                          padding: "2px 6px",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        + טיפ
+                      </button>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {net !== null && (
@@ -779,6 +843,146 @@ export function LiveTab({
                       </IconBtn>
                     </div>
                   </div>
+                  {tipPickerIdx === i && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        flexWrap: "wrap",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 11.5, color: C.dim }}>טיפ בג&apos;יטונים:</span>
+                      {[10, 20, 50, 100].map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          data-testid={`live-tip-quick-${v}`}
+                          onClick={() => setTipAmt(String(v))}
+                          style={{
+                            background: String(v) === tipAmt ? C.brass : "transparent",
+                            border: `1px solid ${C.line}`,
+                            color: String(v) === tipAmt ? "#0A2B21" : C.cream,
+                            borderRadius: 6,
+                            fontSize: 11.5,
+                            padding: "3px 8px",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                      <input
+                        data-testid="live-tip-input"
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        value={tipAmt}
+                        onChange={(e) => setTipAmt(e.target.value.replace(/[^\d]/g, ""))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") addManualTip(i);
+                        }}
+                        placeholder="סכום"
+                        style={{ ...inputStyle, width: 76, padding: "4px 8px", fontSize: 12.5 }}
+                      />
+                      <button
+                        type="button"
+                        data-testid="live-tip-confirm"
+                        disabled={!+tipAmt}
+                        onClick={() => addManualTip(i)}
+                        style={{
+                          background: C.feltDeep,
+                          border: `1px solid ${C.line}`,
+                          color: C.cream,
+                          borderRadius: 8,
+                          fontSize: 11.5,
+                          padding: "4px 10px",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          opacity: !+tipAmt ? 0.45 : 1,
+                        }}
+                      >
+                        הוסף טיפ
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="live-tip-cancel"
+                        onClick={() => {
+                          setTipPickerIdx(null);
+                          setTipAmt("");
+                        }}
+                        style={{
+                          background: "transparent",
+                          border: `1px solid ${C.line}`,
+                          color: C.dim,
+                          borderRadius: 8,
+                          fontSize: 11.5,
+                          padding: "4px 10px",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        ביטול
+                      </button>
+                    </div>
+                  )}
+                  {tipListName === p.name && (
+                    <div
+                      style={{
+                        marginBottom: 8,
+                        borderTop: `1px dashed ${C.line}`,
+                        paddingTop: 6,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      {playerTipEvents(tips, p.name, A).length === 0 && (
+                        <span style={{ fontSize: 11.5, color: C.dim }}>
+                          אין אירועי טיפ מפורטים הערב
+                        </span>
+                      )}
+                      {playerTipEvents(tips, p.name, A).map((ev) => (
+                        <div
+                          key={ev.id}
+                          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}
+                        >
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>טיפ {ev.amount}</span>
+                          <span style={{ color: C.dim, fontVariantNumeric: "tabular-nums" }}>
+                            {new Date(ev.at).toLocaleTimeString("he-IL", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          <span style={{ color: C.dim }}>
+                            {isManualTip(ev) ? "מהאפליקציה" : "מהבוט"}
+                          </span>
+                          {isManualTip(ev) && (
+                            <button
+                              type="button"
+                              data-testid={`live-tip-del-${ev.id}`}
+                              onClick={() => deleteManualTip(ev.id)}
+                              style={{
+                                background: "transparent",
+                                border: `1px solid ${C.line}`,
+                                color: C.loss,
+                                borderRadius: 6,
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                              }}
+                            >
+                              מחק
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div
                     style={{
                       display: "flex",
@@ -877,6 +1081,9 @@ export function LiveTab({
                 setHandOfNight("");
                 setPlanSnap(null);
                 setMenuIdx(null);
+                setTipPickerIdx(null);
+                setTipAmt("");
+                setTipListName(null);
               }
             }}
           />
