@@ -7,6 +7,7 @@ import { C } from "../../lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
 import { settlementTextForSession } from "../../lib/nightShare";
 import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
+import { settlementVersionLabel } from "../../lib/savedSettlement";
 import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "../../lib/nightConfirmations";
 import { latestSession, pastSettlementSessions } from "../../lib/lastSession";
 import { allTransfersPaid } from "../../lib/settlementClosed";
@@ -217,6 +218,14 @@ export function LastSettlementCard({
         >
           {summary}
         </p>
+        {settlementVersionLabel(session) ? (
+          <p
+            data-testid="settlement-version"
+            style={{ margin: "0 0 8px", fontSize: 12, color: C.brass, lineHeight: 1.5 }}
+          >
+            {settlementVersionLabel(session)}
+          </p>
+        ) : null}
         {expanded && (
         <>
         {canMark && (

@@ -37,6 +37,9 @@ export function LiveSettlementBuilder({
   onClose,
   onDone,
   initialPayments = [],
+  initialPreferCreditors = [],
+  notice = "",
+  onSendUpdate,
   onChange,
   inviteSlug,
   sessionId,
@@ -52,7 +55,9 @@ export function LiveSettlementBuilder({
     [rawOpening.balances]
   );
 
-  const [prefer, setPrefer] = useState([]);
+  const [prefer, setPrefer] = useState(() =>
+    Array.isArray(initialPreferCreditors) ? [...initialPreferCreditors] : []
+  );
   const opening = useMemo(
     () => openingBalances(players, cps, { preferCreditors: prefer }),
     [players, cps, prefer]
@@ -66,6 +71,8 @@ export function LiveSettlementBuilder({
   const [err, setErr] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [updateSending, setUpdateSending] = useState(false);
+  const [updateSent, setUpdateSent] = useState(false);
   const [copied, setCopied] = useState(false);
   const preferKey = prefer.slice().sort().join("\0");
   const lastPreferKey = React.useRef(preferKey);
@@ -87,7 +94,7 @@ export function LiveSettlementBuilder({
     setBalances(next);
     setManualPayments(kept);
     if (preferChanged) {
-      onChange?.([]);
+      onChange?.([], { preferCreditors: prefer });
       setFromName("");
       setToName("");
       setAmount("");
@@ -131,6 +138,15 @@ export function LiveSettlementBuilder({
   }, [summaryText, inviteUrl, inviteSlug, dateLabel, title, sessionId]);
 
   const togglePrefer = (name) => {
+    if (
+      manualPayments.length > 0 &&
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "יש העברות ידניות רשומות. שינוי העדפת הזוכים משנה את בסיס החישוב ויאפס אותן. להמשיך?"
+      )
+    ) {
+      return;
+    }
     setPrefer((prev) =>
       prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
     );
@@ -165,7 +181,7 @@ export function LiveSettlementBuilder({
         ...manualPayments,
         { from: fromName, to: toName, amount: Math.round(+amount), id: crypto.randomUUID() },
       ];
-      onChange?.(payments);
+      onChange?.(payments, { preferCreditors: prefer });
       setBalances(next);
       setManualPayments(payments);
       const stillOwes = Math.max(0, -(next[fromName] || 0));
@@ -189,7 +205,7 @@ export function LiveSettlementBuilder({
     const kept = manualPayments.slice(0, -1);
     let next = { ...opening.balances };
     for (const p of kept) next = applyManualPayment(next, p);
-    onChange?.(kept);
+    onChange?.(kept, { preferCreditors: prefer });
     setManualPayments(kept);
     setBalances(next);
     setErr("");
@@ -221,6 +237,21 @@ export function LiveSettlementBuilder({
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {}
+  };
+
+  const sendUpdate = async () => {
+    if (!onSendUpdate || updateSending) return;
+    setUpdateSending(true);
+    setErr("");
+    try {
+      await onSendUpdate();
+      setUpdateSent(true);
+      setTimeout(() => setUpdateSent(false), 4000);
+    } catch (e) {
+      setErr(e.message || "שליחת העדכון נכשלה");
+    } finally {
+      setUpdateSending(false);
+    }
   };
 
   const sel = {
@@ -276,6 +307,26 @@ export function LiveSettlementBuilder({
           הודעה אחת: הסיכום המלא ומתחתיו לינק לערב — כולם נכנסים, רואים מי מעביר למי ומסמנים שולם.
           אפשר לחזור ולערוך מאוחר יותר מכרטיס החלוקה.
         </p>
+
+        {notice ? (
+          <div
+            role="status"
+            data-testid="settlement-edit-notice"
+            style={{
+              border: `1px solid ${C.brass}66`,
+              borderRadius: 14,
+              padding: 12,
+              marginBottom: 14,
+              background: `${C.brass}14`,
+              color: C.cream,
+              fontSize: 13,
+              lineHeight: 1.6,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {notice}
+          </div>
+        ) : null}
 
         {rawOpening.shortfall > 0 && winnerNames.length > 0 && (
           <div
@@ -521,6 +572,35 @@ export function LiveSettlementBuilder({
             {sent ? "אושר ונשלח" : sending ? "שולח…" : "אשר ושלח לינק"}
           </button>
         </div>
+
+        {onSendUpdate ? (
+          <button
+            type="button"
+            disabled={updateSending || sending}
+            data-testid="settlement-send-update"
+            onClick={sendUpdate}
+            style={{
+              width: "100%",
+              marginTop: 8,
+              padding: 12,
+              borderRadius: 12,
+              border: `1px solid ${C.brass}`,
+              background: updateSent ? C.win : "transparent",
+              color: updateSent ? "#06301B" : C.brass,
+              fontFamily: "inherit",
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              opacity: updateSending ? 0.7 : 1,
+            }}
+          >
+            {updateSent ? <CheckCircle2 size={16} /> : <Send size={16} />}
+            {updateSent ? "העדכון נשלח לקבוצה" : updateSending ? "שולח עדכון…" : "שלח עדכון לקבוצה"}
+          </button>
+        ) : null}
 
         <button
           type="button"

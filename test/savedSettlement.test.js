@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { saveManualPayments, paymentPlan, markTransfer } from "../lib/paymentTracking";
+import { saveManualPayments, paymentPlan, markTransfer, markReceipt } from "../lib/paymentTracking";
 import { playersFromSession, settlementTextForSession } from "../lib/nightShare";
-import { savedSettlement } from "../lib/savedSettlement";
+import { savedSettlement, settlementVersionLabel } from "../lib/savedSettlement";
+import { settlementEditNotice } from "../lib/settlementEditNotice";
 import { fetchSnapshot } from "../lib/realtime";
 
 const session = { id: "s1", iso: "2026-09-09", entries: [{ name: "א", amount: -100 }, { name: "ב", amount: 60 }, { name: "ג", amount: 40 }] };
@@ -37,5 +38,91 @@ describe("persisted manual settlement", () => {
     const rpc = vi.fn().mockResolvedValue({ data: [row], error: null });
     expect(await fetchSnapshot({ rpc }, "slug")).toMatchObject(row);
     expect(rpc).toHaveBeenCalledWith("public_group_v2", { p_slug: "slug" });
+  });
+  it("preserves preferred creditors through later manual-payment saves", () => {
+    const shortfallSession = {
+      id: "s-prefer",
+      iso: "2026-09-09",
+      entries: [
+        { name: "א", amount: 100 },
+        { name: "ב", amount: 100 },
+        { name: "ג", amount: -150 },
+      ],
+    };
+    const preferred = saveManualPayments(shortfallSession, [], {
+      preferCreditors: ["א"],
+      now: "2026-10-01T09:00:00.000Z",
+    });
+    expect(preferred.manualSettlement.preferCreditors).toEqual(["א"]);
+    expect(savedSettlement(playersFromSession(preferred), 1, preferred.manualSettlement).balances).toEqual({
+      א: 100,
+      ב: 50,
+      ג: -150,
+    });
+
+    const later = saveManualPayments(preferred, [{ from: "ג", to: "א", amount: 25, id: "p-prefer" }], {
+      now: "2026-10-01T09:05:00.000Z",
+    });
+    expect(later.manualSettlement.preferCreditors).toEqual(["א"]);
+    expect(savedSettlement(playersFromSession(later), 1, later.manualSettlement).preferCreditors).toEqual(["א"]);
+  });
+  it("increments the settlement version and update time only when the saved settlement changes", () => {
+    const first = saveManualPayments(session, [payment], { now: "2026-10-01T09:00:00.000Z" });
+    expect(first.manualSettlement.settlementVersion).toBe(2);
+    expect(first.manualSettlement.settlementUpdatedAt).toBe("2026-10-01T09:00:00.000Z");
+    expect(settlementVersionLabel(first)).toMatch(/^עודכן \d{2}:\d{2} · גרסה 2$/);
+
+    const unchanged = saveManualPayments(first, [payment], { now: "2026-10-01T09:10:00.000Z" });
+    expect(unchanged).toBe(first);
+
+    const second = saveManualPayments(first, [], { now: "2026-10-01T09:15:00.000Z" });
+    expect(second.manualSettlement.settlementVersion).toBe(3);
+    expect(second.manualSettlement.settlementUpdatedAt).toBe("2026-10-01T09:15:00.000Z");
+  });
+  it("keeps marks on unchanged transfers and resets marks on changed transfers", () => {
+    const marked = markReceipt(markTransfer(session, 0, true, "א"), 1, true, "ג");
+    const before = paymentPlan(marked);
+    expect(before.transfers).toEqual([
+      expect.objectContaining({ from: "א", to: "ב", amount: 60 }),
+      expect.objectContaining({ from: "א", to: "ג", amount: 40 }),
+    ]);
+
+    const edited = saveManualPayments(marked, [{ from: "א", to: "ב", amount: 25, id: "p-change" }], {
+      now: "2026-10-01T09:20:00.000Z",
+    });
+    const plan = paymentPlan(edited);
+    const unchangedIndex = plan.transfers.findIndex((t) => t.from === "א" && t.to === "ג" && t.amount === 40);
+    const changedRemainderIndex = plan.transfers.findIndex(
+      (t) => t.from === "א" && t.to === "ב" && t.amount === 35 && !t.manual
+    );
+
+    expect(unchangedIndex).toBeGreaterThan(-1);
+    expect(plan.received[unchangedIndex]).toBe(true);
+    expect(changedRemainderIndex).toBeGreaterThan(-1);
+    expect(plan.paid[changedRemainderIndex]).toBeFalsy();
+    expect(plan.received[changedRemainderIndex]).toBeFalsy();
+    expect(plan.confirmations).toEqual([
+      expect.objectContaining({ index: unchangedIndex, action: "received", by: "ג" }),
+    ]);
+  });
+  it("builds an edit notice when marks exist and when stale manual payments would be dropped", () => {
+    const marked = markTransfer(session, 0, true, "א");
+    const notice = settlementEditNotice(marked);
+    expect(notice.show).toBe(true);
+    expect(notice.markedCount).toBe(1);
+    expect(notice.text).toContain("אפשר לערוך את החלוקה");
+    expect(notice.text).toContain("יאופס");
+
+    const withManual = saveManualPayments(session, [payment]);
+    const stale = {
+      ...withManual,
+      entries: [
+        { name: "א", amount: -50 },
+        { name: "ב", amount: 50 },
+      ],
+    };
+    const staleNotice = settlementEditNotice(stale);
+    expect(staleNotice.droppedManualPayments).toBe(true);
+    expect(staleNotice.text).toContain("לא יישמרו בשמירה הבאה");
   });
 });
