@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildSettlementInviteText, settlementAppUrl } from "../lib/settlementInvite.js";
+import {
+  buildSettlementInviteText,
+  settlementAppUrl,
+  settlementUpdateMessage,
+} from "../lib/settlementInvite.js";
 
 describe("settlementInvite", () => {
   it("builds app url", () => {
@@ -24,5 +28,15 @@ describe("settlementInvite", () => {
     expect(text).toContain("https://example.com/g/kupa");
     expect(text).toContain("💸 טיפים הערב");
     expect(text).not.toMatch(/→/);
+  });
+
+  it("builds a short settlement update message with the live night link", () => {
+    const text = settlementUpdateMessage("https://example.com/g/kupa/n/s1", {
+      d: 14,
+      mo: 9,
+      settlementVersion: 3,
+    });
+    expect(text).toContain("החלוקה של ערב 14.9 עודכנה · גרסה 3");
+    expect(text).toContain("https://example.com/g/kupa/n/s1");
   });
 });
