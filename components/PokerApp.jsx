@@ -90,6 +90,8 @@ function App({
   viewerAuth = null,
   /** צופה: סימון שולם דרך RPC */
   onMarkPayment = null,
+  /** צופה: הצבעה לשחקן הערב דרך RPC */
+  onVotePlayer = null,
   /** לינק לערב ספציפי — /g/slug/n/sessionId */
   focusSessionId = null,
   groupId = null,
@@ -362,6 +364,7 @@ function App({
             commit={commit}
             readOnly={readOnly}
             onMarkPayment={onMarkPayment}
+            onVotePlayer={onVotePlayer}
           />
         )}
         <Header noticeCount={notices.length} onOpenNotices={() => setNoticesOpen(true)} />
@@ -421,6 +424,7 @@ function App({
               viewerName={viewerName}
               isAdmin={isAdmin}
               onMarkPayment={onMarkPayment}
+              onVotePlayer={onVotePlayer}
               focusSessionId={focusSessionId}
             />
           ) : tab === "stats" && statsPanel ? (

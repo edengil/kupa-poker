@@ -15,6 +15,11 @@ import { canMarkTransfer, couplePartner } from "../../lib/paymentAccess";
 import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
 import { flushStore } from "../../lib/store";
 import { AL, canon } from "../../lib/poker/helpers";
+import {
+  playerOfNightCandidates,
+  playerOfNightTally,
+  voteForPlayer,
+} from "../../lib/poker/playerOfNight";
 import { ChevronDown } from "./icons";
 
 /**
@@ -31,6 +36,7 @@ export function LastSettlementCard({
   isAdmin = false,
   sessionId = null,
   onMarkPayment = null,
+  onVotePlayer = null,
   collapsible = false,
   defaultOpen = true,
 }) {
@@ -49,6 +55,15 @@ export function LastSettlementCard({
     const isLatest = latestSession(db?.sessions)?.id === session.id;
     return { session, isLatest, text: text || "", ...paymentPlan(session) };
   }, [db?.sessions, sessionId]);
+
+  /* הצבעת שחקן הערב — הקולות על הערב עצמו; צופה מצביע דרך RPC, מנהל דרך commit */
+  const potnSession = card?.session || null;
+  const potn = useMemo(() => playerOfNightTally(potnSession, A), [potnSession, A]);
+  const potnCandidates = useMemo(
+    () => playerOfNightCandidates(potnSession, A),
+    [potnSession, A]
+  );
+  const [voting, setVoting] = useState(false);
 
   if (!card) return null;
 
@@ -72,6 +87,33 @@ export function LastSettlementCard({
   const canMark = (!readOnly && !!commit) || typeof onMarkPayment === "function";
   const canEditManual = !readOnly && !!commit;
   const canSendLink = isAdmin || canEditManual;
+
+  const myVote = me ? session.playerOfNightVotes?.[me] : undefined;
+  const canVote = !!me && (typeof onVotePlayer === "function" || (!readOnly && !!commit));
+  const vote = async (candidate) => {
+    if (!canVote || voting) return;
+    setVoting(true);
+    try {
+      if (typeof onVotePlayer === "function") {
+        /* השרת משווה לשמות כפי שנשמרו בערב — שולחים את השם הגולמי מהרשומה */
+        const rawCandidate =
+          (session.entries || []).find((e) => canon(e.name, A) === candidate)?.name ||
+          candidate;
+        await onVotePlayer(session, rawCandidate, me);
+      } else if (commit) {
+        const next = voteForPlayer(session, me, candidate, A);
+        if (next !== session) {
+          commit({
+            ...db,
+            sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
+          });
+          await flushStore();
+        }
+      }
+    } finally {
+      setVoting(false);
+    }
+  };
 
   const mayToggle = (transfer) => {
     if (!canMark) return false;
@@ -301,6 +343,77 @@ export function LastSettlementCard({
             </details>
           )}
         </div>
+        {session.handOfNight && (
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 13.5,
+              lineHeight: 1.55,
+              color: C.cream,
+              background: `${C.brass}12`,
+              border: `1px solid ${C.brass}44`,
+              borderRadius: 10,
+              padding: "9px 12px",
+            }}
+          >
+            🃏 <b>יד הערב:</b> {session.handOfNight}
+          </div>
+        )}
+        {potnCandidates.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.brass, marginBottom: 6 }}>
+              ⭐ שחקן הערב
+              {potn.winner
+                ? ` · מוביל: ${potn.winner.name} (${potn.winner.count} קולות)`
+                : " · עדיין אין קולות"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {potnCandidates.map((name) => {
+                const count = potn.counts[name] || 0;
+                const mineVote = myVote === name;
+                const style = {
+                  fontSize: 12.5,
+                  padding: "5px 10px",
+                  borderRadius: 999,
+                  border: `1px solid ${mineVote ? C.brass : C.line}`,
+                  background: mineVote ? `${C.brass}22` : C.feltDeep,
+                  color: mineVote ? C.brass : C.cream,
+                  fontFamily: "inherit",
+                  cursor: canVote ? "pointer" : "default",
+                  fontWeight: mineVote ? 700 : 500,
+                };
+                return canVote ? (
+                  <button
+                    key={name}
+                    type="button"
+                    disabled={voting}
+                    onClick={() => vote(name)}
+                    style={style}
+                    aria-pressed={mineVote}
+                  >
+                    {name}
+                    {count ? ` · ${count}` : ""}
+                  </button>
+                ) : (
+                  <span key={name} style={style}>
+                    {name}
+                    {count ? ` · ${count}` : ""}
+                  </span>
+                );
+              })}
+            </div>
+            {!canVote && !me && (
+              <div style={{ fontSize: 11.5, color: C.dim, marginTop: 5 }}>
+                התחבר כדי להצביע לשחקן הערב.
+              </div>
+            )}
+            {myVote && (
+              <div style={{ fontSize: 11.5, color: C.dim, marginTop: 5 }}>
+                הצבעת ל־{myVote} — אפשר לשנות בלחיצה על שם אחר.
+              </div>
+            )}
+          </div>
+        )}
         </>
         )}
       </div>

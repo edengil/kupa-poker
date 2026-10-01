@@ -19,6 +19,7 @@ export function NightFocus({
   commit,
   readOnly = false,
   onMarkPayment = null,
+  onVotePlayer = null,
 }) {
   const session = (db?.sessions || []).find((s) => s.id === sessionId) || null;
 
@@ -42,6 +43,7 @@ export function NightFocus({
         viewerName={viewerName}
         isAdmin={isAdmin}
         onMarkPayment={onMarkPayment}
+        onVotePlayer={onVotePlayer}
       />
 
       {viewerName ? (

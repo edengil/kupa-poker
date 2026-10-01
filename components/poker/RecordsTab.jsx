@@ -5,6 +5,9 @@ import { C } from "../../lib/poker/colors";
 import { fmt, MONTHS } from "../../lib/poker/format";
 import { computeRecords } from "../../lib/poker/computeRecords";
 import { computeHeadToHead } from "../../lib/poker/headToHead";
+import { computePaymentSpeed, formatPaymentDelay } from "../../lib/poker/paymentSpeed";
+import { computeBustRecords, formatSurvivalMs } from "../../lib/poker/bustRecords";
+import { computeAttendance } from "../../lib/poker/attendance";
 import { Empty } from "./ui";
 import { festiveCardSoft, sectionTitle } from "../../lib/poker/festive";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
@@ -19,6 +22,9 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
   const [picked, setPicked] = useState("");
   const recs = useMemo(() => computeRecords(db), [db]);
   const h2h = useMemo(() => computeHeadToHead(db), [db]);
+  const paymentSpeed = useMemo(() => computePaymentSpeed(db), [db]);
+  const busts = useMemo(() => computeBustRecords(db), [db]);
+  const attendance = useMemo(() => computeAttendance(db), [db]);
   const names = useMemo(() => knownPlayerNames(db).sort((a, b) => a.localeCompare(b, "he")), [db]);
   const personalOf = allowPick && picked ? picked : mineOnly ? viewerName : null;
 
@@ -171,6 +177,68 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
             value={fmt(recs.allKing.amount)} tone={C.win}
             runner={recs.allKing2 && `${recs.allKing2.name} · ${fmt(recs.allKing2.amount)}`}
             third={recs.allKing3 && `${recs.allKing3.name} · ${fmt(recs.allKing3.amount)}`} />
+        )}
+
+        {/* תשלום, תנודתיות מתגלגלת, הגעה וערבי לייב */}
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
+          ⚡ תשלום, הגעה ולייב
+        </div>
+        {paymentSpeed.fastest ? (
+          <Card icon="⚡" title="המשלם המהיר" holder={paymentSpeed.fastest.name}
+            value={formatPaymentDelay(paymentSpeed.fastest.medianHours)}
+            sub={`חציון מפרסום החלוקה לאישור התשלום · ${paymentSpeed.fastest.samples} אישורים`}
+            runner={paymentSpeed.rows[1] && paymentSpeed.rows[1].name !== paymentSpeed.fastest.name &&
+              `${paymentSpeed.rows[1].name} · ${formatPaymentDelay(paymentSpeed.rows[1].medianHours)}`} />
+        ) : (
+          <div style={{
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            ⚡ המשלם המהיר: עדיין אין אישורי תשלום עם זמן — המדד יופיע אחרי שיסמנו «שולם» בלינק החלוקה בשני ערבים לפחות.
+          </div>
+        )}
+        {recs.rollingRoller && (
+          <Card icon="🎢" title="תנודתיות · 30 הימים האחרונים" holder={recs.rollingRoller.name}
+            value={`±${recs.rollingRoller.sd}₪`}
+            sub={`${recs.rollingRoller.nights} ערבים בחלון המתגלגל`} />
+        )}
+        {attendance.enough && attendance.mostReliable ? (
+          <Card icon="🎯" title="אמינות הגעה" holder={attendance.mostReliable.name}
+            value={`${attendance.mostReliable.reliability}%`}
+            sub={`אישר הגעה והגיע ${attendance.mostReliable.attended} מתוך ${attendance.mostReliable.saidYes} · מ־${attendance.nights} ערבים`}
+            runner={attendance.biggestNoShow &&
+              `הכי הרבה הברזות: ${attendance.biggestNoShow.name} · ${attendance.biggestNoShow.noShows}`} />
+        ) : (
+          <div style={{
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            🎯 אמינות הגעה: אין עדיין מספיק נתונים — אישורי ההגעה התחילו להישמר רק מעכשיו, והמדד ייבנה מהערבים הבאים שיישמרו מהלייב.
+          </div>
+        )}
+        {busts?.fastestExit && (
+          <Card icon="🏃" title="היציאה המהירה ביותר · ערבי לייב בלבד" holder={busts.fastestExit.name}
+            value={formatSurvivalMs(busts.fastestExit.survivalMs)}
+            sub={`מ־${busts.liveNights} ערבי לייב עם יומן פעולות`} />
+        )}
+        {busts?.ironMan && (
+          <Card icon="🦾" title="איש הברזל · ערבי לייב בלבד" holder={busts.ironMan.name}
+            value={formatSurvivalMs(busts.ironMan.avgMs)}
+            sub={`הישרדות ממוצעת בערב · ${busts.ironMan.nights} ערבי לייב`} />
+        )}
+        {!busts?.fastestExit && (
+          <div style={{
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            🏃 שיאי יציאה: יופיעו אחרי הערב הבא שיישמר מהלייב — יומן הפעולות התחיל להישמר עם הערב, ורק ממנו נמדדים זמני יציאה.
+          </div>
         )}
 
         {/* ראש־בראש: הנטו של כל שחקן בערבים שבהם היריב ישב איתו בשולחן */}

@@ -518,8 +518,8 @@ export default function OwnerApp() {
         onGameStart={notifyStart}
         onRecords={notifyRecords}
         onPlanShared={notifyPlan}
-        renderRsvps={(planIso) => (
-          <RsvpList supabase={supabase} groupId={group.id} planIso={planIso} />
+        renderRsvps={(planIso, onRows) => (
+          <RsvpList supabase={supabase} groupId={group.id} planIso={planIso} onRows={onRows} />
         )}
       />
     </>

@@ -8,6 +8,7 @@ import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } fr
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
 import { PushPrompt } from "./PushPrompt";
 import { paymentPlan, markPaymentViaRpc } from "../lib/paymentTracking";
+import { votePlayerViaRpc } from "../lib/poker/playerOfNight";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
@@ -111,6 +112,43 @@ export default function PublicApp({ slug, nightId = null }) {
       });
       if (!data) {
         alert("לא הצלחתי לשמור את הסימון. רענן ונסה שוב.");
+        return;
+      }
+      const snap = {
+        id: groupId,
+        data,
+        live,
+        config: pubConfig,
+      };
+      bootViewerStore(snap);
+      dataRef.current = JSON.stringify([data, pubConfig]);
+      setGeneration((g) => g + 1);
+      setFresh(true);
+      setTimeout(() => setFresh(false), 2500);
+      try {
+        localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap }));
+      } catch {}
+      try {
+        const ch = supabase.channel(`group:${slug}`);
+        await ch.subscribe();
+        await ch.send({ type: "broadcast", event: "update", payload: { at: Date.now() } });
+        supabase.removeChannel(ch);
+      } catch {}
+    },
+    [supabase, slug, groupId, live, pubConfig]
+  );
+
+  /* הצבעה לשחקן הערב מהלינק הציבורי — RPC ייעודית, ואז אותו רענון כמו סימון תשלום */
+  const votePlayer = useCallback(
+    async (session, candidate, voter) => {
+      const data = await votePlayerViaRpc(supabase, {
+        slug,
+        sessionId: session.id,
+        candidate,
+        voter,
+      });
+      if (!data) {
+        alert("ההצבעה עדיין לא פעילה בצד השרת. המנהל צריך להריץ את עדכון מסד הנתונים האחרון.");
         return;
       }
       const snap = {
@@ -311,6 +349,7 @@ export default function PublicApp({ slug, nightId = null }) {
         viewerAuth={viewerAuth}
         initialTab={tabRef.current}
         onMarkPayment={markPayment}
+        onVotePlayer={votePlayer}
         focusSessionId={nightId}
         groupId={groupId}
         onTabChange={(tab) => {
