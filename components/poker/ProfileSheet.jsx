@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { C } from "../../lib/poker/colors";
-import { fmt } from "../../lib/poker/format";
+import { fmt, MONTHS } from "../../lib/poker/format";
 import { AL, canon, r2 } from "../../lib/poker/helpers";
 import { availableYears, playerBalanceBreakdown } from "../../lib/poker/totals";
 import { IconBtn, Stat } from "./ui";
@@ -13,6 +13,7 @@ import { BalanceBreakdown } from "./BalanceBreakdown";
 import { computePersonalStats } from "../../lib/poker/personalStats";
 import { playerRivals } from "../../lib/poker/headToHead";
 import { badgesForPlayer } from "../../lib/poker/badges";
+import { monthlyBadgesForPlayer } from "../../lib/poker/monthlyBadges";
 import { playerOfNightWins } from "../../lib/poker/playerOfNight";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
@@ -67,8 +68,30 @@ export function ProfileSheet({ db, name, onClose }) {
     [db, cn, yearFilter]
   );
 
-  const rivals = useMemo(() => playerRivals(db, cn), [db, cn]);
+  /* נמסיס/שותף של השנה הנוכחית; אם אין מספיק נתונים השנה — כל הזמנים */
+  const thisYear = new Date().getFullYear();
+  const rivalsYear = useMemo(() => playerRivals(db, cn, { year: thisYear }), [db, cn, thisYear]);
+  const rivalsAllTime = useMemo(() => playerRivals(db, cn), [db, cn]);
+  const rivalsYearOk = Boolean(rivalsYear && (rivalsYear.bestPartner || rivalsYear.nemesis));
+  const rivals = rivalsYearOk ? rivalsYear : rivalsAllTime;
+  const rivalsScopeLabel = rivalsYearOk ? ` ${thisYear}` : " · כל הזמנים";
   const badges = useMemo(() => badgesForPlayer(db, cn), [db, cn]);
+  /* תגי שיא חודשיים, מקובצים לפי חודש (החדש קודם) */
+  const monthBadgeGroups = useMemo(() => {
+    const list = monthlyBadgesForPlayer(db, cn);
+    const groups = [];
+    const byKey = new Map();
+    for (const b of list) {
+      const key = `${b.y}-${b.mo}`;
+      if (!byKey.has(key)) {
+        const g = { key, label: `${MONTHS[b.mo - 1]} ${b.y}`, badges: [] };
+        byKey.set(key, g);
+        groups.push(g);
+      }
+      byKey.get(key).badges.push(b);
+    }
+    return groups;
+  }, [db, cn]);
   const potnWins = useMemo(() => playerOfNightWins(db)[cn] || 0, [db, cn]);
 
   const yearOptions = useMemo(() => {
@@ -190,7 +213,7 @@ export function ProfileSheet({ db, name, onClose }) {
           >
             {rivals.bestPartner && (
               <div>
-                🤝 השותף הכי רווחי: <b style={{ color: C.cream }}>{rivals.bestPartner.name}</b>
+                🤝 השותף הכי רווחי{rivalsScopeLabel}: <b style={{ color: C.cream }}>{rivals.bestPartner.name}</b>
                 <span style={{ color: C.dim }}>
                   {" "}· ממוצע {fmt(rivals.bestPartner.avg)} לערב יחד ({rivals.bestPartner.nights} ערבים)
                 </span>
@@ -198,7 +221,7 @@ export function ProfileSheet({ db, name, onClose }) {
             )}
             {rivals.nemesis && (
               <div>
-                ⚔️ הנמסיס: <b style={{ color: C.cream }}>{rivals.nemesis.name}</b>
+                ⚔️ הנמסיס{rivalsScopeLabel}: <b style={{ color: C.cream }}>{rivals.nemesis.name}</b>
                 <span style={{ color: C.dim }}>
                   {" "}· ממוצע {fmt(rivals.nemesis.avg)} לערב יחד ({rivals.nemesis.nights} ערבים)
                 </span>
@@ -228,6 +251,39 @@ export function ProfileSheet({ db, name, onClose }) {
                 >
                   {b.icon} {b.label}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {monthBadgeGroups.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12.5, color: C.dim, marginBottom: 6 }}>
+              🏅 שיאי חודש
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+              {monthBadgeGroups.map((g) => (
+                <div key={g.key}>
+                  <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 4 }}>{g.label}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {g.badges.map((b) => (
+                      <span
+                        key={b.id}
+                        title={`${b.label} · ${b.detail}`}
+                        style={{
+                          background: C.card,
+                          border: `1px solid ${C.brass}66`,
+                          color: C.cream,
+                          borderRadius: 999,
+                          padding: "5px 11px",
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {b.icon} {b.base}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

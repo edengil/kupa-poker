@@ -3,8 +3,8 @@
 import React, { useMemo, useState } from "react";
 import { C } from "../../lib/poker/colors";
 import { fmt, MONTHS } from "../../lib/poker/format";
-import { computeRecords } from "../../lib/poker/computeRecords";
-import { computeHeadToHead } from "../../lib/poker/headToHead";
+import { computeRecords, computePeriodRecords, recordPeriods } from "../../lib/poker/computeRecords";
+import { computeHeadToHead, headToHeadYears } from "../../lib/poker/headToHead";
 import { computePaymentSpeed, formatPaymentDelay } from "../../lib/poker/paymentSpeed";
 import { computeBustRecords, formatSurvivalMs } from "../../lib/poker/bustRecords";
 import { computeAttendance } from "../../lib/poker/attendance";
@@ -21,7 +21,35 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
   const [mineOnly, setMineOnly] = useState(false);
   const [picked, setPicked] = useState("");
   const recs = useMemo(() => computeRecords(db), [db]);
-  const h2h = useMemo(() => computeHeadToHead(db), [db]);
+  const currentYear = new Date().getFullYear();
+  const [h2hScope, setH2hScope] = useState(currentYear); // שנה ליריבויות, או "all"
+  const h2h = useMemo(
+    () => computeHeadToHead(db, h2hScope === "all" ? {} : { year: h2hScope }),
+    [db, h2hScope]
+  );
+  const h2hYearOptions = useMemo(() => {
+    const ys = headToHeadYears(db);
+    return ys.includes(currentYear) ? ys : [currentYear, ...ys];
+  }, [db, currentYear]);
+  /* שיאים לפי תקופה: חודש נבחר או שנה נבחרת (ברירת מחדל — התקופה האחרונה עם ערבים) */
+  const periods = useMemo(() => recordPeriods(db), [db]);
+  const [periodKind, setPeriodKind] = useState("month"); // "month" | "year"
+  const [periodMonthKey, setPeriodMonthKey] = useState("");
+  const [periodYear, setPeriodYear] = useState(null);
+  const effMonthKey = periods.months.some((m) => m.key === periodMonthKey)
+    ? periodMonthKey
+    : periods.months[0]?.key;
+  const effPeriodYear =
+    periodYear != null && periods.years.includes(periodYear)
+      ? periodYear
+      : periods.years[0] ?? currentYear;
+  const scoped = useMemo(() => {
+    if (periodKind === "month") {
+      const m = periods.months.find((x) => x.key === effMonthKey);
+      return m ? computePeriodRecords(db, { kind: "month", y: m.y, mo: m.mo }) : null;
+    }
+    return computePeriodRecords(db, { kind: "year", y: effPeriodYear });
+  }, [db, periodKind, periods, effMonthKey, effPeriodYear]);
   const paymentSpeed = useMemo(() => computePaymentSpeed(db), [db]);
   const busts = useMemo(() => computeBustRecords(db), [db]);
   const attendance = useMemo(() => computeAttendance(db), [db]);
@@ -179,6 +207,161 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
             third={recs.allKing3 && `${recs.allKing3.name} · ${fmt(recs.allKing3.amount)}`} />
         )}
 
+        {/* שיאים לפי תקופה — כל כרטיס מחושב רק מערבי החודש/השנה הנבחרים */}
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
+          🗓️ שיאים לפי תקופה
+        </div>
+        <div style={{ display: "flex", gap: 6, margin: "0 2px 10px" }}>
+          <ScopeChip active={periodKind === "month"} onClick={() => setPeriodKind("month")}>חודשי</ScopeChip>
+          <ScopeChip active={periodKind === "year"} onClick={() => setPeriodKind("year")}>שנתי</ScopeChip>
+        </div>
+        <label style={{ display: "block", margin: "0 2px 12px" }}>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 5 }}>
+            {periodKind === "month" ? "חודש" : "שנה"}
+          </div>
+          {periodKind === "month" ? (
+            <select
+              value={effMonthKey || ""}
+              onChange={(e) => setPeriodMonthKey(e.target.value)}
+              style={{
+                width: "100%",
+                background: C.card,
+                color: C.cream,
+                border: `1px solid ${C.line}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 14,
+                fontFamily: "inherit",
+              }}
+            >
+              {periods.months.map((m) => (
+                <option key={m.key} value={m.key}>{m.label}</option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={effPeriodYear}
+              onChange={(e) => setPeriodYear(Number(e.target.value))}
+              style={{
+                width: "100%",
+                background: C.card,
+                color: C.cream,
+                border: `1px solid ${C.line}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 14,
+                fontFamily: "inherit",
+              }}
+            >
+              {periods.years.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          )}
+        </label>
+        {!scoped ? (
+          <div style={{
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            🗓️ אין ערבים מתועדים בתקופה שנבחרה — בחרו תקופה אחרת.
+          </div>
+        ) : (
+          <>
+            <p style={{ margin: "0 2px 8px", color: C.dim, fontSize: 11.5, lineHeight: 1.6 }}>
+              כל השיאים כאן מחושבים רק מ־{scoped.nights} הערבים של {scoped.label}.
+            </p>
+            {periodKind === "month" ? (
+              <>
+                {scoped.recs.monthKing && (
+                  <Card icon="👑" title={`מלך ${scoped.label}`} holder={scoped.recs.monthKing.name}
+                    value={fmt(scoped.recs.monthKing.amount)} tone={C.win}
+                    runner={scoped.recs.monthKing2 && `${scoped.recs.monthKing2.name} · ${fmt(scoped.recs.monthKing2.amount)}`}
+                    third={scoped.recs.monthKing3 && `${scoped.recs.monthKing3.name} · ${fmt(scoped.recs.monthKing3.amount)}`} />
+                )}
+                {scoped.recs.tips?.monthKing && (
+                  <Card icon="🏅" title={`מלך הטיפים · ${scoped.label}`} holder={scoped.recs.tips.monthKing.name}
+                    value={`${scoped.recs.tips.monthKing.chips} ג'`} tone={C.win}
+                    runner={scoped.recs.tips.monthKing2 && `${scoped.recs.tips.monthKing2.name} · ${scoped.recs.tips.monthKing2.chips} ג'`}
+                    third={scoped.recs.tips.monthKing3 && `${scoped.recs.tips.monthKing3.name} · ${scoped.recs.tips.monthKing3.chips} ג'`} />
+                )}
+              </>
+            ) : (
+              <>
+                {scoped.recs.yearKing && (
+                  <Card icon="🏆" title={`מוביל ${scoped.label}`} holder={scoped.recs.yearKing.name}
+                    value={fmt(scoped.recs.yearKing.amount)} tone={C.win}
+                    runner={scoped.recs.yearKing2 && `${scoped.recs.yearKing2.name} · ${fmt(scoped.recs.yearKing2.amount)}`}
+                    third={scoped.recs.yearKing3 && `${scoped.recs.yearKing3.name} · ${fmt(scoped.recs.yearKing3.amount)}`} />
+                )}
+                {scoped.recs.tips?.allKing && (
+                  <Card icon="🏅" title={`מלך הטיפים · ${scoped.label}`} holder={scoped.recs.tips.allKing.name}
+                    value={`${scoped.recs.tips.allKing.chips} ג'`} tone={C.win}
+                    runner={scoped.recs.tips.allKing2 && `${scoped.recs.tips.allKing2.name} · ${scoped.recs.tips.allKing2.chips} ג'`}
+                    third={scoped.recs.tips.allKing3 && `${scoped.recs.tips.allKing3.name} · ${scoped.recs.tips.allKing3.chips} ג'`} />
+                )}
+              </>
+            )}
+            {scoped.recs.bestNight && (
+              <Card icon="🔥" title={`ערב השיא · ${scoped.label}`} holder={scoped.recs.bestNight.name}
+                value={fmt(scoped.recs.bestNight.amount)} tone={C.win} sub={dt(scoped.recs.bestNight)}
+                runner={scoped.recs.bestNight2 && `${scoped.recs.bestNight2.name} · ${fmt(scoped.recs.bestNight2.amount)} · ${dt(scoped.recs.bestNight2)}`}
+                third={scoped.recs.bestNight3 && `${scoped.recs.bestNight3.name} · ${fmt(scoped.recs.bestNight3.amount)} · ${dt(scoped.recs.bestNight3)}`} />
+            )}
+            {scoped.recs.worstNight && scoped.recs.worstNight.amount < 0 && (
+              <Card icon="🥶" title={`הערב הקשה · ${scoped.label}`} holder={scoped.recs.worstNight.name}
+                value={fmt(scoped.recs.worstNight.amount)} tone={C.loss} sub={dt(scoped.recs.worstNight)} />
+            )}
+            {scoped.recs.most && (
+              <Card icon="🎯" title={`הכי הרבה ערבים · ${scoped.label}`} holder={scoped.recs.most.name}
+                value={`${scoped.recs.most.nights}`}
+                runner={scoped.recs.most2 && `${scoped.recs.most2.name} · ${scoped.recs.most2.nights}`}
+                third={scoped.recs.most3 && `${scoped.recs.most3.name} · ${scoped.recs.most3.nights}`} />
+            )}
+            {scoped.recs.mostWins && scoped.recs.mostWins.wins > 0 && (
+              <Card icon="✅" title={`הכי הרבה ערבים חיוביים · ${scoped.label}`} holder={scoped.recs.mostWins.name}
+                value={`${scoped.recs.mostWins.wins} ערבים`} tone={C.win}
+                runner={scoped.recs.mostWins2 && scoped.recs.mostWins2.wins > 0 &&
+                  `${scoped.recs.mostWins2.name} · ${scoped.recs.mostWins2.wins} ערבים`}
+                third={scoped.recs.mostWins3 && scoped.recs.mostWins3.wins > 0 &&
+                  `${scoped.recs.mostWins3.name} · ${scoped.recs.mostWins3.wins} ערבים`} />
+            )}
+            {periodKind === "month" ? (
+              <>
+                {scoped.recs.chips?.bestMonth && (
+                  <Card icon="🪙" title={`שיא הכי הרבה ג'יטונים בסיום · ${scoped.label}`}
+                    holder={scoped.recs.chips.bestMonth.name}
+                    value={`${scoped.recs.chips.bestMonth.chips} ג'`} tone={C.win}
+                    sub={dt(scoped.recs.chips.bestMonth)} />
+                )}
+                {scoped.recs.coupleFills?.monthTop && (
+                  <Card icon="🤝" title={`מילוי זוגי · ${scoped.label}`}
+                    holder={scoped.recs.coupleFills.monthTop.label}
+                    value={`${scoped.recs.coupleFills.monthTop.chips} ג'`}
+                    sub={`${scoped.recs.coupleFills.monthTop.count} מילויים · ${scoped.recs.coupleFills.monthTop.couple || ""}`} />
+                )}
+              </>
+            ) : (
+              <>
+                {scoped.recs.chips?.bestYear && (
+                  <Card icon="🪙" title={`שיא הכי הרבה ג'יטונים בסיום · ${scoped.label}`}
+                    holder={scoped.recs.chips.bestYear.name}
+                    value={`${scoped.recs.chips.bestYear.chips} ג'`} tone={C.win}
+                    sub={dt(scoped.recs.chips.bestYear)} />
+                )}
+                {scoped.recs.coupleFills?.allTop && (
+                  <Card icon="🔗" title={`מילוי זוגי · ${scoped.label}`}
+                    holder={scoped.recs.coupleFills.allTop.label}
+                    value={`${scoped.recs.coupleFills.allTop.chips} ג'`}
+                    sub={`${scoped.recs.coupleFills.allTop.count} פעמים · ${scoped.recs.coupleFills.allTop.couple || ""}`} />
+                )}
+              </>
+            )}
+          </>
+        )}
+
         {/* תשלום, תנודתיות מתגלגלת, הגעה וערבי לייב */}
         <div style={sectionTitle({ margin: "12px 2px 0" })}>
           ⚡ תשלום, הגעה ולייב
@@ -241,26 +424,62 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
           </div>
         )}
 
-        {/* ראש־בראש: הנטו של כל שחקן בערבים שבהם היריב ישב איתו בשולחן */}
-        {h2h && h2h.topRivalries.length > 0 && (
-          <>
-            <div style={sectionTitle({ margin: "12px 2px 0" })}>
-              ⚔️ ראש בראש
-            </div>
-            <p style={{ margin: "0 2px 8px", color: C.dim, fontSize: 11.5, lineHeight: 1.6 }}>
-              היריבויות עם הכי הרבה ערבים משותפים (מינימום 3). הנטו הוא של כל שחקן באותם ערבים.
-            </p>
-            {h2h.topRivalries.map((p) => (
-              <Card
-                key={`${p.a}|${p.b}`}
-                icon="⚔️"
-                title={`${p.a} ⚔ ${p.b}`}
-                holder={p.aNet >= p.bNet ? `מוביל: ${p.a}` : `מוביל: ${p.b}`}
-                value={`${p.nights} ערבים`}
-                sub={`נטו בערבים המשותפים: ${p.a} ${fmt(p.aNet)} · ${p.b} ${fmt(p.bNet)}`}
-              />
+        {/* ראש־בראש לפי שנה: הנטו של כל שחקן בערבים שבהם היריב ישב איתו בשולחן */}
+        <div style={sectionTitle({ margin: "12px 2px 0" })}>
+          ⚔️ ראש בראש · {h2hScope === "all" ? "כל הזמנים" : h2hScope}
+        </div>
+        <p style={{ margin: "0 2px 8px", color: C.dim, fontSize: 11.5, lineHeight: 1.6 }}>
+          היריבויות עם הכי הרבה ערבים משותפים (מינימום 3). הנטו הוא של כל שחקן באותם ערבים.
+        </p>
+        <label style={{ display: "block", margin: "0 2px 12px" }}>
+          <div style={{ fontSize: 12, color: C.dim, marginBottom: 5 }}>שנה ליריבויות</div>
+          <select
+            value={String(h2hScope)}
+            onChange={(e) =>
+              setH2hScope(e.target.value === "all" ? "all" : Number(e.target.value))
+            }
+            style={{
+              width: "100%",
+              background: C.card,
+              color: C.cream,
+              border: `1px solid ${C.line}`,
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 14,
+              fontFamily: "inherit",
+            }}
+          >
+            {h2hYearOptions.map((y) => (
+              <option key={y} value={y}>{y}</option>
             ))}
-          </>
+            <option value="all">כל הזמנים</option>
+          </select>
+        </label>
+        {h2h && h2h.topRivalries.length > 0 ? (
+          h2h.topRivalries.map((p) => (
+            <Card
+              key={`${p.a}|${p.b}`}
+              icon="⚔️"
+              title={`${p.a} ⚔ ${p.b}`}
+              holder={p.aNet >= p.bNet ? `מוביל: ${p.a}` : `מוביל: ${p.b}`}
+              value={`${p.nights} ערבים`}
+              sub={`נטו בערבים המשותפים: ${p.a} ${fmt(p.aNet)} · ${p.b} ${fmt(p.bNet)}`}
+            />
+          ))
+        ) : (
+          <div style={{
+            background: `linear-gradient(165deg, ${C.card} 0%, ${C.feltDeep} 100%)`,
+            border: `1px dashed ${C.brass}55`,
+            borderRadius: 14,
+            padding: "12px 14px", fontSize: 13, color: C.dim, lineHeight: 1.6,
+          }}>
+            ⚔️{" "}
+            {h2hScope === "all"
+              ? "אין מספיק ערבים משותפים — צריך לפחות 3 ערבים משותפים לאותם שני שחקנים יחד."
+              : h2h
+                ? `אין מספיק ערבים משותפים ב־${h2hScope} — צריך לפחות 3 ערבים משותפים לאותם שני שחקנים יחד.`
+                : `אין ערבים מתועדים ב־${h2hScope}.`}
+          </div>
         )}
 
         {/* שיאי טיפים גבוה ברשימה — אחרי מלכי החודש/שנה/כל הזמנים — כדי לעודד טיפים */}
