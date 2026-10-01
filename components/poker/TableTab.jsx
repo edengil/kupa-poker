@@ -10,6 +10,8 @@ import { Award, Crown, Share2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { LastSettlementCard, SettlementHistory } from "./LastSettlementCard";
 import { latestSession } from "../../lib/lastSession";
+import { computeLeague } from "../../lib/poker/leaguePoints";
+import { seasonWrapText } from "../../lib/poker/seasonWrap";
 
 function Ledger({ totals, official, readOnly = false }) {
   const winners = totals.filter((t) => t.amount > 0),
@@ -129,6 +131,11 @@ function Ledger({ totals, official, readOnly = false }) {
 /* טאב טבלה — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function TableTab({ db, commit, years, readOnly = false, scope, setScope, y, setY, mo, setMo, viewerName = null, isAdmin = false, onMarkPayment = null, focusSessionId = null }) {
   const [share, setShare] = useState(false);
+  const [wrapShare, setWrapShare] = useState(false);
+  const league = useMemo(
+    () => (scope === "year" ? computeLeague(db, y) : null),
+    [db, scope, y]
+  );
   /* בלינק לערב (/n/…) הכרטיס של אותו ערב כבר מוצג למעלה — לא מכפילים */
   const showLatest = !focusSessionId || latestSession(db.sessions)?.id !== focusSessionId;
   const cardProps = { commit, readOnly, viewerName, isAdmin, onMarkPayment };
@@ -196,9 +203,30 @@ export function TableTab({ db, commit, years, readOnly = false, scope, setScope,
           סיכום — {title}
         </h2>
         {totals.length > 0 && (
-          <IconBtn onClick={() => setShare(true)}>
-            <Share2 size={15} />
-          </IconBtn>
+          <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {scope === "year" && (
+              <button
+                type="button"
+                onClick={() => setWrapShare(true)}
+                style={{
+                  border: `1px solid ${C.brass}66`,
+                  background: "transparent",
+                  color: C.brass,
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                🎁 סיכום שנה
+              </button>
+            )}
+            <IconBtn onClick={() => setShare(true)}>
+              <Share2 size={15} />
+            </IconBtn>
+          </span>
         )}
       </div>
       {totals.length === 0 ? (
@@ -224,11 +252,81 @@ export function TableTab({ db, commit, years, readOnly = false, scope, setScope,
           </p>
         </>
       )}
+      {league && league.rows.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <h2
+            style={{
+              fontSize: 17,
+              fontWeight: 700,
+              margin: "0 2px 4px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            🏆 ליגת נקודות {league.year}
+          </h2>
+          <p style={{ color: C.dim, fontSize: 12, margin: "0 2px 10px", lineHeight: 1.6 }}>
+            נקודות לפי מיקום בערב (10/7/5/3/1) — בלי קשר לכסף. מ־{league.nights} ערבים.
+          </p>
+          <div
+            style={{
+              background: C.card,
+              border: `1px solid ${C.line}`,
+              borderRadius: 14,
+              padding: "6px 14px",
+            }}
+          >
+            {league.rows.map((r, i) => (
+              <div
+                key={r.name}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 4px",
+                  borderTop: i === 0 ? "none" : `1px solid ${C.line}44`,
+                }}
+              >
+                <span style={{ flex: "0 0 26px", fontSize: 15 }}>
+                  {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: 14,
+                    fontWeight: i === 0 ? 700 : 500,
+                    color: C.cream,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {r.name}
+                  <span style={{ color: C.dim, fontWeight: 400, fontSize: 12 }}>
+                    {" "}· {r.wins}× ראשון · {r.nights} ערבים
+                  </span>
+                </span>
+                <b style={{ color: C.brass, fontVariantNumeric: "tabular-nums", fontSize: 15 }}>
+                  {r.points} נק׳
+                </b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {share && (
         <ShareSheet
           title={`סיכום פוקר — ${title}`}
           text={toWhatsApp(totals, null, title, AL(db), true)}
           onClose={() => setShare(false)}
+        />
+      )}
+      {wrapShare && (
+        <ShareSheet
+          title={`🎁 סיכום שנה — ${y}`}
+          text={seasonWrapText(db, y, viewerName)}
+          onClose={() => setWrapShare(false)}
         />
       )}
     </div>
