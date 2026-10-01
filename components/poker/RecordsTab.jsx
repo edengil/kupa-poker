@@ -10,6 +10,7 @@ import { computeBustRecords, formatSurvivalMs } from "../../lib/poker/bustRecord
 import { computeAttendance } from "../../lib/poker/attendance";
 import { compareSeries, COMPARE_MAX } from "../../lib/poker/compareChart";
 import { CompareChart } from "./CompareChart";
+import { SummaryCardButton } from "./SummaryCardButton";
 import { SERIES_COLORS } from "../../lib/poker/colors";
 import { periodTotals } from "../../lib/poker/totals";
 import { Empty } from "./ui";
@@ -297,6 +298,14 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
             <p style={{ margin: "0 2px 8px", color: C.dim, fontSize: 11.5, lineHeight: 1.6 }}>
               כל השיאים כאן מחושבים רק מ־{scoped.nights} הערבים של {scoped.label}.
             </p>
+            <SummaryCardButton
+              db={db}
+              scope={
+                periodKind === "month"
+                  ? { kind: "month", y: scoped.y, mo: scoped.mo }
+                  : { kind: "year", y: scoped.y }
+              }
+            />
             {periodKind === "month" ? (
               <>
                 {scoped.recs.monthKing && (
