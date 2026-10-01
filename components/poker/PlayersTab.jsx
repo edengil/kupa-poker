@@ -5,6 +5,7 @@ import { C } from "../../lib/poker/colors";
 import { fmt, MONTHS } from "../../lib/poker/format";
 import { AL, canon, r2 } from "../../lib/poker/helpers";
 import { periodTotals, yearNum } from "../../lib/poker/totals";
+import { computeSkillRatings, SKILL_MIN_NIGHTS } from "../../lib/poker/skillRating";
 import { Empty } from "./ui";
 import { ChevronLeft, Crown } from "./icons";
 
@@ -35,6 +36,10 @@ export function PlayersTab({ db, onPlayer }) {
     () => periodTotals(db, scope, y, mo).totals,
     [db, scope, y, mo]
   );
+  const skillByName = useMemo(() => {
+    const { rows } = computeSkillRatings(db);
+    return new Map(rows.map((r) => [r.name, r]));
+  }, [db]);
 
   // ספירת הערבים חייבת להיות באותו חתך כמו הסכומים, אחרת הממוצע לא מייצג
   const counts = useMemo(() => {
@@ -142,6 +147,9 @@ export function PlayersTab({ db, onPlayer }) {
         </select>
       </div>
       <p role="status" style={{ fontSize: 12, color: C.dim }}>{visibleTotals.length} שחקנים</p>
+      <p style={{ fontSize: 12, color: C.dim, margin: "0 0 12px", lineHeight: 1.5 }}>
+        🎯 דירוג מיומנות: כל ערב הוא ראש־בראש מול כל היושבים בשולחן לפי הנטו. נכנסים לטבלה אחרי {SKILL_MIN_NIGHTS} ערבים.
+      </p>
       {!visibleTotals.length ? (
         <Empty text={query ? "לא נמצאו שחקנים. נסה שם אחר." : "אין ערבים בתקופה הזאת."} />
       ) : (
@@ -190,6 +198,26 @@ export function PlayersTab({ db, onPlayer }) {
                 >
                   {i === 0 && <Crown size={15} color={C.brass} />}
                   {t.name}
+                  {(() => {
+                    const sk = skillByName.get(t.name);
+                    if (!sk?.ranked) return null;
+                    return (
+                      <span
+                        title={`דירוג מיומנות ${Math.round(sk.rating)} · מקום ${sk.rank} · ${sk.nights} ערבים`}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: C.feltDeep,
+                          background: C.brass,
+                          borderRadius: 999,
+                          padding: "1px 7px",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        🎯 {Math.round(sk.rating)}
+                      </span>
+                    );
+                  })()}
                 </span>
                 <span
                   style={{

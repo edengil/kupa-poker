@@ -16,6 +16,7 @@ import { badgesForPlayer } from "../../lib/poker/badges";
 import { monthlyBadgesForPlayer } from "../../lib/poker/monthlyBadges";
 import { playerOfNightWins } from "../../lib/poker/playerOfNight";
 import { playerEmail, normalizePlayerEmail } from "../../lib/poker/emailRsvp";
+import { skillRatingFor, SKILL_MIN_NIGHTS } from "../../lib/poker/skillRating";
 
 /* עריכת אימייל לשחקן — מוצג רק לבעלים (פרופיל בצפייה בלבד לא מקבל onSave). */
 function EmailEditor({ current, onSave }) {
@@ -90,6 +91,7 @@ function EmailEditor({ current, onSave }) {
 export function ProfileSheet({ db, name, onClose, onSaveEmail }) {
   const A = AL(db);
   const cn = canon(name, A);
+  const skill = useMemo(() => skillRatingFor(db, cn), [db, cn]);
   const years = useMemo(() => availableYears(db), [db]);
   const [yearFilter, setYearFilter] = useState(null); // null = הכל
 
@@ -214,6 +216,24 @@ export function ProfileSheet({ db, name, onClose, onSaveEmail }) {
 
         {typeof onSaveEmail === "function" && (
           <EmailEditor current={playerEmail(db, cn)} onSave={onSaveEmail} />
+        )}
+
+        {skill && (
+          <p style={{ fontSize: 13.5, color: C.cream, margin: "0 0 14px", lineHeight: 1.6 }}>
+            🎯 דירוג מיומנות:{" "}
+            <b style={{ color: C.brass, fontVariantNumeric: "tabular-nums" }}>
+              {Math.round(skill.rating)}
+            </b>
+            {skill.ranked ? (
+              <span style={{ color: C.dim }}>
+                {" "}· מקום {skill.rank} מתוך {skill.tableSize} · {skill.wins} ניצחונות מול {skill.losses} הפסדים בזוגות
+              </span>
+            ) : (
+              <span style={{ color: C.dim }}>
+                {" "}· עוד {Math.max(0, SKILL_MIN_NIGHTS - skill.nights)} ערבים לכניסה לטבלה הרשמית
+              </span>
+            )}
+          </p>
         )}
 
         {years.length > 0 && (
