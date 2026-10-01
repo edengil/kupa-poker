@@ -9,7 +9,7 @@
 import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback } from "react";
 import { store } from "../lib/store";
 import { C } from "../lib/poker/colors";
-import { Header, TabBar, Style } from "./poker/chrome";
+import { Header, TabBar, Style, TABBAR_H } from "./poker/chrome";
 import { Banner } from "./poker/Banner";
 import { TableTab } from "./poker/TableTab";
 import { normalize } from "../lib/poker/db";
@@ -352,7 +352,7 @@ function App({
         style={{
           maxWidth: 640,
           margin: "0 auto",
-          padding: "0 13px calc(90px + env(safe-area-inset-bottom))",
+          padding: `0 13px calc(${TABBAR_H}px + env(safe-area-inset-bottom))`,
         }}
       >
         {focusSessionId && (

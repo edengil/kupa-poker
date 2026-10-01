@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
+import { envValue, hasEnv } from "@/lib/env";
 
 /* ============================================================================
    עמוד מצב מרוכז — מבט אחד על בריאות הבוט וההגדרות.
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 const WHAPI_BASE = "https://gate.whapi.cloud";
 
 function authorized(request) {
-  const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
+  const secret = envValue("WHATSAPP_WEBHOOK_SECRET");
   const given = new URL(request.url).searchParams.get("secret");
   return Boolean(secret) && given === secret;
 }
@@ -72,7 +73,7 @@ async function whapiWebhooks(token) {
 }
 
 async function groupState() {
-  const slug = process.env.KUPA_GROUP_SLUG;
+  const slug = envValue("KUPA_GROUP_SLUG");
   if (!slug) return { found: false, reason: "no KUPA_GROUP_SLUG" };
   try {
     const supabase = getAdminSupabase();
@@ -103,15 +104,15 @@ export async function GET(request) {
       {
         error: "forbidden",
         env: {
-          hasWebhookSecret: Boolean(process.env.WHATSAPP_WEBHOOK_SECRET),
-          hasWhapiToken: Boolean(process.env.WHAPI_TOKEN),
+          hasWebhookSecret: hasEnv("WHATSAPP_WEBHOOK_SECRET"),
+          hasWhapiToken: hasEnv("WHAPI_TOKEN"),
         },
       },
       { status: 403 }
     );
   }
 
-  const token = process.env.WHAPI_TOKEN;
+  const token = envValue("WHAPI_TOKEN");
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));
 
   const [whapi, webhooks, group] = await Promise.all([
@@ -124,14 +125,14 @@ export async function GET(request) {
     ok: true,
     time: now.toISOString(),
     env: {
-      hasWhapiToken: Boolean(process.env.WHAPI_TOKEN),
-      hasWhapiGroupId: Boolean(process.env.WHAPI_GROUP_ID),
-      hasWebhookSecret: Boolean(process.env.WHATSAPP_WEBHOOK_SECRET),
-      hasSupabaseKey: Boolean(process.env.SUPABASE_SECRET_KEY),
-      hasKupaSlug: Boolean(process.env.KUPA_GROUP_SLUG),
-      hasOwner: Boolean(process.env.WHATSAPP_OWNER),
-      hasErrorAlert: Boolean(process.env.ERROR_ALERT_WEBHOOK),
-      siteUrl: process.env.NEXT_PUBLIC_SITE_URL || null,
+      hasWhapiToken: hasEnv("WHAPI_TOKEN"),
+      hasWhapiGroupId: hasEnv("WHAPI_GROUP_ID"),
+      hasWebhookSecret: hasEnv("WHATSAPP_WEBHOOK_SECRET"),
+      hasSupabaseKey: hasEnv("SUPABASE_SECRET_KEY"),
+      hasKupaSlug: hasEnv("KUPA_GROUP_SLUG"),
+      hasOwner: hasEnv("WHATSAPP_OWNER"),
+      hasErrorAlert: hasEnv("ERROR_ALERT_WEBHOOK"),
+      siteUrl: envValue("NEXT_PUBLIC_SITE_URL") || null,
     },
     whapi,
     webhooks,

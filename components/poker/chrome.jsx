@@ -107,6 +107,9 @@ export function Header({ noticeCount = 0, onOpenNotices }) {
   );
 }
 
+/* גובה שמור קבוע לסרגל התחתון, כולל מרווח נשימה מעליו. */
+export const TABBAR_H = 90;
+
 export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false }) {
   const WRITE_TABS = ["live", "input", "sessions"];
   const items = [
@@ -261,7 +264,6 @@ export function Style() {
     <style
       dangerouslySetInnerHTML={{
         __html: `
-    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap');
     *{box-sizing:border-box;}
     textarea::placeholder,input::placeholder{color:${C.dim};opacity:.7;}
     button:focus-visible,textarea:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid ${C.brass};outline-offset:2px;}
