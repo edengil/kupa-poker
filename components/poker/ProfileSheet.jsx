@@ -11,6 +11,8 @@ import { CumChart } from "./CumChart";
 import { PersonalStatsCard } from "./PersonalStatsCard";
 import { BalanceBreakdown } from "./BalanceBreakdown";
 import { computePersonalStats } from "../../lib/poker/personalStats";
+import { playerRivals } from "../../lib/poker/headToHead";
+import { badgesForPlayer } from "../../lib/poker/badges";
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function ProfileSheet({ db, name, onClose }) {
@@ -63,6 +65,9 @@ export function ProfileSheet({ db, name, onClose }) {
       computePersonalStats(db, cn, yearFilter != null ? { year: yearFilter } : {}),
     [db, cn, yearFilter]
   );
+
+  const rivals = useMemo(() => playerRivals(db, cn), [db, cn]);
+  const badges = useMemo(() => badgesForPlayer(db, cn), [db, cn]);
 
   const yearOptions = useMemo(() => {
     const opts = [[null, "הכל"]];
@@ -166,6 +171,62 @@ export function ProfileSheet({ db, name, onClose }) {
             />
           )}
         </div>
+        {rivals && (rivals.bestPartner || rivals.nemesis) && (
+          <div
+            style={{
+              background: C.card,
+              border: `1px solid ${C.line}`,
+              borderRadius: 14,
+              padding: "11px 14px",
+              marginBottom: 12,
+              fontSize: 13.5,
+              lineHeight: 1.9,
+            }}
+          >
+            {rivals.bestPartner && (
+              <div>
+                🤝 השותף הכי רווחי: <b style={{ color: C.cream }}>{rivals.bestPartner.name}</b>
+                <span style={{ color: C.dim }}>
+                  {" "}· ממוצע {fmt(rivals.bestPartner.avg)} לערב יחד ({rivals.bestPartner.nights} ערבים)
+                </span>
+              </div>
+            )}
+            {rivals.nemesis && (
+              <div>
+                ⚔️ הנמסיס: <b style={{ color: C.cream }}>{rivals.nemesis.name}</b>
+                <span style={{ color: C.dim }}>
+                  {" "}· ממוצע {fmt(rivals.nemesis.avg)} לערב יחד ({rivals.nemesis.nights} ערבים)
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+        {badges.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12.5, color: C.dim, marginBottom: 6 }}>
+              🎖️ הישגים · כל הזמנים
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {badges.map((b) => (
+                <span
+                  key={b.id}
+                  title={b.desc}
+                  style={{
+                    background: C.card,
+                    border: `1px solid ${C.brass}66`,
+                    color: C.cream,
+                    borderRadius: 999,
+                    padding: "5px 11px",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                  }}
+                >
+                  {b.icon} {b.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <BalanceBreakdown db={db} playerName={cn} year={yearFilter} />
         <PersonalStatsCard db={db} playerName={cn} year={yearFilter} />
         {rows.length > 1 ? (
