@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:all": "vitest run && playwright test"
+    "test:all": "vitest run && playwright test",
+    "lint": "next lint",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -25,7 +27,14 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
+    "prettier": "^3.6.2",
     "sharp": "^0.35.3",
     "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": "20.x",
+    "npm": ">=10"
   }
 }

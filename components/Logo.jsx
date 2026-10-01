@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useId } from "react";
 
 /* ============================================================================
    הלוגו של עדן — מותאם לפלטת האפליקציה.
@@ -12,7 +12,7 @@ import React from "react";
    ============================================================================ */
 
 export function EGMark({ size = 64, className, style }) {
-  const uid = React.useId ? React.useId().replace(/:/g, "") : "eg";
+  const uid = useId().replace(/:/g, "");
   const ink = `egFelt_${uid}`;
 
   return (
@@ -110,6 +110,7 @@ export function EGFooter() {
 export function EGSplash() {
   return (
     <main
+      role="status"
       style={{
         /* תופס את כל המסך ממש — ככה התוכן תמיד באמצע, גם עם ה-safe area של האייפון */
         position: "fixed",

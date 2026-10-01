@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabase, pingViewers } from "@/lib/supabaseAdmin";
 import { notifyGameStart } from "@/lib/push";
 import { reportError } from "@/lib/monitor";
+import { envValue, hasEnv, serverSiteUrl } from "@/lib/env";
 import {
   parseCommands, applyCommands, extractMessage, isAllowed,
   sendToGroup, listGroups, BOT_MARK, setPresenceOffline,
@@ -33,7 +34,7 @@ export const dynamic = "force-dynamic";
 const ok = (extra = {}) => NextResponse.json({ ok: true, ...extra });
 
 function guard(request) {
-  const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
+  const secret = envValue("WHATSAPP_WEBHOOK_SECRET");
   const given = new URL(request.url).searchParams.get("secret");
   return Boolean(secret) && given === secret;
 }
@@ -50,16 +51,16 @@ function parseBotControl(text) {
 /* אבחון בלי לדלוף את הסוד עצמו: אומר רק אם המשתנה קיים בכלל ומה אורכו.
    configured:false פירושו שהבנייה רצה לפני שהמשתנים נוספו. */
 function why(request) {
-  const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
+  const secret = envValue("WHATSAPP_WEBHOOK_SECRET");
   const given = new URL(request.url).searchParams.get("secret");
   return {
     error: "forbidden",
     configured: Boolean(secret),
     expectedLength: secret ? secret.length : 0,
     receivedLength: given ? given.length : 0,
-    hasSupabaseKey: Boolean(process.env.SUPABASE_SECRET_KEY),
-    hasWhapiToken: Boolean(process.env.WHAPI_TOKEN),
-    hasSlug: Boolean(process.env.KUPA_GROUP_SLUG),
+    hasSupabaseKey: hasEnv("SUPABASE_SECRET_KEY"),
+    hasWhapiToken: hasEnv("WHAPI_TOKEN"),
+    hasSlug: hasEnv("KUPA_GROUP_SLUG"),
   };
 }
 
@@ -67,7 +68,7 @@ function why(request) {
 export async function GET(request) {
   if (!guard(request)) return NextResponse.json(why(request), { status: 403 });
   try {
-    const groups = await listGroups(process.env.WHAPI_TOKEN);
+    const groups = await listGroups(envValue("WHAPI_TOKEN"));
     const list = (groups?.groups || []).map((g) => ({ id: g.id, name: g.name || g.subject }));
     return NextResponse.json({ groups: list });
   } catch (e) {
@@ -95,8 +96,8 @@ export async function POST(request) {
     return ok({ skipped: "bot echo" });
   }
 
-  const groupId = process.env.WHAPI_GROUP_ID;
-  const ownerPhone = process.env.WHATSAPP_OWNER;
+  const groupId = envValue("WHAPI_GROUP_ID");
+  const ownerPhone = envValue("WHATSAPP_OWNER");
   const isOwnerDm =
     groupId &&
     msg.chatId !== groupId &&
@@ -105,18 +106,18 @@ export async function POST(request) {
 
   /* הודעה שעדן שלח מהטלפון = הוא היה "מחובר". איפוס נוכחות עם throttle
      גלובלי ב־setPresenceOffline — Sandbox מוגבל ל־~1,000 קריאות API/חודש. */
-  if (isAllowed(msg, process.env.WHATSAPP_OWNER, "")) {
-    await setPresenceOffline(process.env.WHAPI_TOKEN);
+  if (isAllowed(msg, envValue("WHATSAPP_OWNER"), "")) {
+    await setPresenceOffline(envValue("WHAPI_TOKEN"));
   }
 
-  if (!isAllowed(msg, process.env.WHATSAPP_OWNER, process.env.WHATSAPP_ALLOWED))
+  if (!isAllowed(msg, envValue("WHATSAPP_OWNER"), envValue("WHATSAPP_ALLOWED")))
     return ok({ skipped: "not allowed" });
 
   const supabase = getAdminSupabase();
   const { data: row, error } = await supabase
     .from("groups")
     .select("id, slug, live, config, data")
-    .eq("slug", process.env.KUPA_GROUP_SLUG)
+    .eq("slug", envValue("KUPA_GROUP_SLUG"))
     .single();
 
   if (error || !row) {
@@ -128,7 +129,7 @@ export async function POST(request) {
      נבדקות לפני מתג ה-botOn, אחרת אי אפשר היה להדליק בוט כבוי. */
   const botCmd = parseBotControl(msg.text);
   if (botCmd) {
-    if (!isAllowed(msg, process.env.WHATSAPP_OWNER, "")) return ok({ skipped: "not owner" });
+    if (!isAllowed(msg, envValue("WHATSAPP_OWNER"), "")) return ok({ skipped: "not owner" });
     let reply;
     if (botCmd === "state") {
       reply = `${BOT_MARK} הבוט כרגע ${row.config?.botOn ? "פעיל ✅" : "כבוי 💤"}`;
@@ -147,7 +148,7 @@ export async function POST(request) {
         : `${BOT_MARK} הבוט כבוי. "בוט הדלק" יחזיר אותי.`;
     }
     try {
-      await sendToGroup(reply, { token: process.env.WHAPI_TOKEN, groupId: msg.chatId });
+      await sendToGroup(reply, { token: envValue("WHAPI_TOKEN"), groupId: msg.chatId });
     } catch (e) {
       console.error(e.message);
     }
@@ -181,14 +182,14 @@ export async function POST(request) {
     try {
       if (reminded.ownerDm && ownerPhone) {
         await sendToGroup(reminded.ownerDm, {
-          token: process.env.WHAPI_TOKEN,
+          token: envValue("WHAPI_TOKEN"),
           groupId: ownerPhone,
         });
       }
       /* נדנוד קצר לקבוצה — רק כשהפונקציה החזירה reply (ביט שקט). */
       if (reminded.reply && groupId) {
         await sendToGroup(reminded.reply, {
-          token: process.env.WHAPI_TOKEN,
+          token: envValue("WHAPI_TOKEN"),
           groupId,
         });
       }
@@ -217,9 +218,7 @@ export async function POST(request) {
 
   /* כתובת האפליקציה + slug — לפקודת "לינק" ול־CTA בסוף ערב (חלוקה באפליקציה).
      ידועים רק כאן, לא בפרסר. */
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null);
+  const siteUrl = serverSiteUrl();
   for (const c of cmds) {
     c.siteUrl = siteUrl;
     c.slug = row.slug;
@@ -264,7 +263,7 @@ export async function POST(request) {
   }
 
   try {
-    const token = process.env.WHAPI_TOKEN;
+    const token = envValue("WHAPI_TOKEN");
     if (ownerDm && ownerPhone) {
       try {
         await sendToGroup(ownerDm, { token, groupId: ownerPhone });

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { C } from "../../lib/poker/colors";
+import { C, RADIUS, SEAT } from "../../lib/poker/colors";
 import { dur, hhmm } from "../../lib/poker/helpers";
 
 /* שולחן פוקר ויזואלי — חולץ מ-PokerApp.jsx כ-JSX נקי.
@@ -45,7 +45,7 @@ export function PokerTable({
         marginBottom: 12,
         background: C.card,
         border: `1px solid ${C.line}`,
-        borderRadius: 16,
+        borderRadius: RADIUS.lg,
         overflow: "hidden",
       }}
     >
@@ -121,15 +121,16 @@ export function PokerTable({
           <button
             key={p.name}
             disabled={readOnly}
+            aria-label={`${p.name}, ${+p.buyin || 0} שקלים, ${chips} ג'יטונים`}
             onClick={() => onSeat(i)}
             style={{
               position: "absolute",
               left: `${x}%`,
               top: `${y}%`,
               transform: "translate(-50%,-50%)",
-              width: 78,
+              width: SEAT.width,
               padding: "7px 4px",
-              borderRadius: 12,
+              borderRadius: SEAT.radius,
               cursor: readOnly ? "default" : "pointer",
               border: `1px solid ${C.brassSoft}`,
               background: C.feltDeep,
@@ -156,7 +157,7 @@ export function PokerTable({
             <span style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
               {+p.buyin || 0}₪
             </span>
-            <span style={{ fontSize: 9.5, color: C.dim, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: 10.5, color: C.dim, fontVariantNumeric: "tabular-nums" }}>
               {chips} ג&apos;
             </span>
           </button>

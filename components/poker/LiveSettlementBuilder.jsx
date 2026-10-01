@@ -310,7 +310,7 @@ export function LiveSettlementBuilder({
 
         {notice ? (
           <div
-            role="status"
+            role="note"
             data-testid="settlement-edit-notice"
             style={{
               border: `1px solid ${C.brass}66`,

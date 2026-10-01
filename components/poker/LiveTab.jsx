@@ -29,6 +29,8 @@ import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { LiveExitField } from "./live/LiveExitField";
 import { LiveDistributionPanel } from "./live/LiveDistributionPanel";
+import { LivePlayerSetupPanel } from "./live/LivePlayerSetupPanel";
+import { LivePotPanel } from "./live/LivePotPanel";
 import { LiveRebuysBoard } from "./live/LiveRebuysBoard";
 import { LiveBitShare, LiveShareSheet, LiveSendPrompt } from "./live/LiveShare";
 import { PlanCard } from "./PlanCard";
@@ -525,124 +527,15 @@ export function LiveTab({
         }
         onPlanShared={onPlanShared}
       />
-      <div
-        style={{
-          background: `linear-gradient(165deg, ${C.cardHi} 0%, ${C.card} 100%)`,
-          border: `1px solid ${C.brass}44`,
-          borderRadius: 14,
-          padding: 12,
-          marginBottom: 12,
-        }}
-      >
-        <div style={{ ...sectionEyebrow, marginBottom: 8 }}>
-          <span style={{ fontSize: 13 }}>♠</span>
-          {players.length === 0 ? "פתח ערב חי" : "הוסף לשולחן"}
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
-            <label
-              style={{
-                fontSize: 11.5,
-                color: C.dim,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <UserPlus size={13} />
-              הוסף שחקן (חדש או קיים)
-            </label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addPlayer(name)}
-              placeholder="שם"
-              aria-label="שם שחקן ללייב"
-              data-testid="live-player-name"
-              style={{ ...inputStyle, marginTop: 4, width: "100%" }}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => addPlayer(name)}
-            aria-label="הוסף שחקן"
-            data-testid="live-add-player"
-            style={{
-              ...brassCta,
-              borderRadius: 9,
-              padding: "11px 15px",
-            }}
-          >
-            <Plus size={18} />
-          </button>
-        </div>
-        {known.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              gap: 6,
-              flexWrap: "wrap",
-              marginTop: 10,
-              maxHeight: 88,
-              overflowY: "auto",
-            }}
-          >
-            {known
-              .filter((k) => !players.some((p) => p.name === k))
-              .map((k) => (
-                <button
-                  key={k}
-                  onClick={() => addPlayer(k)}
-                  style={{
-                    fontSize: 12,
-                    padding: "4px 10px",
-                    borderRadius: 16,
-                    background: C.feltDeep,
-                    border: `1px solid ${C.line}`,
-                    color: C.cream,
-                    cursor: "pointer",
-                  }}
-                >
-                  {k}
-                </button>
-              ))}
-          </div>
-        )}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginTop: 12,
-            fontSize: 12.5,
-            color: C.dim,
-          }}
-        >
-          <Coins size={14} />
-          <span>1 ש&quot;ח = {cps} ג&apos;יטונים</span>
-          <div style={{ display: "flex", gap: 5, marginRight: "auto" }}>
-            {[2, 4].map((v) => (
-              <button
-                key={v}
-                onClick={() => setConfig({ chipsPerShekel: v })}
-                style={{
-                  fontSize: 12,
-                  padding: "3px 9px",
-                  borderRadius: 7,
-                  cursor: "pointer",
-                  border: "none",
-                  fontWeight: cps === v ? 700 : 500,
-                  background: cps === v ? C.brass : C.feltDeep,
-                  color: cps === v ? C.feltDeep : C.cream,
-                }}
-              >
-                ×{v}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
+      <LivePlayerSetupPanel
+        name={name}
+        setName={setName}
+        addPlayer={addPlayer}
+        known={known}
+        players={players}
+        cps={cps}
+        setConfig={setConfig}
+      />
       {players.length === 0 ? (
         <Empty text="♠ השולחן מחכה. הוסף שחקן ראשון — כל כניסה מוסיפה לקופה, והג'יטונים מתעדכנים לבד." />
       ) : (
@@ -913,70 +806,17 @@ export function LiveTab({
             })}
           </div>
 
-          <div
-            style={{
-              marginTop: 12,
-              background: C.card,
-              border: `1px solid ${C.line}`,
-              borderRadius: 12,
-              padding: 13,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-                fontSize: 13.5,
-              }}
-            >
-              <span style={{ color: C.dim }}>בקופה</span>
-              <b style={{ fontVariantNumeric: "tabular-nums" }}>
-                {pot}₪ · {potChips} ג&apos;יטונים
-              </b>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                marginBottom: 10,
-                alignItems: "flex-end",
-              }}
-            >
-              <label style={{ flex: 1, fontSize: 11.5, color: C.dim }}>
-                כניסות שהכנתי
-                <input
-                  value={entriesCount}
-                  onChange={(e) => setEntriesCount(e.target.value.replace(/\D/g, ""))}
-                  placeholder="0"
-                  style={{
-                    ...inputStyle,
-                    marginTop: 3,
-                    width: "100%",
-                    textAlign: "center",
-                  }}
-                />
-              </label>
-              <div
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  fontSize: 12.5,
-                  color: C.dim,
-                  paddingBottom: 9,
-                }}
-              >
-                בשימוש <b style={{ color: C.cream }}>{entriesUsed}</b> · נותרו{" "}
-                <b style={{ color: C.brass }}>{entriesLeft === null ? "—" : entriesLeft}</b>{" "}
-                בחוץ
-              </div>
-            </div>
-            <LiveBitShare
-              onSendUpdate={() => waSend(bitReport)}
-              onPreview={() => setShare({ raw: bitReport })}
-            />
-          </div>
-
+          <LivePotPanel
+            pot={pot}
+            potChips={potChips}
+            entriesCount={entriesCount}
+            setEntriesCount={setEntriesCount}
+            entriesUsed={entriesUsed}
+            entriesLeft={entriesLeft}
+            bitReport={bitReport}
+            waSend={waSend}
+            setShare={setShare}
+          />
           <LiveRebuysBoard board={rebuyBoard} />
 
           <label style={{ display: "block", fontSize: 12, color: C.dim, margin: "4px 0 12px" }}>
