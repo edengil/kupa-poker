@@ -114,6 +114,42 @@ describe("removeManualTip", () => {
   });
 });
 
+describe("removeManualTip restoreCashout option", () => {
+  it("restoreCashout:false removes the event and recomputes tipsGiven without touching cashout", () => {
+    const add = applyManualTip({ players: basePlayers(), tips: [], name: "דור לירז", amount: 50, now: 1000 });
+    expect(add.players[1].cashout).toBe("250");
+    const rm = removeManualTip({ players: add.players, tips: add.tips, tipId: add.event.id, restoreCashout: false });
+    expect(rm.ok).toBe(true);
+    expect(rm.tips).toHaveLength(0);
+    // האירוע נמחק, tipsGiven חזר ל־0, והיציאה נשארה כמו שנרשמה (250)
+    expect(rm.players[1]).toMatchObject({ cashout: "250", tipsGiven: 0 });
+  });
+
+  it("explicit restoreCashout:true keeps the default restore behavior", () => {
+    const add = applyManualTip({ players: basePlayers(), tips: [], name: "דור לירז", amount: 50, now: 1000 });
+    const rm = removeManualTip({ players: add.players, tips: add.tips, tipId: add.event.id, restoreCashout: true });
+    expect(rm.players[1]).toMatchObject({ cashout: "300", tipsGiven: 0 });
+  });
+
+  it("restoreCashout:false on an event that never touched cashout behaves like a plain delete", () => {
+    const add = applyManualTip({ players: basePlayers(), tips: [], name: "אופיר", amount: 50, now: 1000 });
+    expect(add.event.fromCashout).toBeUndefined();
+    const rm = removeManualTip({ players: add.players, tips: add.tips, tipId: add.event.id, restoreCashout: false });
+    expect(rm.players[0]).toMatchObject({ cashout: "", tipsGiven: 0 });
+    expect(rm.tips).toHaveLength(0);
+  });
+
+  it("restoreCashout:false keeps the other events' totals intact", () => {
+    const a = applyManualTip({ players: basePlayers(), tips: [], name: "דור לירז", amount: 50, now: 1 });
+    const b = applyManualTip({ players: a.players, tips: a.tips, name: "דור לירז", amount: 30, now: 2 });
+    expect(b.players[1].cashout).toBe("220");
+    const rm = removeManualTip({ players: b.players, tips: b.tips, tipId: a.event.id, restoreCashout: false });
+    // האירוע הראשון (50) נמחק בלי לגעת ביציאה; נשארו 30 מהיומן והיציאה 220
+    expect(rm.tips).toHaveLength(1);
+    expect(rm.players[1]).toMatchObject({ cashout: "220", tipsGiven: 30 });
+  });
+});
+
 describe("playerTipEvents + merge with bot log", () => {
   it("lists one player's events chronologically", () => {
     const tips = [

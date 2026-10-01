@@ -75,4 +75,56 @@ describe("liveActionLog", () => {
   it("keeps a longer local log even when remote is preferred", () => {
     expect(pickActionLog([{ id: 1 }, { id: 2 }, { id: 3 }], [{ id: 9 }], true)).toHaveLength(3);
   });
+
+  it("undoes a manual tip add: event removed, cashout restored", () => {
+    const ev = { id: "app_1", name: "דן", amount: 50, at: 1000, src: "app", fromCashout: true, cashDelta: 50 };
+    const players = [{ name: "דן", buyin: 50, cashout: "250", tipsGiven: 50 }];
+    const log = appendAction([], { t: "tipAdd", name: "דן", event: ev });
+    const out = undoLast({ players, tips: [ev], actionLog: log });
+    expect(out.tips).toHaveLength(0);
+    expect(out.players[0]).toMatchObject({ cashout: "300", tipsGiven: 0 });
+    expect(out.actionLog).toHaveLength(0);
+  });
+
+  it("undoes a manual tip add that did not touch cashout", () => {
+    const ev = { id: "app_1", name: "דן", amount: 50, at: 1000, src: "app" };
+    const players = [{ name: "דן", buyin: 50, cashout: "", tipsGiven: 50 }];
+    const log = appendAction([], { t: "tipAdd", name: "דן", event: ev });
+    const out = undoLast({ players, tips: [ev], actionLog: log });
+    expect(out.tips).toHaveLength(0);
+    expect(out.players[0]).toMatchObject({ cashout: "", tipsGiven: 0 });
+  });
+
+  it("undoes a manual tip delete with cashout restoration: event reinserted, cashout re-subtracted", () => {
+    const ev = { id: "app_1", name: "דן", amount: 50, at: 1000, src: "app", fromCashout: true, cashDelta: 50 };
+    const players = [{ name: "דן", buyin: 50, cashout: "300", tipsGiven: 0 }];
+    const log = appendAction([], { t: "tipDel", name: "דן", event: ev, cashoutRestored: true });
+    const out = undoLast({ players, tips: [], actionLog: log });
+    expect(out.tips).toHaveLength(1);
+    expect(out.tips[0].id).toBe("app_1");
+    expect(out.players[0]).toMatchObject({ cashout: "250", tipsGiven: 50 });
+  });
+
+  it("undoes a manual tip delete without cashout restoration: event reinserted, cashout untouched", () => {
+    const ev = { id: "app_1", name: "דן", amount: 50, at: 1000, src: "app", fromCashout: true, cashDelta: 50 };
+    const players = [{ name: "דן", buyin: 50, cashout: "300", tipsGiven: 0 }];
+    const log = appendAction([], { t: "tipDel", name: "דן", event: ev, cashoutRestored: false });
+    const out = undoLast({ players, tips: [], actionLog: log });
+    expect(out.tips).toHaveLength(1);
+    expect(out.players[0]).toMatchObject({ cashout: "300", tipsGiven: 50 });
+  });
+
+  it("does not duplicate the event when undoing a delete whose event is already in the log", () => {
+    const ev = { id: "app_1", name: "דן", amount: 50, at: 1000, src: "app" };
+    const players = [{ name: "דן", buyin: 50, cashout: "", tipsGiven: 50 }];
+    const log = appendAction([], { t: "tipDel", name: "דן", event: ev, cashoutRestored: true });
+    const out = undoLast({ players, tips: [ev], actionLog: log });
+    expect(out.tips).toHaveLength(1);
+    expect(out.players[0].tipsGiven).toBe(50);
+  });
+
+  it("labels manual tip actions in Hebrew", () => {
+    expect(labelAction({ t: "tipAdd", name: "דן", event: { amount: 50 } })).toContain("טיפ");
+    expect(labelAction({ t: "tipDel", name: "דן", event: { amount: 50 } })).toContain("מחיקת טיפ");
+  });
 });

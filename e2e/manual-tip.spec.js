@@ -61,16 +61,19 @@ test.describe("טיפ ידני בלייב (גיבוי לנפילת הבוט)", (
     await expect(page.getByTestId("live-tip-label-טיפמן")).toHaveText("טיפ 80");
     await expect(page.getByTestId("live-cashout-טיפמן")).toHaveValue("420");
 
-    // רשימת האירועים: מחיקת ה־30 מחזירה את היציאה ל־450
+    // רשימת האירועים: מחיקת ה־30 — הטיפ ירד מהיציאה, נפתח אישור בשורה
     await page.getByTestId("live-tip-label-טיפמן").click();
     const ev30 = saved.tips.find((t) => t.amount === 30);
     await page.getByTestId(`live-tip-del-${ev30.id}`).click();
+    await expect(page.getByTestId(`live-tip-del-confirm-${ev30.id}`)).toContainText("להחזיר 30 ליציאה");
+    await page.getByTestId(`live-tip-del-yes-${ev30.id}`).click();
     await expect(page.getByTestId("live-tip-label-טיפמן")).toHaveText("טיפ 50");
     await expect(page.getByTestId("live-cashout-טיפמן")).toHaveValue("450");
 
     // מחיקת האחרון — התווית נעלמת והיציאה חוזרת ל־500
     const ev50 = saved.tips.find((t) => t.amount === 50);
     await page.getByTestId(`live-tip-del-${ev50.id}`).click();
+    await page.getByTestId(`live-tip-del-yes-${ev50.id}`).click();
     await expect(page.getByTestId("live-tip-label-טיפמן")).toHaveCount(0);
     await expect(page.getByTestId("live-cashout-טיפמן")).toHaveValue("500");
   });
@@ -159,5 +162,98 @@ test.describe("טיפ ידני בלייב (גיבוי לנפילת הבוט)", (
       expect.objectContaining({ name: "סוגר", amount: 5 }),
       expect.objectContaining({ name: "סוגר", amount: 20 }),
     ]);
+  });
+
+  test("ביטול מכסה הוספת טיפ — האירוע נעלם והיציאה חוזרת", async ({ page }) => {
+    await openLive(page);
+    await addPlayer(page, "מבטל");
+    await setCashout(page, "מבטל", 500);
+
+    await page.getByTestId("live-tip-open-מבטל").click();
+    await page.getByTestId("live-tip-quick-50").click();
+    await page.getByTestId("live-tip-confirm").click();
+    await expect(page.getByTestId("live-tip-label-מבטל")).toHaveText("טיפ 50");
+    await expect(page.getByTestId("live-cashout-מבטל")).toHaveValue("450");
+
+    // כפתור הביטול גלוי ומכסה את הוספת הטיפ
+    await expect(page.getByTestId("live-undo")).toBeVisible();
+    await page.getByTestId("live-undo").click();
+    await expect(page.getByTestId("live-tip-label-מבטל")).toHaveCount(0);
+    await expect(page.getByTestId("live-cashout-מבטל")).toHaveValue("500");
+    await expect.poll(async () => (await readLive(page))?.tips?.length ?? 0).toBe(0);
+  });
+
+  test("ביטול מכסה גם מחיקת טיפ — האירוע חוזר והיציאה יורדת שוב", async ({ page }) => {
+    await openLive(page);
+    await addPlayer(page, "מבטלמחיקה");
+    await setCashout(page, "מבטלמחיקה", 500);
+
+    await page.getByTestId("live-tip-open-מבטלמחיקה").click();
+    await page.getByTestId("live-tip-quick-50").click();
+    await page.getByTestId("live-tip-confirm").click();
+    await expect(page.getByTestId("live-cashout-מבטלמחיקה")).toHaveValue("450");
+
+    await page.getByTestId("live-tip-label-מבטלמחיקה").click();
+    const saved = await readLive(page);
+    const ev = saved.tips.find((t) => t.amount === 50);
+    await page.getByTestId(`live-tip-del-${ev.id}`).click();
+    await page.getByTestId(`live-tip-del-yes-${ev.id}`).click();
+    await expect(page.getByTestId("live-cashout-מבטלמחיקה")).toHaveValue("500");
+
+    // ביטול מחזיר את האירוע ליומן ומוריד שוב מהיציאה
+    await page.getByTestId("live-undo").click();
+    await expect(page.getByTestId("live-tip-label-מבטלמחיקה")).toHaveText("טיפ 50");
+    await expect(page.getByTestId("live-cashout-מבטלמחיקה")).toHaveValue("450");
+    await expect.poll(async () => (await readLive(page))?.tips?.length ?? 0).toBe(1);
+  });
+
+  test("מחיקת טיפ שירד מהיציאה דורשת אישור — שני המסלולים", async ({ page }) => {
+    await openLive(page);
+    await addPlayer(page, "מאשר");
+    await setCashout(page, "מאשר", 500);
+
+    await page.getByTestId("live-tip-open-מאשר").click();
+    await page.getByTestId("live-tip-quick-50").click();
+    await page.getByTestId("live-tip-confirm").click();
+    await expect(page.getByTestId("live-cashout-מאשר")).toHaveValue("450");
+
+    // לחיצה על מחיקה פותחת אישור בשורה — שום דבר עוד לא נמחק
+    await page.getByTestId("live-tip-label-מאשר").click();
+    let saved = await readLive(page);
+    const ev = saved.tips.find((t) => t.amount === 50);
+    await page.getByTestId(`live-tip-del-${ev.id}`).click();
+    await expect(page.getByTestId(`live-tip-del-confirm-${ev.id}`)).toContainText("להחזיר 50 ליציאה");
+    await page.screenshot({ path: "test-results/manual-tip-confirm.png" });
+    await expect.poll(async () => (await readLive(page))?.tips?.length ?? 0).toBe(1);
+
+    // «השאר את היציאה» — האירוע נמחק, היציאה נשארת 450
+    await page.getByTestId(`live-tip-del-no-${ev.id}`).click();
+    await expect(page.getByTestId("live-tip-label-מאשר")).toHaveCount(0);
+    await expect(page.getByTestId("live-cashout-מאשר")).toHaveValue("450");
+    await expect.poll(async () => (await readLive(page))?.tips?.length ?? 0).toBe(0);
+
+    // מסלול שני — «החזר ליציאה»
+    await page.getByTestId("live-tip-open-מאשר").click();
+    await page.getByTestId("live-tip-quick-20").click();
+    await page.getByTestId("live-tip-confirm").click();
+    await expect(page.getByTestId("live-tip-label-מאשר")).toHaveText("טיפ 20");
+    await expect(page.getByTestId("live-cashout-מאשר")).toHaveValue("430");
+    saved = await readLive(page);
+    const ev2 = saved.tips.find((t) => t.amount === 20);
+    await page.getByTestId(`live-tip-del-${ev2.id}`).click();
+    await page.getByTestId(`live-tip-del-yes-${ev2.id}`).click();
+    await expect(page.getByTestId("live-tip-label-מאשר")).toHaveCount(0);
+    await expect(page.getByTestId("live-cashout-מאשר")).toHaveValue("450");
+  });
+
+  test("הבוחר מציג סה״כ טיפים עד כה", async ({ page }) => {
+    await openLive(page);
+    await addPlayer(page, "סוכם");
+    await page.getByTestId("live-tip-open-סוכם").click();
+    await expect(page.getByTestId("live-tip-total-סוכם")).toContainText("טיפים עד כה: 0");
+    await page.getByTestId("live-tip-quick-20").click();
+    await page.getByTestId("live-tip-confirm").click();
+    await page.getByTestId("live-tip-open-סוכם").click();
+    await expect(page.getByTestId("live-tip-total-סוכם")).toContainText("טיפים עד כה: 20");
   });
 });

@@ -152,6 +152,7 @@ export function LiveTab({
   const [tipPickerIdx, setTipPickerIdx] = useState(null); // שורת שחקן עם בוחר טיפ פתוח
   const [tipAmt, setTipAmt] = useState(""); // סכום (ג'יטונים) בבוחר הטיפ הידני
   const [tipListName, setTipListName] = useState(null); // שחקן שרשימת הטיפים שלו פתוחה
+  const [tipDelConfirm, setTipDelConfirm] = useState(null); // מזהה אירוע טיפ שממתין לאישור מחיקה
   const longPressRef = useRef(null);
   /* שדות שהבוט כותב (applied/pending/closing/מחמאות) — נשמרים כדי לא לדרוס אותם */
   const liveMetaRef = useRef({});
@@ -516,6 +517,7 @@ export function LiveTab({
     setTipPickerIdx(null);
     setTipAmt("");
     setTipListName(null);
+    setTipDelConfirm(null);
     // הערב נסגר — הבוט חוזר לישון עד המשחק הבא
     if (getConfig().botOn) setConfig({ botOn: false });
     setSettleBuilder({
@@ -561,14 +563,21 @@ export function LiveTab({
     if (!res.ok) return;
     setPlayers(res.players);
     setTips(res.tips);
+    setActionLog((log) =>
+      appendAction(log, { t: "tipAdd", name: p.name, event: res.event })
+    );
     setTipPickerIdx(null);
     setTipAmt("");
   }
-  function deleteManualTip(tipId) {
-    const res = removeManualTip({ players, tips, tipId, aliases: A });
+  function deleteManualTip(tipId, { restoreCashout = true } = {}) {
+    const res = removeManualTip({ players, tips, tipId, aliases: A, restoreCashout });
     if (!res.ok) return;
     setPlayers(res.players);
     setTips(res.tips);
+    setActionLog((log) =>
+      appendAction(log, { t: "tipDel", name: res.event.name, event: res.event, cashoutRestored: restoreCashout })
+    );
+    setTipDelConfirm(null);
   }
 
   return (
@@ -789,7 +798,10 @@ export function LiveTab({
                           type="button"
                           data-testid={`live-tip-label-${p.name}`}
                           title="רשימת הטיפים של הערב"
-                          onClick={() => setTipListName(tipListName === p.name ? null : p.name)}
+                          onClick={() => {
+                            setTipListName(tipListName === p.name ? null : p.name);
+                            setTipDelConfirm(null);
+                          }}
                           style={{
                             background: "transparent",
                             border: "none",
@@ -854,6 +866,12 @@ export function LiveTab({
                       }}
                     >
                       <span style={{ fontSize: 11.5, color: C.dim }}>טיפ בג&apos;יטונים:</span>
+                      <span
+                        data-testid={`live-tip-total-${p.name}`}
+                        style={{ fontSize: 11.5, color: C.dim, fontVariantNumeric: "tabular-nums" }}
+                      >
+                        סה״כ טיפים עד כה: {tipShownFor(p, tips, A)}
+                      </span>
                       {[10, 20, 50, 100].map((v) => (
                         <button
                           key={v}
@@ -960,11 +978,13 @@ export function LiveTab({
                           <span style={{ color: C.dim }}>
                             {isManualTip(ev) ? "מהאפליקציה" : "מהבוט"}
                           </span>
-                          {isManualTip(ev) && (
+                          {isManualTip(ev) && tipDelConfirm !== ev.id && (
                             <button
                               type="button"
                               data-testid={`live-tip-del-${ev.id}`}
-                              onClick={() => deleteManualTip(ev.id)}
+                              onClick={() =>
+                                ev.fromCashout ? setTipDelConfirm(ev.id) : deleteManualTip(ev.id)
+                              }
                               style={{
                                 background: "transparent",
                                 border: `1px solid ${C.line}`,
@@ -978,6 +998,55 @@ export function LiveTab({
                             >
                               מחק
                             </button>
+                          )}
+                          {isManualTip(ev) && tipDelConfirm === ev.id && (
+                            <span
+                              data-testid={`live-tip-del-confirm-${ev.id}`}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span style={{ fontSize: 11.5, color: C.dim }}>
+                                הטיפ ירד מהיציאה — להחזיר {ev.cashDelta ?? ev.amount} ליציאה?
+                              </span>
+                              <button
+                                type="button"
+                                data-testid={`live-tip-del-yes-${ev.id}`}
+                                onClick={() => deleteManualTip(ev.id, { restoreCashout: true })}
+                                style={{
+                                  background: C.feltDeep,
+                                  border: `1px solid ${C.line}`,
+                                  color: C.cream,
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  padding: "2px 8px",
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                החזר ליציאה
+                              </button>
+                              <button
+                                type="button"
+                                data-testid={`live-tip-del-no-${ev.id}`}
+                                onClick={() => deleteManualTip(ev.id, { restoreCashout: false })}
+                                style={{
+                                  background: "transparent",
+                                  border: `1px solid ${C.line}`,
+                                  color: C.dim,
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  padding: "2px 8px",
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                השאר את היציאה
+                              </button>
+                            </span>
                           )}
                         </div>
                       ))}
