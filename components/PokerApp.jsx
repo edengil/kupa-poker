@@ -32,6 +32,8 @@ import { receiptConfirmPrompt, transferConfirmPrompt } from "../lib/nightConfirm
 import { collectNotices, noticesForViewer } from "../lib/notifications";
 import { markReceipt, markTransfer } from "../lib/paymentTracking";
 import { NotificationsSheet } from "./poker/NotificationsSheet";
+import { noticeDeliveryDecision } from "../lib/noticeDelivery";
+import { getNoticeDeliveryState } from "../lib/pushClient";
 import { allTransfersPaid } from "../lib/settlementClosed";
 import { announceSettlementClosed } from "../lib/announceSettlementClosed";
 import { flushStore } from "../lib/store";
@@ -99,6 +101,26 @@ function App({
   const [transferPromptDismissed, setTransferPromptDismissed] = useState(false);
   const [receiptPromptDismissed, setReceiptPromptDismissed] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
+  // null = עדיין בודק יכולת פוש; true = מקבל פוש בחוץ, false = מציג בתוך המסך
+  const [pushCapable, setPushCapable] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let state = await getNoticeDeliveryState().catch(() => null);
+      let decision = noticeDeliveryDecision(state || {});
+      // האישור ניתן אבל המנוי עוד נרשם ברקע ב-PushPrompt — בדיקה אחת נוספת
+      if (!decision.canPush && state?.installed && state?.permission === "granted") {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (!alive) return;
+        state = await getNoticeDeliveryState().catch(() => state);
+        decision = noticeDeliveryDecision(state || {});
+      }
+      if (alive) setPushCapable(decision.canPush);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
   // initialTab מאפשר לרענון מבחוץ (remount אחרי פינג מהבוט) לא לזרוק
   // את המשתמש בחזרה לטבלה
   const [tab, setTabState] = useState(initialTab);
@@ -303,7 +325,8 @@ function App({
     >
       <Style />
       <RecordsAlert lines={recordAlert} onDismiss={dismissRecordAlert} />
-      {transferPrompt && !transferPromptDismissed ? (
+      {/* חלונות הכניסה רק למי שלא יכול לקבל פוש בחוץ; מי שמקבל פוש רואה תג שקט בלבד */}
+      {pushCapable === false && transferPrompt && !transferPromptDismissed ? (
         <TransferConfirmPopup
           session={transferPrompt.session}
           rows={transferPrompt.rows}
@@ -312,7 +335,7 @@ function App({
           onConfirm={confirmOwnTransfers}
           onLater={() => setTransferPromptDismissed(true)}
         />
-      ) : receiptPrompt && !receiptPromptDismissed ? (
+      ) : pushCapable === false && receiptPrompt && !receiptPromptDismissed ? (
         <TransferConfirmPopup
           kind="received"
           session={receiptPrompt.session}
