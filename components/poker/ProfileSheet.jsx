@@ -15,9 +15,79 @@ import { playerRivals } from "../../lib/poker/headToHead";
 import { badgesForPlayer } from "../../lib/poker/badges";
 import { monthlyBadgesForPlayer } from "../../lib/poker/monthlyBadges";
 import { playerOfNightWins } from "../../lib/poker/playerOfNight";
+import { playerEmail, normalizePlayerEmail } from "../../lib/poker/emailRsvp";
+
+/* עריכת אימייל לשחקן — מוצג רק לבעלים (פרופיל בצפייה בלבד לא מקבל onSave). */
+function EmailEditor({ current, onSave }) {
+  const [value, setValue] = useState(current || "");
+  const [note, setNote] = useState("");
+  const invalid = value.trim() !== "" && !normalizePlayerEmail(value);
+  const dirty = value.trim() !== (current || "");
+  const btn = {
+    padding: "8px 14px",
+    borderRadius: 9,
+    border: `1px solid ${C.brass}`,
+    background: C.brass,
+    color: C.feltDeep,
+    fontFamily: "inherit",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+        📧 אימייל לזימוני ערבים
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          type="email"
+          dir="ltr"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setNote("");
+          }}
+          placeholder="name@example.com"
+          aria-label="אימייל של השחקן"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            background: C.feltDeep,
+            border: `1px solid ${invalid ? C.loss : C.line}`,
+            borderRadius: 9,
+            color: C.cream,
+            fontFamily: "inherit",
+            fontSize: 13.5,
+            padding: "8px 10px",
+          }}
+        />
+        <button
+          type="button"
+          disabled={invalid || !dirty}
+          onClick={() => {
+            onSave(value.trim());
+            setNote("נשמר ✓");
+          }}
+          style={{ ...btn, opacity: invalid || !dirty ? 0.45 : 1 }}
+        >
+          שמור
+        </button>
+      </div>
+      {invalid && (
+        <p style={{ color: C.loss, fontSize: 12, margin: "5px 0 0" }}>הכתובת לא נראית תקינה</p>
+      )}
+      {note && !dirty && (
+        <p role="status" style={{ color: C.dim, fontSize: 12, margin: "5px 0 0" }}>
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /* פרופיל שחקן — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function ProfileSheet({ db, name, onClose }) {
+export function ProfileSheet({ db, name, onClose, onSaveEmail }) {
   const A = AL(db);
   const cn = canon(name, A);
   const years = useMemo(() => availableYears(db), [db]);
@@ -141,6 +211,10 @@ export function ProfileSheet({ db, name, onClose }) {
             <X size={17} />
           </IconBtn>
         </div>
+
+        {typeof onSaveEmail === "function" && (
+          <EmailEditor current={playerEmail(db, cn)} onSave={onSaveEmail} />
+        )}
 
         {years.length > 0 && (
           <div

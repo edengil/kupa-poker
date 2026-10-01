@@ -7,6 +7,9 @@ import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "../../lib/po
 import { HOSTS, wazeShortUrl } from "../../lib/poker/hosts";
 import { isPlanStale, planTodayIso } from "../../lib/planTiming";
 import { computeNightHype } from "../../lib/poker/nightHype";
+import { requestEmailInvites } from "../../lib/sendEmailInvites";
+import { emailRsvpStatus } from "../../lib/poker/emailRsvp";
+import { flushStore } from "../../lib/store";
 import { waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Share2 } from "./icons";
 
@@ -45,6 +48,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
   const [sendStatus, setSendStatus] = useState(null); // null | sending | sent | error
+  const [inviteNote, setInviteNote] = useState("");
   const [sendError, setSendError] = useState("");
   const [inviteFallbackText, setInviteFallbackText] = useState("");
   const [copied, setCopied] = useState(false);
@@ -98,18 +102,39 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
 
   const save = async () => {
     if (!iso) return;
+    const isUpdate = !!plan;
     const next = {
       iso,
       time,
       location: location.trim(),
       note: note.trim(),
       createdAt: Date.now(),
+      // עריכת אותו ערב שומרת את הזימונים והאישורים שכבר הגיעו מהאימייל
+      ...(isUpdate && plan.iso === iso
+        ? { emailInvites: plan.emailInvites, emailRsvps: plan.emailRsvps }
+        : {}),
     };
-    const isUpdate = !!plan;
     commit({ ...db, plan: next });
     setEditing(false);
     // ההזמנה יוצאת לקבוצת הוואטסאפ עם הלינק — שהחברים יאשרו הגעה
     await announce(next, isUpdate);
+    // וגם זימון אישי באימייל לכל מי שיש לו כתובת שמורה — אישור מהמייל
+    // נרשם ישר בערב הפתוח. כשלון כאן לא חוסם את פתיחת הערב.
+    try {
+      await flushStore();
+      const r = await requestEmailInvites(next.iso);
+      const sentCount = (r.sent || []).length;
+      const missingCount = (r.missingEmail || []).length;
+      if (sentCount || missingCount) {
+        setInviteNote(
+          `📧 נשלחו ${sentCount} זימונים באימייל${missingCount ? ` · ל־${missingCount} שחקנים אין אימייל שמור` : ""}`
+        );
+      } else {
+        setInviteNote("");
+      }
+    } catch (e) {
+      setInviteNote(`שליחת הזימונים באימייל נכשלה: ${e?.message || "נסו שוב"}`);
+    }
   };
   const clear = () => {
     commit({ ...db, plan: null });
@@ -455,6 +480,50 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               </button>
             )}
             {typeof renderRsvps === "function" && renderRsvps(plan.iso)}
+            {inviteNote && (
+              <p role="status" style={{ fontSize: 12, color: C.dim, margin: "10px 2px 0", lineHeight: 1.5 }}>
+                {inviteNote}
+              </p>
+            )}
+            {(() => {
+              const rows = emailRsvpStatus(db);
+              const invited = rows.filter((r) => r.invited || r.answer);
+              const missing = rows.filter((r) => !r.email && !r.invited && !r.answer);
+              if (!invited.length && !missing.length) return null;
+              const chip = (r) => ({
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "3px 9px",
+                borderRadius: 999,
+                fontSize: 11.5,
+                border: `1px solid ${r.answer === "yes" ? C.brass : C.line}`,
+                color: r.answer === "yes" ? C.brass : r.answer === "no" ? C.loss : C.dim,
+                background: C.feltDeep,
+              });
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+                    📧 זימוני אימייל
+                  </div>
+                  {invited.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      {invited.map((r) => (
+                        <span key={r.name} style={chip(r)}>
+                          {r.name}
+                          {r.answer === "yes" ? " · מגיע ✅" : r.answer === "no" ? " · לא מגיע" : " · נשלח"}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {missing.length > 0 && (
+                    <p style={{ fontSize: 12, color: C.dim, margin: "6px 0 0", lineHeight: 1.5 }}>
+                      בלי אימייל שמור: {missing.map((r) => r.name).join(", ")} — אפשר להוסיף בפרופיל השחקן
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
       </div>

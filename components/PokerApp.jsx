@@ -13,6 +13,7 @@ import { Header, TabBar, Style, TABBAR_H } from "./poker/chrome";
 import { Banner } from "./poker/Banner";
 import { TableTab } from "./poker/TableTab";
 import { normalize } from "../lib/poker/db";
+import { setPlayerEmail } from "../lib/poker/emailRsvp";
 import { brokenRecords } from "../lib/poker/brokenRecords";
 import { RecordsAlert } from "./poker/RecordsAlert.jsx";
 import { normalizeRecordAlertLines } from "../lib/poker/recordsAlert";
@@ -439,7 +440,16 @@ function App({
       </div>
       {profile && (
         <Suspense fallback={null}>
-          <ProfileSheet db={db} name={profile} onClose={() => setProfile(null)} />
+          <ProfileSheet
+            db={db}
+            name={profile}
+            onClose={() => setProfile(null)}
+            onSaveEmail={
+              readOnly
+                ? undefined
+                : (email) => commit(setPlayerEmail(db, profile, email))
+            }
+          />
         </Suspense>
       )}
       <TabBar
