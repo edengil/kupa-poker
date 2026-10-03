@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { summaryCardData } from "../lib/poker/summaryCard.js";
+import { buildSummaryCardSvg } from "../components/poker/SummaryCardButton.jsx";
 
 const S = (iso, entries) => ({
   iso,
@@ -63,5 +64,45 @@ describe("summaryCardData — קצוות", () => {
     expect(summaryCardData(db(), { kind: "month", y: 2024, mo: 1 })).toBeNull();
     expect(summaryCardData(db(), { kind: "week", y: 2026 })).toBeNull();
     expect(summaryCardData(null, { kind: "year", y: 2026 })).toBeNull();
+  });
+});
+
+describe("buildSummaryCardSvg — כותרת ולוגו", () => {
+  const svg = () =>
+    buildSummaryCardSvg(summaryCardData(db(), { kind: "month", y: 2026, mo: 9 }));
+
+  it("אין letter-spacing ב־brand ויש direction:rtl (תיקון ההיפוך)", () => {
+    const s = svg();
+    const brandRule = s.match(/\.brand\s*\{[^}]*\}/)?.[0] || "";
+    expect(brandRule).not.toContain("letter-spacing");
+    expect(brandRule).toContain("direction: rtl");
+    // שאר הקלאסים לא קיבלו כיוון גלובלי
+    expect(s).not.toContain("letter-spacing");
+  });
+
+  it("הלוגו EG מוטמע בתחתית עם הגרדיאנט שלו", () => {
+    const s = svg();
+    expect(s).toContain('id="egCard"');
+    expect(s).toContain('<g transform="translate(520.8,984.8) scale(0.6)">');
+    // שני העיגולים, שלושת ה־path-ים של האותיות והנקודה
+    expect(s).toContain('r="30" fill="url(#egCard)"');
+    expect(s).toContain('cx="50.5" cy="47.5" r="2.2" fill="#D9A441"');
+    expect(s).toContain("M15.5 20h14.2");
+    expect(s).toContain("M47.8 22.1");
+    expect(s).toContain("M48.2 31.2");
+  });
+
+  it("פריסת תחתית: שיאים, לוגו, קרדיט — בלי חפיפות", () => {
+    const s = svg();
+    // שורות השיאים ב־y=912+i*32
+    expect(s).toContain('y="912" class="extra"');
+    // שורת הקרדיט ב־y=1042, בתוך המסגרת (1054)
+    expect(s).toContain('y="1042" class="foot"');
+    // הלוגו: קוטר 38.4 סביב (540,1004) — מעל הקרדיט ומתחת לשיאים
+    const logoY = 984.8;
+    const logoBottom = logoY + 64 * 0.6;
+    const lastExtraBaseline = 912 + 2 * 32;
+    expect(logoY).toBeGreaterThan(lastExtraBaseline + 4);
+    expect(logoBottom).toBeLessThan(1042 - 14);
   });
 });

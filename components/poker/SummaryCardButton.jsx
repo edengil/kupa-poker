@@ -44,9 +44,19 @@ export function buildSummaryCardSvg(data) {
   const extraBlock = extras
     .map(
       (line, i) =>
-        `<text x="${cx}" y="${938 + i * 36}" class="extra">${esc(line)}</text>`
+        `<text x="${cx}" y="${912 + i * 32}" class="extra">${esc(line)}</text>`
     )
     .join("\n");
+
+  /* הלוגו של עדן (EGMark) בתחתית הכרטיס — אותם path-ים כמו components/Logo.jsx */
+  const logoBlock = `<g transform="translate(520.8,984.8) scale(0.6)">
+    <circle cx="32" cy="32" r="30" fill="url(#egCard)"/>
+    <circle cx="32" cy="32" r="26.5" fill="none" stroke="rgba(217,164,65,0.45)" stroke-width="1"/>
+    <path fill="#EFE7D2" d="M15.5 20h14.2c.85 0 1.45.55 1.45 1.35v1.55c0 .8-.6 1.35-1.45 1.35H19.4v4.35h8.6c.8 0 1.35.5 1.35 1.25v1.4c0 .75-.55 1.25-1.35 1.25h-8.6v4.55h10.5c.85 0 1.45.55 1.45 1.35v1.55c0 .8-.6 1.35-1.45 1.35H15.5c-.85 0-1.45-.55-1.45-1.35V21.35c0-.8.6-1.35 1.45-1.35z"/>
+    <path fill="#EFE7D2" d="M47.8 22.1c-2.2-2.55-5.55-4.05-9.3-4.05-7.35 0-12.85 5.35-12.85 13.05S31.15 44.1 38.5 44.1c3.55 0 6.75-1.3 9.05-3.55.55-.55.55-1.4.05-1.9l-1.45-1.4c-.5-.5-1.3-.5-1.8.05-1.55 1.5-3.55 2.3-5.85 2.3-4.55 0-7.7-3.2-7.7-7.95s3.15-7.95 7.7-7.95c2.2 0 4.1.75 5.55 2.1.45.4 1.15.4 1.6-.05l1.5-1.5c.5-.5.5-1.3 0-1.8z"/>
+    <path fill="#EFE7D2" d="M48.2 31.2h-7.4c-.85 0-1.45.6-1.45 1.4v1.7c0 .8.6 1.4 1.45 1.4H45v3.35c0 .75.55 1.3 1.3 1.3h1.55c.75 0 1.3-.55 1.3-1.3V32.6c0-.8-.6-1.4-1.4-1.4z"/>
+    <circle cx="50.5" cy="47.5" r="2.2" fill="#D9A441"/>
+  </g>`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
@@ -54,9 +64,14 @@ export function buildSummaryCardSvg(data) {
       <stop offset="0" stop-color="#15493A"/>
       <stop offset="1" stop-color="#0A2B21"/>
     </linearGradient>
+    <linearGradient id="egCard" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2C6B54"/>
+      <stop offset="0.55" stop-color="#15493A"/>
+      <stop offset="1" stop-color="#0A2B21"/>
+    </linearGradient>
     <style>
       text { font-family: Arial, Helvetica, sans-serif; text-anchor: middle; }
-      .brand { font-size: 30px; fill: #D9A441; font-weight: 700; letter-spacing: 2px; }
+      .brand { font-size: 30px; fill: #D9A441; font-weight: 700; direction: rtl; }
       .title { font-size: 58px; fill: #EFE7D2; font-weight: 800; }
       .label { font-size: 32px; fill: #9DBBAC; }
       .king { font-size: 84px; fill: #EFE7D2; font-weight: 800; }
@@ -65,8 +80,8 @@ export function buildSummaryCardSvg(data) {
       .statL { font-size: 24px; fill: #9DBBAC; }
       .podT { font-size: 30px; fill: #9DBBAC; font-weight: 700; }
       .pod { font-size: 36px; fill: #EFE7D2; font-weight: 700; }
-      .extra { font-size: 27px; fill: #EFE7D2; }
-      .foot { font-size: 22px; fill: #9DBBAC; }
+      .extra { font-size: 26px; fill: #EFE7D2; }
+      .foot { font-size: 20px; fill: #9DBBAC; }
     </style>
   </defs>
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
@@ -91,7 +106,8 @@ export function buildSummaryCardSvg(data) {
   <text x="${cx}" y="715" class="podT">🏆 הפודיום</text>
   ${podiumRows}
   ${extraBlock}
-  <text x="${cx}" y="1040" class="foot">נוצר באפליקציית קופה — פוקר ♠</text>
+  ${logoBlock}
+  <text x="${cx}" y="1042" class="foot">נוצר באפליקציית קופה — פוקר ♠</text>
 </svg>`;
 }
 

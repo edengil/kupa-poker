@@ -31,6 +31,7 @@ import { NightFocus } from "./poker/NightFocus";
 import { TransferConfirmPopup } from "./poker/TransferConfirmPopup";
 import { receiptConfirmPrompt, transferConfirmPrompt } from "../lib/nightConfirmations";
 import { collectNotices, noticesForViewer } from "../lib/notifications";
+import { loadSeenIds, markSeenIds, saveSeenIds, unseenNotices } from "../lib/noticeSeen";
 import { markReceipt, markTransfer } from "../lib/paymentTracking";
 import { NotificationsSheet } from "./poker/NotificationsSheet";
 import { noticeDeliveryDecision } from "../lib/noticeDelivery";
@@ -39,6 +40,10 @@ import { allTransfersPaid } from "../lib/settlementClosed";
 import { announceSettlementClosed } from "../lib/announceSettlementClosed";
 import { flushStore } from "../lib/store";
 import { EGFooter } from "./Logo";
+
+/* localStorage בטוח ל־SSR — null כשאין חלון דפדפן. */
+const safeStorage = () =>
+  typeof window !== "undefined" && window.localStorage ? window.localStorage : null;
 
 const LiveTab = lazy(() =>
   import("./poker/LiveTab").then((m) => ({ default: m.LiveTab }))
@@ -220,6 +225,27 @@ function App({
     () => (db ? noticesForViewer(collectNotices(db), viewerName, { isAdmin, aliases }) : []),
     [db, viewerName, isAdmin, aliases]
   );
+  /* באדג' בסגנון פייסבוק: סופר רק התראות שטרם נצפו. פתיחת המגירה מסמנת
+     את כל ה־id-ים הנוכחיים כנצפו; התראה חדשה (id חדש) תדליק שוב את הבאדג'. */
+  const [seenIds, setSeenIds] = useState([]);
+  useEffect(() => {
+    setSeenIds(loadSeenIds(safeStorage(), viewerName));
+  }, [viewerName]);
+  const unseenCount = useMemo(
+    () => unseenNotices(notices, seenIds).length,
+    [notices, seenIds]
+  );
+  const openNotices = useCallback(() => {
+    setNoticesOpen(true);
+    setSeenIds((prev) => {
+      const { ids, changed } = markSeenIds(
+        prev,
+        notices.map((n) => n.id)
+      );
+      if (changed) saveSeenIds(safeStorage(), viewerName, ids);
+      return changed ? ids : prev;
+    });
+  }, [notices, viewerName]);
   const markNotice = useCallback(async (item) => {
     if (!db || !item?.sessionId || item.index == null) return;
     const session = db.sessions.find((s) => s.id === item.sessionId);
@@ -368,7 +394,7 @@ function App({
             onVotePlayer={onVotePlayer}
           />
         )}
-        <Header noticeCount={notices.length} onOpenNotices={() => setNoticesOpen(true)} />
+        <Header noticeCount={unseenCount} onOpenNotices={openNotices} />
         {noticesOpen ? (
           <NotificationsSheet
             items={notices}
