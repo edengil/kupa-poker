@@ -24,14 +24,28 @@ export function buildSummaryCardSvg(data) {
   const H = 1080;
   const cx = W / 2;
   const medals = ["🥇", "🥈", "🥉"];
-  const podiumRows = data.podium
-    .map(
-      (p, i) =>
-        `<text x="${cx}" y="${780 + i * 58}" class="pod">${medals[i]} ${esc(
-          p.name
-        )} · ${esc(money(p.amount))}</text>`
-    )
+  const rankLabel = (i) => (i < 3 ? medals[i] : `#${i + 1}`);
+  const signedMoney = (v) => `${fmt(v)} ₪`;
+
+  /* דירוג מלא בשתי עמודות — מתכווץ אוטומטית כשיש המון שחקנים */
+  const standings = data.standings || [];
+  const n = standings.length;
+  const rows = Math.max(1, Math.ceil(n / 2));
+  const tableTop = 330;
+  const tableBottom = 730;
+  const rowH = Math.min(58, (tableBottom - tableTop) / rows);
+  const rowFont = rowH >= 52 ? 30 : 26;
+  const tableH = rows * rowH;
+  const firstBaseline = tableTop + (tableBottom - tableTop - tableH) / 2 + rowH * 0.72;
+  const standingRows = standings
+    .map((p, i) => {
+      const colX = i < rows ? 800 : 280; // עמודה ימנית: מקומות ראשונים
+      const y = (firstBaseline + (i % rows) * rowH).toFixed(1);
+      const amtColor = p.amount < 0 ? "#E08080" : "#D9A441";
+      return `<text x="${colX}" y="${y}" class="srow" style="font-size:${rowFont}px">${rankLabel(i)} ${esc(p.name)} · <tspan fill="${amtColor}">${esc(signedMoney(p.amount))}</tspan></text>`;
+    })
     .join("\n");
+
   const extras = [
     data.bestNight &&
       `🔥 ערב השיא: ${data.bestNight.name} · ${money(data.bestNight.amount)} · ${data.bestNight.date}`,
@@ -40,16 +54,17 @@ export function buildSummaryCardSvg(data) {
     data.mostNights &&
       `🎯 הכי הרבה ערבים: ${data.mostNights.name} · ${data.mostNights.nights} ערבים`,
   ].filter(Boolean);
-  // שורות ההמשך נערמות מתחת לפודיום, בתוך המסגרת
+  // שורות השיאים מתחת לטבלה, בתוך המסגרת
   const extraBlock = extras
     .map(
       (line, i) =>
-        `<text x="${cx}" y="${912 + i * 32}" class="extra">${esc(line)}</text>`
+        `<text x="${cx}" y="${836 + i * 34}" class="extra">${esc(line)}</text>`
     )
     .join("\n");
 
-  /* הלוגו של עדן (EGMark) בתחתית הכרטיס — אותם path-ים כמו components/Logo.jsx */
-  const logoBlock = `<g transform="translate(520.8,984.8) scale(0.6)">
+  /* הלוגו של עדן (EGMark) בתחתית הכרטיס — אותם path-ים כמו components/Logo.jsx.
+     יושב במרווח ייעודי בין השיאים לקרדיט, לא צמוד לאף שורה. */
+  const logoBlock = `<g transform="translate(512,940) scale(0.875)">
     <circle cx="32" cy="32" r="30" fill="url(#egCard)"/>
     <circle cx="32" cy="32" r="26.5" fill="none" stroke="rgba(217,164,65,0.45)" stroke-width="1"/>
     <path fill="#EFE7D2" d="M15.5 20h14.2c.85 0 1.45.55 1.45 1.35v1.55c0 .8-.6 1.35-1.45 1.35H19.4v4.35h8.6c.8 0 1.35.5 1.35 1.25v1.4c0 .75-.55 1.25-1.35 1.25h-8.6v4.55h10.5c.85 0 1.45.55 1.45 1.35v1.55c0 .8-.6 1.35-1.45 1.35H15.5c-.85 0-1.45-.55-1.45-1.35V21.35c0-.8.6-1.35 1.45-1.35z"/>
@@ -73,13 +88,9 @@ export function buildSummaryCardSvg(data) {
       text { font-family: Arial, Helvetica, sans-serif; text-anchor: middle; }
       .brand { font-size: 30px; fill: #D9A441; font-weight: 700; direction: rtl; }
       .title { font-size: 58px; fill: #EFE7D2; font-weight: 800; }
-      .label { font-size: 32px; fill: #9DBBAC; }
-      .king { font-size: 84px; fill: #EFE7D2; font-weight: 800; }
-      .kingAmt { font-size: 54px; fill: #D9A441; font-weight: 800; }
-      .statV { font-size: 44px; fill: #EFE7D2; font-weight: 800; }
-      .statL { font-size: 24px; fill: #9DBBAC; }
-      .podT { font-size: 30px; fill: #9DBBAC; font-weight: 700; }
-      .pod { font-size: 36px; fill: #EFE7D2; font-weight: 700; }
+      .secT { font-size: 32px; fill: #9DBBAC; font-weight: 700; }
+      .srow { font-size: 30px; fill: #EFE7D2; font-weight: 700; }
+      .stats { font-size: 28px; fill: #9DBBAC; }
       .extra { font-size: 26px; fill: #EFE7D2; }
       .foot { font-size: 20px; fill: #9DBBAC; }
     </style>
@@ -89,25 +100,12 @@ export function buildSummaryCardSvg(data) {
   <text x="${cx}" y="105" class="brand">♠ קופה — פוקר</text>
   <text x="${cx}" y="185" class="title">${esc(data.title)}</text>
   <line x1="${cx - 240}" y1="225" x2="${cx + 240}" y2="225" stroke="#D9A441" stroke-width="2" stroke-opacity=".7"/>
-  <text x="${cx}" y="305" class="label">👑 מלך התקופה</text>
-  <text x="${cx}" y="395" class="king">${esc(data.king?.name || "—")}</text>
-  <text x="${cx}" y="465" class="kingAmt">${esc(data.king ? money(data.king.amount) : "")}</text>
-  <g>
-    <rect x="70" y="520" width="290" height="130" rx="20" fill="#0A2B21" fill-opacity=".55" stroke="#2C6B54"/>
-    <rect x="395" y="520" width="290" height="130" rx="20" fill="#0A2B21" fill-opacity=".55" stroke="#2C6B54"/>
-    <rect x="720" y="520" width="290" height="130" rx="20" fill="#0A2B21" fill-opacity=".55" stroke="#2C6B54"/>
-    <text x="215" y="580" class="statV">${data.nights}</text>
-    <text x="215" y="622" class="statL">ערבים</text>
-    <text x="540" y="580" class="statV">${data.players}</text>
-    <text x="540" y="622" class="statL">שחקנים</text>
-    <text x="865" y="580" class="statV">${esc(moved(data.totalMoved))}</text>
-    <text x="865" y="622" class="statL">זז על השולחן</text>
-  </g>
-  <text x="${cx}" y="715" class="podT">🏆 הפודיום</text>
-  ${podiumRows}
+  <text x="${cx}" y="292" class="secT">🏆 דירוג התקופה</text>
+  ${standingRows}
+  <text x="${cx}" y="778" class="stats">${data.nights} ערבים · ${data.players} שחקנים · ${esc(moved(data.totalMoved))} זזו על השולחן</text>
   ${extraBlock}
   ${logoBlock}
-  <text x="${cx}" y="1042" class="foot">נוצר באפליקציית קופה — פוקר ♠</text>
+  <text x="${cx}" y="1030" class="foot">נוצר באפליקציית קופה — פוקר ♠</text>
 </svg>`;
 }
 

@@ -70,6 +70,17 @@ describe("summaryCardData — קצוות", () => {
 describe("buildSummaryCardSvg — כותרת ולוגו", () => {
   const svg = () =>
     buildSummaryCardSvg(summaryCardData(db(), { kind: "month", y: 2026, mo: 9 }));
+  // חודש עם 5 שחקנים — לבדיקת הדירוג המלא
+  const db5 = () => ({
+    aliases: {},
+    roster: [],
+    sessions: [
+      S("2026-09-05", [["אבי", 500], ["משה", -300], ["דנה", -200], ["רון", 150], ["גל", -150]]),
+      S("2026-09-19", [["משה", 700], ["אבי", -400], ["דנה", -300], ["רון", -100], ["גל", 100]]),
+    ],
+  });
+  const svg5 = () =>
+    buildSummaryCardSvg(summaryCardData(db5(), { kind: "month", y: 2026, mo: 9 }));
 
   it("אין letter-spacing ב־brand ויש direction:rtl (תיקון ההיפוך)", () => {
     const s = svg();
@@ -83,7 +94,7 @@ describe("buildSummaryCardSvg — כותרת ולוגו", () => {
   it("הלוגו EG מוטמע בתחתית עם הגרדיאנט שלו", () => {
     const s = svg();
     expect(s).toContain('id="egCard"');
-    expect(s).toContain('<g transform="translate(520.8,984.8) scale(0.6)">');
+    expect(s).toContain('<g transform="translate(512,940) scale(0.875)">');
     // שני העיגולים, שלושת ה־path-ים של האותיות והנקודה
     expect(s).toContain('r="30" fill="url(#egCard)"');
     expect(s).toContain('cx="50.5" cy="47.5" r="2.2" fill="#D9A441"');
@@ -92,17 +103,65 @@ describe("buildSummaryCardSvg — כותרת ולוגו", () => {
     expect(s).toContain("M48.2 31.2");
   });
 
-  it("פריסת תחתית: שיאים, לוגו, קרדיט — בלי חפיפות", () => {
-    const s = svg();
-    // שורות השיאים ב־y=912+i*32
-    expect(s).toContain('y="912" class="extra"');
-    // שורת הקרדיט ב־y=1042, בתוך המסגרת (1054)
-    expect(s).toContain('y="1042" class="foot"');
-    // הלוגו: קוטר 38.4 סביב (540,1004) — מעל הקרדיט ומתחת לשיאים
-    const logoY = 984.8;
-    const logoBottom = logoY + 64 * 0.6;
-    const lastExtraBaseline = 912 + 2 * 32;
-    expect(logoY).toBeGreaterThan(lastExtraBaseline + 4);
-    expect(logoBottom).toBeLessThan(1042 - 14);
+  it("דירוג מלא: כל השחקנים מופיעים בשתי עמודות, ממוין יורד", () => {
+    const s = svg5();
+    const data = summaryCardData(db5(), { kind: "month", y: 2026, mo: 9 });
+    expect(data.standings.map((p) => p.name)).toEqual(["משה", "אבי", "רון", "גל", "דנה"]);
+    for (const p of data.standings) expect(s).toContain(p.name);
+    // מדליות לשלושת הראשונים, מספרים לשאר
+    expect(s).toContain("🥇");
+    expect(s).toContain("🥈");
+    expect(s).toContain("🥉");
+    expect(s).toContain("#4");
+    expect(s).toContain("#5");
+    // סכומים עם סימן: חיובי בזהב, שלילי באדום רך
+    expect(s).toContain("#D9A441");
+    expect(s).toContain("#E08080");
+    // שתי העמודות קיימות
+    expect(s).toContain('x="800"');
+    expect(s).toContain('x="280"');
+  });
+
+  it("פריסה אנכית: טבלה, שיאים, לוגו, קרדיט — בלי חפיפות ובתוך המסגרת", () => {
+    const s = svg5();
+    const ys = [...s.matchAll(/<text x="(\d+)" y="([\d.]+)" class="srow"/g)].map(
+      (m) => Number(m[2])
+    );
+    expect(ys.length).toBeGreaterThan(0);
+    const tableBottom = Math.max(...ys);
+    expect(tableBottom).toBeLessThan(730); // בתוך אזור הטבלה
+    // שורת הסטטיסטיקה מתחת לטבלה
+    expect(s).toContain('y="778" class="stats"');
+    // שורות השיאים מתחתיה
+    expect(s).toContain('y="836" class="extra"');
+    // הלוגו (56 פיקסלים, 940–996) — מרווח מעל ומתחת
+    expect(940).toBeGreaterThan(836 + 2 * 34 + 20);
+    expect(940 + 56).toBeLessThan(1030 - 16);
+    // הקרדיט בתוך המסגרת (1054)
+    expect(s).toContain('y="1030" class="foot"');
+  });
+
+  it("עם המון שחקנים הטבלה מתכווצת ולא גולשת", () => {
+    const many = Array.from({ length: 18 }, (_, i) => ({
+      name: `שחקן${i + 1}`,
+      amount: (18 - i) * 10,
+    }));
+    const s = buildSummaryCardSvg({
+      title: "סיכום חודש",
+      nights: 6,
+      players: 18,
+      totalMoved: 1000,
+      standings: many,
+      bestNight: null,
+      stormyNight: null,
+      mostNights: null,
+    });
+    const ys = [...s.matchAll(/<text x="\d+" y="([\d.]+)" class="srow"/g)].map((m) =>
+      Number(m[1])
+    );
+    expect(ys).toHaveLength(18);
+    expect(Math.max(...ys)).toBeLessThan(730);
+    expect(Math.min(...ys)).toBeGreaterThan(330);
+    for (const p of many) expect(s).toContain(p.name);
   });
 });
