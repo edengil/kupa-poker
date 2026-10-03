@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeSkillRatings,
   skillRatingFor,
+  sortPlayerNamesByAttendanceAndRating,
   SKILL_START,
   SKILL_MIN_NIGHTS,
 } from "../lib/poker/skillRating.js";
@@ -99,5 +100,43 @@ describe("skillRatingFor", () => {
     expect(row.tableSize).toBe(2);
     expect(skillRatingFor(db, "לא קיים")).toBeNull();
     expect(skillRatingFor(db, "")).toBeNull();
+  });
+});
+
+describe("sortPlayerNamesByAttendanceAndRating", () => {
+  it("מסדר קודם לפי נוכחות ואז דירוג, ואת מי שלא מגיע בסוף", () => {
+    const db = {
+      aliases: {},
+      sessions: [
+        night("2026-09-01", [["אבי", 100], ["משה", -100], ["דוד", 50], ["רחל", -50]]),
+        night("2026-09-02", [["אבי", 80], ["משה", -80]]),
+        night("2026-09-03", [["אבי", 90], ["דוד", -90]]),
+      ],
+    };
+    const sorted = sortPlayerNamesByAttendanceAndRating(["רחל", "דוד", "משה", "אבי", "זר"], db);
+    expect(sorted[0]).toBe("אבי"); // 3 ערבים — ראשון
+    expect(sorted[sorted.length - 1]).toBe("זר"); // 0 ערבים — אחרון
+    // בעלי 2 ערבים לפני בעלת ערב אחד
+    expect(sorted.indexOf("דוד")).toBeLessThan(sorted.indexOf("רחל"));
+    expect(sorted.indexOf("משה")).toBeLessThan(sorted.indexOf("רחל"));
+  });
+
+  it("בשוויון נוכחות — הדירוג הגבוה קודם", () => {
+    const db = {
+      aliases: {},
+      sessions: [
+        night("2026-09-01", [["מנצח", 100], ["מפסיד", -100]]),
+        night("2026-09-02", [["מנצח", 100], ["מפסיד", -100]]),
+      ],
+    };
+    const sorted = sortPlayerNamesByAttendanceAndRating(["מפסיד", "מנצח"], db);
+    expect(sorted).toEqual(["מנצח", "מפסיד"]);
+  });
+
+  it("לא משנה את המערך המקורי ועובד גם בלי מסד", () => {
+    const input = ["ב", "א"];
+    const sorted = sortPlayerNamesByAttendanceAndRating(input, null);
+    expect(input).toEqual(["ב", "א"]);
+    expect(sorted).toEqual(["א", "ב"]); // נפילה לאלפביתי
   });
 });

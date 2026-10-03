@@ -18,6 +18,7 @@ import { festiveCardSoft, sectionTitle } from "../../lib/poker/festive";
 import { PersonalHighlightsCard } from "./PersonalHighlightsCard";
 import { PersonalStatsCard } from "./PersonalStatsCard";
 import { knownPlayerNames } from "../../lib/poker/personalHighlights";
+import { sortPlayerNamesByAttendanceAndRating } from "../../lib/poker/skillRating";
 import { formatNightClock, fmtPct } from "../../lib/poker/extraRecords";
 import { durWords } from "../../lib/poker/helpers";
 
@@ -78,7 +79,12 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
       setCmpPicked([...cur, name]);
     }
   };
-  const names = useMemo(() => knownPlayerNames(db).sort((a, b) => a.localeCompare(b, "he")), [db]);
+  // בוחר השחקנים בשיאים אישיים: קודם מי שמגיע הכי הרבה ערבים ומדורג הכי גבוה,
+  // בסוף מי שלא מגיע או מדורג נמוך.
+  const names = useMemo(
+    () => sortPlayerNamesByAttendanceAndRating(knownPlayerNames(db), db),
+    [db]
+  );
   const personalOf = allowPick && picked ? picked : mineOnly ? viewerName : null;
 
   if (!recs) return <Empty text="עוד אין ערבים — אין שיאים." />;
