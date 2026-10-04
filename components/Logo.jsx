@@ -102,6 +102,9 @@ export function EGFooter() {
       <div style={{ fontSize: 10, color: "#9DBBAC", opacity: 0.8, marginTop: 5 }}>
         &copy; {new Date().getFullYear()} Eden Haim Gil &middot; All rights reserved
       </div>
+      <div style={{ fontSize: 10, color: "#9DBBAC", opacity: 0.65, marginTop: 4 }}>
+        האפליקציה מודדת שימוש אנונימי כדי להשתפר — לא נאספים פרטים אישיים
+      </div>
     </footer>
   );
 }

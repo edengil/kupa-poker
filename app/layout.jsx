@@ -1,3 +1,5 @@
+import AnalyticsInit from "@/components/AnalyticsInit";
+
 export const metadata = {
   title: "קופה — פוקר",
   description: "מעקב אחרי ערבי הפוקר של הקבוצה",
@@ -50,7 +52,10 @@ export default function RootLayout({ children }) {
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AnalyticsInit />
+        {children}
+      </body>
     </html>
   );
 }

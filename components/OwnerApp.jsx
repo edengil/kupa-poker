@@ -16,6 +16,7 @@ import { authShell, brassCta } from "../lib/poker/festive";
 import { C as festiveC } from "../lib/poker/colors";
 import { getConfig, onConfig, setConfig } from "../lib/poker/config";
 import { buildPlanInviteText } from "../lib/planInvite";
+import { track } from "../lib/analytics";
 
 const C = {
   feltDeep: festiveC.feltDeep,
@@ -443,6 +444,7 @@ export default function OwnerApp() {
     if (!slug) throw new Error("אין קישור קבוצה — רענן את העמוד");
     const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
     const text = buildPlanInviteText(plan, { isUpdate, baseUrl: base, slug });
+    track("evening_planned", { is_update: !!isUpdate });
     try {
       await sendToWhatsAppGroup(text);
     } catch (e) {

@@ -40,6 +40,7 @@ import { allTransfersPaid } from "../lib/settlementClosed";
 import { announceSettlementClosed } from "../lib/announceSettlementClosed";
 import { flushStore } from "../lib/store";
 import { EGFooter } from "./Logo";
+import { track } from "../lib/analytics";
 
 /* localStorage בטוח ל־SSR — null כשאין חלון דפדפן. */
 const safeStorage = () =>
@@ -135,6 +136,7 @@ function App({
   // מעבר טאב מדווח החוצה — ככה יומן הצפיות יודע במה כל צופה הסתכל
   const setTab = (id) => {
     setTabState(id);
+    track("tab_viewed", { tab: id });
     if (typeof onTabChange === "function") onTabChange(id);
   };
   const [profile, setProfile] = useState(null);
