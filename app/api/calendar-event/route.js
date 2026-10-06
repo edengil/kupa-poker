@@ -6,7 +6,7 @@ import { reportError } from "@/lib/monitor";
 import {
   calendarConfigured,
   createEveningEvent,
-  addEventAttendees,
+  updateEveningEvent,
 } from "@/lib/googleCalendar";
 import { inviteRecipientLists, planSummaryText } from "@/lib/poker/emailRsvp";
 
@@ -166,8 +166,22 @@ export async function POST(request) {
       eventId = null; // סמן ישן — מתייחסים כאילו אין אירוע
     }
     if (eventId) {
-      // אירוע כבר קיים לערב הזה — רק מוסיף אורחים חדשים
-      await addEventAttendees(eventId, emails, auth.group.id);
+      // אירוע כבר קיים לערב הזה — מעדכן הכל: כותרת, תיאור, מיקום, שעות ואורחים
+      await updateEveningEvent(eventId, {
+        iso: plan.iso,
+        time: plan.time,
+        location: plan.location,
+        title: `🃏 ערב פוקר ♠️♥️ — יום ${weekday}`,
+        description: buildRichEventDescription(plan, weekday),
+        attendeeEmails: emails,
+        groupId: auth.group.id,
+      });
+      // מעדכן חותמת סנכרון
+      const nextData = {
+        ...db,
+        plan: { ...plan, calendarEventId: eventId, calendarSyncedAt: Date.now() },
+      };
+      await admin.from("groups").update({ data: nextData }).eq("id", groupRow.id);
     } else {
       // כותבים סמן pending לפני הקריאה לגוגל — אם הבקשה תיכשל/תתנתק אחרי
       // שהאירוע נוצר, ניסיון חוזר לא ייצור אירוע כפול
