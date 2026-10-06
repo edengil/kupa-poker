@@ -270,7 +270,16 @@ export function LiveTab({
     if (!nm || players.some((p) => canon(p.name, A) === nm)) return;
     /* שחקן ראשון פותח את המשחק — מצלמים את ההזמנה ואת אישורי ההגעה
        לפני שהתוכנית נמחקת, כדי לשמור צילום נוכחות עם הערב. */
-    if (players.length === 0 && !startedAt && !planSnap) {
+    const isGameStart = players.length === 0 && !startedAt;
+    if (isGameStart) {
+      // משחק נפתח — מדליקים את הבוט בשרת בוודאות, בלי להסתמך על המטמון
+      // המקומי (שעלול לחשוב שהוא כבר דלוק כשבשרת הוא כבוי)
+      setConfig({ botOn: true });
+      if (typeof onGameStart === "function") onGameStart();
+      // ההזמנה לערב כבר התממשה — מסירים כדי שלא יישאר "מחכה לערב"
+      if (db.plan) commit({ ...db, plan: null });
+    }
+    if (isGameStart && !planSnap) {
       setPlanSnap(
         db.plan
           ? {
@@ -285,11 +294,6 @@ export function LiveTab({
     setPlayers((p) => {
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
-        // משחק נפתח — הבוט בקבוצה נדלק לבד, והצופים מקבלים התראה
-        if (!getConfig().botOn) setConfig({ botOn: true });
-        if (typeof onGameStart === "function") onGameStart();
-        // ההזמנה לערב כבר התממשה — מסירים כדי שלא יישאר "מחכה לערב"
-        if (db.plan) commit({ ...db, plan: null });
       }
       return [
         ...p,
