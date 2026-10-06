@@ -8,7 +8,7 @@ import { HOSTS, wazeShortUrl } from "../../lib/poker/hosts";
 import { isPlanStale, planTodayIso } from "../../lib/planTiming";
 import { computeNightHype } from "../../lib/poker/nightHype";
 import { requestEmailInvites } from "../../lib/sendEmailInvites";
-import { emailRsvpStatus } from "../../lib/poker/emailRsvp";
+import { emailRsvpStatus, parseEmailImport, applyEmailImport } from "../../lib/poker/emailRsvp";
 import { flushStore } from "../../lib/store";
 import { waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Share2 } from "./icons";
@@ -53,6 +53,37 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const [inviteFallbackText, setInviteFallbackText] = useState("");
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importResult, setImportResult] = useState(null);
+  const [importing, setImporting] = useState(false);
+
+  /* ייבוא אימיילים מרשימת "שם: email" — שומר לפרופילים ושולח זימונים לחדשים.
+     השרת מדלג על מי שכבר קיבל זימון לערב הזה, אז השליחה החוזרת בטוחה. */
+  const doEmailImport = async () => {
+    const { matched, unmatched, invalid } = parseEmailImport(db, importText);
+    if (!matched.length && !unmatched.length && !invalid.length) return;
+    setImporting(true);
+    try {
+      commit(applyEmailImport(db, matched));
+      await flushStore();
+      setImportText("");
+      let sent = 0;
+      let sendError = false;
+      if (matched.length && plan?.iso) {
+        try {
+          const r = await requestEmailInvites(plan.iso);
+          sent = (r.sent || []).length;
+          if (sent) setInviteNote(`📧 נשלחו ${sent} זימונים באימייל לכתובות החדשות`);
+        } catch {
+          sendError = true;
+        }
+      }
+      setImportResult({ saved: matched.length, unmatched, invalid, sent, sendError });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const startEdit = () => {
     const fields = splitPlanFields(plan);
@@ -520,6 +551,45 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
                     <p style={{ fontSize: 12, color: C.dim, margin: "6px 0 0", lineHeight: 1.5 }}>
                       בלי אימייל שמור: {missing.map((r) => r.name).join(", ")} — אפשר להוסיף בפרופיל השחקן
                     </p>
+                  )}
+                  {missing.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => { setImportOpen(!importOpen); setImportResult(null); }}
+                        style={{ background: "none", border: `1px solid ${C.line}`, color: C.brass, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        {importOpen ? "סגור ייבוא ▴" : "📥 ייבוא אימיילים ▾"}
+                      </button>
+                      {importOpen && (
+                        <div style={{ marginTop: 8 }}>
+                          <textarea
+                            value={importText}
+                            onChange={(e) => setImportText(e.target.value)}
+                            placeholder={"אופיר סנה: ofir@example.com\nאיציק תפילין: itzik@example.com"}
+                            rows={4}
+                            style={{ width: "100%", boxSizing: "border-box", background: C.feltDeep, color: C.cream, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }}
+                          />
+                          <button
+                            type="button"
+                            onClick={doEmailImport}
+                            disabled={importing || !importText.trim()}
+                            style={{ marginTop: 6, background: C.brass, color: C.feltDeep, border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: importing || !importText.trim() ? 0.6 : 1 }}
+                          >
+                            {importing ? "שומר…" : "שמור אימיילים"}
+                          </button>
+                          {importResult && (
+                            <p style={{ fontSize: 12, color: C.dim, margin: "6px 0 0", lineHeight: 1.6 }}>
+                              נשמרו {importResult.saved} אימיילים
+                              {importResult.sent ? ` · נשלחו ${importResult.sent} זימונים` : ""}
+                              {importResult.sendError ? " · השליחה נכשלה — נסו לשמור את הערב שוב" : ""}
+                              {importResult.unmatched.length > 0 && <> · לא זוהו: {importResult.unmatched.join(", ")}</>}
+                              {importResult.invalid.length > 0 && <> · כתובות לא תקינות: {importResult.invalid.join(", ")}</>}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               );

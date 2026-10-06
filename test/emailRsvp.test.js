@@ -8,6 +8,8 @@ import {
   applyEmailRsvp,
   emailRsvpStatus,
   planSummaryText,
+  parseEmailImport,
+  applyEmailImport,
 } from "../lib/poker/emailRsvp.js";
 import {
   signRsvpToken,
@@ -178,5 +180,50 @@ describe("rsvp token", () => {
     delete process.env.SUPABASE_SECRET_KEY;
     expect(signRsvpToken(args)).toBeNull();
     expect(verifyRsvpToken("a.b")).toBeNull();
+  });
+});
+
+describe("parseEmailImport", () => {
+  const tdb = () => ({ roster: ["אבי כהן", "משה לוי", "דנה"], aliases: {} });
+
+  it("מפענח שורות 'שם: email' ומתאים לשחקנים מוכרים", () => {
+    const { matched, unmatched, invalid } = parseEmailImport(
+      tdb(),
+      "אבי כהן: avi@example.com\nמשה לוי: moshe@example.com"
+    );
+    expect(matched).toEqual([
+      { name: "אבי כהן", email: "avi@example.com" },
+      { name: "משה לוי", email: "moshe@example.com" },
+    ]);
+    expect(unmatched).toEqual([]);
+    expect(invalid).toEqual([]);
+  });
+
+  it("מנרמל כינויים דרך aliases ומתעלם מכפילויות", () => {
+    const db = { roster: ["אבי כהן"], aliases: { אבי: "אבי כהן" } };
+    const { matched, unmatched } = parseEmailImport(db, "אבי: avi@example.com\nאבי כהן: avi2@example.com");
+    expect(matched).toEqual([{ name: "אבי כהן", email: "avi@example.com" }]);
+    expect(unmatched).toEqual(["אבי כהן: avi2@example.com"]);
+  });
+
+  it("מסווג שורות לא תקינות ושמות לא מוכרים", () => {
+    const { matched, unmatched, invalid } = parseEmailImport(
+      tdb(),
+      "דנה: not-an-email\nזר מוחלט: zar@example.com\nשורה בלי כלום"
+    );
+    expect(matched).toEqual([]);
+    expect(unmatched).toContain("זר מוחלט: zar@example.com");
+    expect(unmatched).toContain("שורה בלי כלום");
+    expect(invalid).toEqual(["דנה: not-an-email"]);
+  });
+
+  it("applyEmailImport שומר את כל הכתובות בבת אחת", () => {
+    const next = applyEmailImport(tdb(), [
+      { name: "אבי כהן", email: "avi@example.com" },
+      { name: "משה לוי", email: "moshe@example.com" },
+    ]);
+    expect(playerEmail(next, "אבי כהן")).toBe("avi@example.com");
+    expect(playerEmail(next, "משה לוי")).toBe("moshe@example.com");
+    expect(playerEmail(next, "דנה")).toBeNull();
   });
 });
