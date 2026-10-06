@@ -25,7 +25,11 @@ describe("addHours", () => {
 });
 
 describe("calendarConfigured", () => {
-  it("מחזיר boolean", () => {
-    expect(typeof calendarConfigured()).toBe("boolean");
+  it("מחזיר boolean (async)", async () => {
+    expect(typeof (await calendarConfigured())).toBe("boolean");
+  });
+  it("false כשאין env ואין DB", async () => {
+    // בלי משתני סביבה ובלי groupId — אמור להיות false
+    expect(await calendarConfigured(null)).toBe(false);
   });
 });

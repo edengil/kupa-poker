@@ -629,6 +629,15 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
                     return (
                       <div style={{ marginTop: 8 }}>
                         <a
+                          href="/api/calendar/auth"
+                          style={{ display: "inline-block", background: C.brass, color: C.feltDeep, border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, textDecoration: "none", fontFamily: "inherit", marginBottom: 6 }}
+                        >
+                          🔗 חבר יומן גוגל
+                        </a>
+                        <p style={{ fontSize: 11, color: C.dim, margin: "0 0 8px", lineHeight: 1.5 }}>
+                          חיבור חד-פעמי — אחריו כל ערב ייצור אוטומטית אירוע ביומן עם זימונים
+                        </p>
+                        <a
                           href={calUrl}
                           target="_blank"
                           rel="noreferrer"

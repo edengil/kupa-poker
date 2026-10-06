@@ -65,7 +65,7 @@ export async function POST(request) {
   if (auth.error) {
     return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
   }
-  if (!calendarConfigured()) {
+  if (!(await calendarConfigured(auth.group.id))) {
     return NextResponse.json({ configured: false, code: "calendar_off" });
   }
 
@@ -94,7 +94,7 @@ export async function POST(request) {
 
   let responses;
   try {
-    responses = await getEventAttendeeResponses(eventId);
+    responses = await getEventAttendeeResponses(eventId, auth.group.id);
   } catch (e) {
     await reportError(e, "calendar-sync/fetch");
     return NextResponse.json(
@@ -125,7 +125,7 @@ export async function POST(request) {
     // וההפך: ענה "לא מגיע" באפליקציה אבל עדיין אורח — מסירים מהאירוע
     if (appNo.has(name)) {
       try {
-        await removeEventAttendee(eventId, r.email);
+        await removeEventAttendee(eventId, r.email, auth.group.id);
         removed.push(name);
       } catch (e) {
         await reportError(e, "calendar-sync/remove");

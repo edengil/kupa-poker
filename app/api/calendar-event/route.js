@@ -90,7 +90,7 @@ export async function POST(request) {
     );
   }
 
-  if (!calendarConfigured()) {
+  if (!(await calendarConfigured(auth.group.id))) {
     return NextResponse.json({ configured: false, code: "calendar_off" });
   }
 
@@ -130,7 +130,7 @@ export async function POST(request) {
     let eventId = plan.calendarEventId || null;
     if (eventId) {
       // אירוע כבר קיים לערב הזה — רק מוסיף אורחים חדשים
-      await addEventAttendees(eventId, emails);
+      await addEventAttendees(eventId, emails, auth.group.id);
     } else {
       eventId = await createEveningEvent({
         iso: plan.iso,
@@ -139,6 +139,7 @@ export async function POST(request) {
         title: `פוקר ♦️ ערב ${weekday}`,
         description: `${planSummaryText(plan)}\n\nנשלח מקופת הפוקר`,
         attendeeEmails: emails,
+        groupId: auth.group.id,
       });
       // שומר את מזהה האירוע בתוכנית לסנכרון
       const nextData = {
