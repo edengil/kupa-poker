@@ -63,14 +63,14 @@ export default function PrivacyPage() {
 
         <h2>What the app does</h2>
         <p>
-          Kupa Poker is an app for managing a private poker group's fund: tracking
+          Kupa Poker is an app for managing a private poker group&apos;s fund: tracking
           buy-ins, tips, balances, and planning poker evenings.
         </p>
 
         <h2>Data we collect</h2>
         <ul>
-          <li>Players' first and last names, as entered by the group manager.</li>
-          <li>Players' email addresses — for sending evening invitations.</li>
+          <li>Players&apos; first and last names, as entered by the group manager.</li>
+          <li>Players&apos; email addresses — for sending evening invitations.</li>
           <li>Game data: buy-ins, tips, balances, and RSVP responses.</li>
           <li>Google sign-in details (name and email) — for user identification.</li>
         </ul>
@@ -78,15 +78,15 @@ export default function PrivacyPage() {
         <h2>Google Calendar access</h2>
         <p>
           The app requests Google Calendar access (calendar.events scope) for one
-          purpose only: creating poker evening events in the group manager's
+          purpose only: creating poker evening events in the group manager&apos;s
           calendar, with players as guests, so Google sends them invitations. The
-          app reads guests' responses (accepted/declined) to update the attendee
+          app reads guests&apos; responses (accepted/declined) to update the attendee
           list — and makes no other use of the calendar.
         </p>
 
         <h2>Limited use disclosure</h2>
         <p>
-          Kupa Poker's use and transfer of information received from Google APIs
+          Kupa Poker&apos;s use and transfer of information received from Google APIs
           adheres to the{" "}
           <a href="https://developers.google.com/terms/api-services-user-data-policy">
             Google API Services User Data Policy
