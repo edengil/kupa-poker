@@ -46,7 +46,8 @@ function buildRichEventDescription(plan, weekday) {
     lines.push("");
   }
   lines.push("יאללה בואו לשחק! 🎰");
-  lines.push("אשרו הגעה כאן ביומן או בקישור מההזמנה.");
+  lines.push("מי שלא בא יא חלייה 😂");
+  lines.push("אשרו הגעה כאן ביומן או באתר: https://kupa-poker.vercel.app");
   lines.push("");
   lines.push("נשלח מקופת הפוקר 🃏");
   return lines.join("\n");
