@@ -15,10 +15,13 @@ const REDIRECT_URI = `${SITE}/api/calendar/callback`;
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 function htmlPage(title, body) {
+  const backBtn =
+    `<div style="margin-top:28px">` +
+    `<a href="/" style="display:inline-block;background:#d4a017;color:#0f2c1e;font-weight:bold;font-size:18px;padding:14px 44px;border-radius:12px;text-decoration:none">← חזרה לאפליקציה</a></div>`;
   return new NextResponse(
     `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +
       `<body style="font-family:system-ui;background:#0f2c1e;color:#f5efe0;display:flex;align-items:center;justify-content:center;min-height:90vh;margin:0;padding:20px;text-align:center">` +
-      `<div style="max-width:420px">${body}</div></body></html>`,
+      `<div style="max-width:420px">${body}${backBtn}</div></body></html>`,
     { headers: { "Content-Type": "text/html; charset=utf-8" } }
   );
 }
@@ -30,7 +33,7 @@ export async function GET(request) {
   const groupId = url.searchParams.get("state") || "";
 
   if (error || !code) {
-    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>גוגל לא אישרה את החיבור (${error || "no_code"}). נסו שוב.</p><p><a href="/" style="color:#d4a017">חזרה לאפליקציה</a></p>`);
+    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>גוגל לא אישרה את החיבור (${error || "no_code"}). נסו שוב.</p>`);
   }
 
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || "";
@@ -57,11 +60,11 @@ export async function GET(request) {
     tokens = await res.json();
   } catch (e) {
     await reportError(e, "calendar-callback/exchange");
-    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>החלפת הקוד בטוקן נכשלה. נסו שוב.</p><p><a href="/" style="color:#d4a017">חזרה לאפליקציה</a></p>`);
+    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>החלפת הקוד בטוקן נכשלה. נסו שוב.</p>`);
   }
 
   if (!tokens.refresh_token) {
-    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>גוגל לא החזירה refresh token. נסו שוב (ודאו שבחרתם לאשר).</p><p><a href="/" style="color:#d4a017">חזרה לאפליקציה</a></p>`);
+    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>גוגל לא החזירה refresh token. נסו שוב (ודאו שבחרתם לאשר).</p>`);
   }
 
   if (!groupId) {
@@ -87,6 +90,6 @@ export async function GET(request) {
 
   return htmlPage(
     "היומן חובר ✅",
-    `<h1>✅ היומן חובר בהצלחה!</h1><p>מעכשיו כל ערב שתפתחו ייצור אוטומטית אירוע ביומן גוגל עם השחקנים כאורחים.</p><p><a href="/" style="color:#d4a017">חזרה לאפליקציה</a></p>`
+    `<h1>✅ היומן חובר בהצלחה!</h1><p>מעכשיו כל ערב שתפתחו ייצור אוטומטית אירוע ביומן גוגל עם השחקנים כאורחים.</p>`
   );
 }
