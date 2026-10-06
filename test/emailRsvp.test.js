@@ -110,9 +110,32 @@ describe("emailRsvpStatus", () => {
       email: "avi@example.com",
       invited: true,
       answer: "yes",
+      via: "email",
     });
     const moshe = rows.find((r) => r.name === "משה");
-    expect(moshe).toEqual({ name: "משה", email: null, invited: false, answer: null });
+    expect(moshe).toEqual({ name: "משה", email: null, invited: false, answer: null, via: null });
+  });
+
+  it("תשובת יומן עדכנית גוברת על תשובת אימייל ישנה", () => {
+    const base = db();
+    base.plan = applyEmailRsvp(base.plan, "אבי כהן", "yes", 6);
+    base.plan.calendarRsvps = { "אבי כהן": { status: "no", at: 10, via: "calendar" } };
+    base.plan.calendarEventId = "evt123";
+    const rows = emailRsvpStatus(base);
+    const avi = rows.find((r) => r.name === "אבי כהן");
+    expect(avi.answer).toBe("no");
+    expect(avi.via).toBe("calendar");
+    expect(avi.invited).toBe(true);
+  });
+
+  it("תשובת אימייל עדכנית גוברת על תשובת יומן ישנה", () => {
+    const base = db();
+    base.plan = applyEmailRsvp(base.plan, "אבי כהן", "yes", 20);
+    base.plan.calendarRsvps = { "אבי כהן": { status: "no", at: 10, via: "calendar" } };
+    const rows = emailRsvpStatus(base);
+    const avi = rows.find((r) => r.name === "אבי כהן");
+    expect(avi.answer).toBe("yes");
+    expect(avi.via).toBe("email");
   });
 });
 

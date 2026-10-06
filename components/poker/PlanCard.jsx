@@ -8,7 +8,10 @@ import { HOSTS, wazeShortUrl } from "../../lib/poker/hosts";
 import { isPlanStale, planTodayIso } from "../../lib/planTiming";
 import { computeNightHype } from "../../lib/poker/nightHype";
 import { requestEmailInvites } from "../../lib/sendEmailInvites";
+import { requestCalendarEvent } from "../../lib/requestCalendarEvent";
+import { requestCalendarSync } from "../../lib/requestCalendarSync";
 import { emailRsvpStatus, parseEmailImport, applyEmailImport } from "../../lib/poker/emailRsvp";
+import { buildGoogleCalendarUrl } from "../../lib/poker/calendarInvite";
 import { flushStore } from "../../lib/store";
 import { waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Share2 } from "./icons";
@@ -41,10 +44,33 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planStale, db.plan?.iso]);
 
+  // סנכרון תשובות מהיומן — פעם אחת בטעינה כשהסנכרון האחרון ישן מ-5 דקות
+  const [syncing, setSyncing] = useState(false);
+  useEffect(() => {
+    const eventId = plan?.calendarEventId;
+    if (!eventId) return;
+    const lastSync = plan?.calendarSyncedAt || 0;
+    if (Date.now() - lastSync < 5 * 60 * 1000) return;
+    let cancelled = false;
+    (async () => {
+      setSyncing(true);
+      try {
+        await requestCalendarSync();
+        // השרת עדכן את ה-DB — רענון מקומי יגיע דרך ה-Realtime/poll הרגיל
+      } catch {
+        /* שקט — הסנכרון הבא ינסה שוב */
+      } finally {
+        if (!cancelled) setSyncing(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan?.calendarEventId]);
+
   const [editing, setEditing] = useState(false);
   const hype = useMemo(() => (plan ? computeNightHype(db) : null), [db, plan]);
   const [iso, setIso] = useState("");
-  const [time, setTime] = useState("21:00");
+  const [time, setTime] = useState("20:00");
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
   const [sendStatus, setSendStatus] = useState(null); // null | sending | sent | error
@@ -88,7 +114,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
   const startEdit = () => {
     const fields = splitPlanFields(plan);
     setIso(plan?.iso || todayIso);
-    setTime(plan?.time || "21:00");
+    setTime(plan?.time || "20:00");
     setLocation(fields.location);
     setNote(fields.note);
     setEditing(true);
@@ -149,22 +175,27 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     setEditing(false);
     // ההזמנה יוצאת לקבוצת הוואטסאפ עם הלינק — שהחברים יאשרו הגעה
     await announce(next, isUpdate);
-    // וגם זימון אישי באימייל לכל מי שיש לו כתובת שמורה — אישור מהמייל
-    // נרשם ישר בערב הפתוח. כשלון כאן לא חוסם את פתיחת הערב.
+    // זימון ביומן גוגל לכל מי שיש לו כתובת שמורה (אם היומן מחובר) —
+    // אחרת נופל בחזרה לזימון אישי באימייל. כשלון כאן לא חוסם את פתיחת הערב.
     try {
       await flushStore();
-      const r = await requestEmailInvites(next.iso);
-      const sentCount = (r.sent || []).length;
-      const missingCount = (r.missingEmail || []).length;
-      if (sentCount || missingCount) {
-        setInviteNote(
-          `📧 נשלחו ${sentCount} זימונים באימייל${missingCount ? ` · ל־${missingCount} שחקנים אין אימייל שמור` : ""}`
-        );
+      const cal = await requestCalendarEvent(next.iso);
+      if (cal.configured && cal.eventId) {
+        setInviteNote(`📅 נוצר אירוע ביומן ונשלח זימון ל־${cal.attendees || 0} שחקנים`);
       } else {
-        setInviteNote("");
+        const r = await requestEmailInvites(next.iso);
+        const sentCount = (r.sent || []).length;
+        const missingCount = (r.missingEmail || []).length;
+        if (sentCount || missingCount) {
+          setInviteNote(
+            `📧 נשלחו ${sentCount} זימונים באימייל${missingCount ? ` · ל־${missingCount} שחקנים אין אימייל שמור` : ""}`
+          );
+        } else {
+          setInviteNote("");
+        }
       }
     } catch (e) {
-      setInviteNote(`שליחת הזימונים באימייל נכשלה: ${e?.message || "נסו שוב"}`);
+      setInviteNote(`שליחת הזימונים נכשלה: ${e?.message || "נסו שוב"}`);
     }
   };
   const clear = () => {
@@ -591,6 +622,26 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
                       )}
                     </div>
                   )}
+                  {(() => {
+                    const withEmail = rows.filter((r) => r.email);
+                    const calUrl = buildGoogleCalendarUrl(plan, withEmail.map((r) => r.email));
+                    if (!calUrl) return null;
+                    return (
+                      <div style={{ marginTop: 8 }}>
+                        <a
+                          href={calUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ display: "inline-block", background: "none", border: `1px solid ${C.line}`, color: C.brass, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, textDecoration: "none", fontFamily: "inherit" }}
+                        >
+                          📅 זימון ביומן גוגל
+                        </a>
+                        <p style={{ fontSize: 11, color: C.dim, margin: "4px 0 0", lineHeight: 1.5 }}>
+                          פותח אירוע ביומן עם {withEmail.length} השחקנים כאורחים — גוגל תשלח להם זימון כשתשמרו את האירוע
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
