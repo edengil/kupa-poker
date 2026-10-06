@@ -7,6 +7,8 @@ import {
   calendarConfigured,
   createEveningEvent,
   updateEveningEvent,
+  findEveningEvents,
+  deleteCalendarEvent,
 } from "@/lib/googleCalendar";
 import { inviteRecipientLists, planSummaryText } from "@/lib/poker/emailRsvp";
 
@@ -30,7 +32,7 @@ const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
  * כותרת עם קלפים, מיקום בולט (כולל אצל מי משחקים), שעה, והזמנה לאשר הגעה.
  */
 function buildRichEventDescription(plan, weekday) {
-  const lines = ["🃏♠️♥️ ערב פוקר ♣️♦️🃏", ""];
+  const lines = ["🃏♠️♥️ ערב פוקר ♣️♦️🃏", "מי שלא בא יא חלייה 😂", ""];
   if (plan?.location) {
     lines.push(`📍 ${plan.location}`);
     lines.push("");
@@ -46,7 +48,6 @@ function buildRichEventDescription(plan, weekday) {
     lines.push("");
   }
   lines.push("יאללה בואו לשחק! 🎰");
-  lines.push("מי שלא בא יא חלייה 😂");
   lines.push("אשרו הגעה כאן ביומן או באתר: https://kupa-poker.vercel.app");
   lines.push("");
   lines.push("נשלח מקופת הפוקר 🃏");
@@ -156,26 +157,66 @@ export async function POST(request) {
 
   try {
     let eventId = plan.calendarEventId || null;
-    // הגנה מפני יצירה כפולה: אם יש סמן "pending" טרי (< 3 דקות), בקשה קודמת
-    // כנראה עדיין יוצרת את האירוע — לא יוצרים שני
+    // סמן pending מסמן בקשה אחרת שיוצרת כרגע — מחכים עד 15 שניות שהיא תסיים
+    // במקום ליצור אירוע כפול
     if (eventId && eventId.startsWith("pending:")) {
-      const pendingAt = parseInt(eventId.split(":")[2] || "0", 10);
-      if (Date.now() - pendingAt < 3 * 60 * 1000) {
-        return NextResponse.json({ configured: true, eventId: null, code: "retry_pending" });
+      const deadline = Date.now() + 15000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const { data: fresh } = await admin.from("groups").select("data").eq("id", groupRow.id).single();
+        const cur = fresh?.data?.plan?.calendarEventId || null;
+        if (cur && !cur.startsWith("pending:")) { eventId = cur; break; }
+        if (!cur) { eventId = null; break; }
       }
-      eventId = null; // סמן ישן — מתייחסים כאילו אין אירוע
+      if (eventId && eventId.startsWith("pending:")) eventId = null; // פג תוקף ההמתנה
+    }
+    const eveningPayload = {
+      iso: plan.iso,
+      time: plan.time,
+      location: plan.location,
+      title: `🃏 ערב פוקר ♠️♥️ — ${weekday}`,
+      description: buildRichEventDescription(plan, weekday),
+      attendeeEmails: emails,
+      groupId: auth.group.id,
+    };
+    // רשת ביטחון: לפני יצירה מחפשים אירוע קיים לאותו ערב ביומן
+    if (!eventId) {
+      const existing = await findEveningEvents(plan.iso, auth.group.id);
+      if (existing.length) eventId = existing[0].id;
     }
     if (eventId) {
-      // אירוע כבר קיים לערב הזה — מעדכן הכל: כותרת, תיאור, מיקום, שעות ואורחים
-      await updateEveningEvent(eventId, {
-        iso: plan.iso,
-        time: plan.time,
-        location: plan.location,
-        title: `🃏 ערב פוקר ♠️♥️ — יום ${weekday}`,
-        description: buildRichEventDescription(plan, weekday),
-        attendeeEmails: emails,
-        groupId: auth.group.id,
-      });
+      // עדכון שקט של האירוע הקיים (בלי להספים את האורחים)
+      try {
+        await updateEveningEvent(eventId, eveningPayload);
+      } catch (e) {
+        if (e?.status === 404 || e?.status === 410) {
+          // האירוע נמחק ידנית — מחפשים חלופה לפני יצירת חדש
+          const existing = await findEveningEvents(plan.iso, auth.group.id);
+          eventId = existing.length ? existing[0].id : null;
+          if (eventId) await updateEveningEvent(eventId, eveningPayload);
+        } else throw e;
+      }
+      // ניקוי עצמי: אם יש כפילויות מאותו ערב — שומרים את החדש ביותר, מוחקים את השאר בשקט
+      if (eventId) {
+        try {
+          const dupes = await findEveningEvents(plan.iso, auth.group.id);
+          const extras = dupes.filter((e) => e.id !== eventId);
+          // שומרים את החדש ביותר כקנוני
+          let canonical = eventId;
+          for (const ex of extras) {
+            const exTime = new Date(ex.created || 0).getTime();
+            const canEv = dupes.find((e) => e.id === canonical);
+            const canTime = new Date(canEv?.created || 0).getTime();
+            if (exTime > canTime) canonical = ex.id;
+          }
+          for (const ex of dupes) {
+            if (ex.id !== canonical) {
+              try { await deleteCalendarEvent(ex.id, auth.group.id); } catch { /* ממשיכים */ }
+            }
+          }
+          eventId = canonical;
+        } catch { /* ניקוי נכשל — לא חוסם */ }
+      }
       // מעדכן חותמת סנכרון
       const nextData = {
         ...db,
@@ -190,15 +231,33 @@ export async function POST(request) {
         .from("groups")
         .update({ data: { ...db, plan: { ...plan, calendarEventId: pendingMarker } } })
         .eq("id", groupRow.id);
-      eventId = await createEveningEvent({
-        iso: plan.iso,
-        time: plan.time,
-        location: plan.location,
-        title: `🃏 ערב פוקר ♠️♥️ — יום ${weekday}`,
-        description: buildRichEventDescription(plan, weekday),
-        attendeeEmails: emails,
-        groupId: auth.group.id,
-      });
+      // בדיקה אטומית: אם בקשה מקבילה כתבה סמן משלה אחרינו — היא מנצחת, מחכים לה
+      const { data: checkRow } = await admin.from("groups").select("data").eq("id", groupRow.id).single();
+      const checkMarker = checkRow?.data?.plan?.calendarEventId || null;
+      if (checkMarker && checkMarker !== pendingMarker && checkMarker.startsWith("pending:")) {
+        const deadline = Date.now() + 20000;
+        let winner = null;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 1000));
+          const { data: w } = await admin.from("groups").select("data").eq("id", groupRow.id).single();
+          const cur = w?.data?.plan?.calendarEventId || null;
+          if (cur && !cur.startsWith("pending:")) { winner = cur; break; }
+        }
+        if (winner) {
+          await updateEveningEvent(winner, eveningPayload);
+          return NextResponse.json({ configured: true, eventId: winner, attendees: emails.length });
+        }
+        // המנצחת נכשלה — נופלים לחיפוש כפילות ואז יצירה
+        const existing = await findEveningEvents(plan.iso, auth.group.id);
+        if (existing.length) {
+          eventId = existing[0].id;
+          await updateEveningEvent(eventId, eveningPayload);
+          const nextData = { ...db, plan: { ...plan, calendarEventId: eventId, calendarSyncedAt: Date.now() } };
+          await admin.from("groups").update({ data: nextData }).eq("id", groupRow.id);
+          return NextResponse.json({ configured: true, eventId, attendees: emails.length });
+        }
+      }
+      eventId = await createEveningEvent(eveningPayload);
       // שומר את מזהה האירוע בתוכנית לסנכרון
       const nextData = {
         ...db,
