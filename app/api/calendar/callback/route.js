@@ -82,7 +82,17 @@ export async function GET(request) {
       },
       { onConflict: "group_id" }
     );
-    if (upErr) throw upErr;
+    if (upErr) {
+      const detail = [
+        upErr.message,
+        upErr.code ? `code=${upErr.code}` : "",
+        upErr.details ? `details=${upErr.details}` : "",
+        upErr.hint ? `hint=${upErr.hint}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+      throw new Error(`supabase_upsert_failed: ${detail || JSON.stringify(upErr)}`);
+    }
   } catch (e) {
     await reportError(e, "calendar-callback/store");
     return htmlPage("שגיאת שרת", `<h1>❌ שגיאת שרת</h1><p>שמירת החיבור נכשלה. נסו שוב.</p>`);
