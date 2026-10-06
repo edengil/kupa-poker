@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { summaryCardData } from "../lib/poker/summaryCard.js";
-import { buildSummaryCardSvg } from "../components/poker/SummaryCardButton.jsx";
+import { buildSummaryCardSvg } from "../lib/poker/summaryCardSvg.js";
 
 const S = (iso, entries) => ({
   iso,

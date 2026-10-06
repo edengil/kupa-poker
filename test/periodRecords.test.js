@@ -87,3 +87,37 @@ describe("computePeriodRecords", () => {
     expect(computePeriodRecords(db, { kind: "week", y: 2026 })).toBeNull();
   });
 });
+
+describe("computePeriodRecords — רבעון וחצי שנה", () => {
+  it("רבעון 3 2026 כולל אוגוסט+ספטמבר בלבד", () => {
+    const q3 = computePeriodRecords(db, { kind: "quarter", y: 2026, q: 3 });
+    expect(q3).not.toBeNull();
+    expect(q3.nights).toBe(4);
+    expect(q3.label).toBe("רבעון 3 · 2026");
+    // נתנאל: 500+100-300-100=200; קובי: 200+150-60=290; עדן: 100-50-500-40=-490
+    // בודק שאין זליגה: ערב דצמבר 2025 לא נספר, וספטמבר כן
+    expect(q3.recs.bestNight).toBeTruthy();
+    expect(q3.nights).toBe(4);
+  });
+
+  it("רבעון 4 2026 ריק — מחזיר null", () => {
+    expect(computePeriodRecords(db, { kind: "quarter", y: 2026, q: 4 })).toBeNull();
+  });
+
+  it("חציון 2 2026 כולל אוגוסט+ספטמבר", () => {
+    const h2 = computePeriodRecords(db, { kind: "half", y: 2026, h: 2 });
+    expect(h2).not.toBeNull();
+    expect(h2.nights).toBe(4);
+    expect(h2.label).toBe("חציון 2 · 2026");
+  });
+
+  it("חציון 1 2026 ריק — מחזיר null", () => {
+    expect(computePeriodRecords(db, { kind: "half", y: 2026, h: 1 })).toBeNull();
+  });
+
+  it("ערכים לא תקינים — מחזיר null", () => {
+    expect(computePeriodRecords(db, { kind: "quarter", y: 2026, q: 5 })).toBeNull();
+    expect(computePeriodRecords(db, { kind: "half", y: 2026, h: 0 })).toBeNull();
+    expect(computePeriodRecords(db, { kind: "decade", y: 2026 })).toBeNull();
+  });
+});

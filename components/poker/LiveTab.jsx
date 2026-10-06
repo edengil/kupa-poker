@@ -12,6 +12,7 @@ import { applyManualTip, removeManualTip, playerTipEvents, isManualTip } from ".
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
+import { notifyTransfersSettlement } from "../../lib/poker/notifyTransfersClient";
 import { detectLiveRecords, liveRecordAnnouncement } from "../../lib/poker/liveRecords";
 import { postToGroup } from "../../lib/postToGroup";
 import { buildAttendanceSnapshot } from "../../lib/poker/attendance";
@@ -505,6 +506,9 @@ export function LiveTab({
     const saved = await flushStore();
     if (saved === false) {
       alert("הערב נשמר במכשיר, אבל השמירה לשרת נכשלה. השאר את המסך פתוח עד שמופיע «כל השינויים נשמרו».");
+    } else {
+      // הערב נשמר — שולח לכל שחקן פוש אישי עם ההעברות שלו (למי להעביר / מי יעביר אליו)
+      void notifyTransfersSettlement(rec.id);
     }
     /* סיכום + טיפים; חלוקה ידנית במסך נפרד לפני שליחה לקבוצה */
     const summaryText = nightSummaryText({ ...rec, cps }, A);

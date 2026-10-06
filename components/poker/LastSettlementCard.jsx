@@ -13,6 +13,7 @@ import { latestSession, pastSettlementSessions } from "../../lib/lastSession";
 import { allTransfersPaid } from "../../lib/settlementClosed";
 import { canMarkTransfer, couplePartner } from "../../lib/paymentAccess";
 import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
+import { notifyPaymentConfirmed } from "../../lib/poker/notifyTransfersClient";
 import { flushStore } from "../../lib/store";
 import { AL, canon } from "../../lib/poker/helpers";
 import {
@@ -137,6 +138,16 @@ export function LastSettlementCard({
       }
       if (value && allTransfersPaid(next)) {
         await announceSettlementClosed(session.id);
+      }
+      if (value) {
+        // שחקן אישר תשלום — מתריע למנהל
+        const t = transfers[index];
+        void notifyPaymentConfirmed(session.id, {
+          transferIndex: index,
+          payerName: viewerName || t?.from,
+          payeeName: t?.to,
+          amount: t?.amount,
+        });
       }
     } finally {
       setBusy(null);
