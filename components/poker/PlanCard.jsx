@@ -166,9 +166,16 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
       location: location.trim(),
       note: note.trim(),
       createdAt: Date.now(),
-      // עריכת אותו ערב שומרת את הזימונים והאישורים שכבר הגיעו מהאימייל
+      // עריכת אותו ערב שומרת את הזימונים והאישורים שכבר הגיעו (אימייל + יומן) —
+      // בלי זה נוצר אירוע יומן כפול ונשלחות הזמנות כפולות לכל הרשימה
       ...(isUpdate && plan.iso === iso
-        ? { emailInvites: plan.emailInvites, emailRsvps: plan.emailRsvps }
+        ? {
+            emailInvites: plan.emailInvites,
+            emailRsvps: plan.emailRsvps,
+            calendarEventId: plan.calendarEventId,
+            calendarRsvps: plan.calendarRsvps,
+            calendarSyncedAt: plan.calendarSyncedAt,
+          }
         : {}),
     };
     commit({ ...db, plan: next });

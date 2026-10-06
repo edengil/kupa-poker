@@ -25,6 +25,33 @@ export const dynamic = "force-dynamic";
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/**
+ * בונה תיאור עשיר וחגיגי לאירוע היומן:
+ * כותרת עם קלפים, מיקום בולט (כולל אצל מי משחקים), שעה, והזמנה לאשר הגעה.
+ */
+function buildRichEventDescription(plan, weekday) {
+  const lines = ["🃏♠️♥️ ערב פוקר ♣️♦️🃏", ""];
+  if (plan?.location) {
+    lines.push(`📍 ${plan.location}`);
+    lines.push("");
+  }
+  const d = plan?.iso ? new Date(`${plan.iso}T12:00:00`) : null;
+  if (d && !Number.isNaN(d.getTime())) {
+    const dateStr = `${d.getDate()} ב${["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"][d.getMonth()]} ${d.getFullYear()}`;
+    lines.push(`🕐 יום ${weekday} · ${dateStr}${plan?.time ? ` · בשעה ${plan.time}` : ""}`);
+    lines.push("");
+  }
+  if (plan?.note) {
+    lines.push(`📝 ${plan.note}`);
+    lines.push("");
+  }
+  lines.push("יאללה בואו לשחק! 🎰");
+  lines.push("אשרו הגעה כאן ביומן או בקישור מההזמנה.");
+  lines.push("");
+  lines.push("נשלח מקופת הפוקר 🃏");
+  return lines.join("\n");
+}
+
 function userClientFromBearer(bearer) {
   return createClient(URL, ANON, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -128,16 +155,32 @@ export async function POST(request) {
 
   try {
     let eventId = plan.calendarEventId || null;
+    // הגנה מפני יצירה כפולה: אם יש סמן "pending" טרי (< 3 דקות), בקשה קודמת
+    // כנראה עדיין יוצרת את האירוע — לא יוצרים שני
+    if (eventId && eventId.startsWith("pending:")) {
+      const pendingAt = parseInt(eventId.split(":")[2] || "0", 10);
+      if (Date.now() - pendingAt < 3 * 60 * 1000) {
+        return NextResponse.json({ configured: true, eventId: null, code: "retry_pending" });
+      }
+      eventId = null; // סמן ישן — מתייחסים כאילו אין אירוע
+    }
     if (eventId) {
       // אירוע כבר קיים לערב הזה — רק מוסיף אורחים חדשים
       await addEventAttendees(eventId, emails, auth.group.id);
     } else {
+      // כותבים סמן pending לפני הקריאה לגוגל — אם הבקשה תיכשל/תתנתק אחרי
+      // שהאירוע נוצר, ניסיון חוזר לא ייצור אירוע כפול
+      const pendingMarker = `pending:${Math.random().toString(36).slice(2)}:${Date.now()}`;
+      await admin
+        .from("groups")
+        .update({ data: { ...db, plan: { ...plan, calendarEventId: pendingMarker } } })
+        .eq("id", groupRow.id);
       eventId = await createEveningEvent({
         iso: plan.iso,
         time: plan.time,
         location: plan.location,
-        title: `פוקר ♦️ ערב ${weekday}`,
-        description: `${planSummaryText(plan)}\n\nנשלח מקופת הפוקר`,
+        title: `🃏 ערב פוקר ♠️♥️ — יום ${weekday}`,
+        description: buildRichEventDescription(plan, weekday),
         attendeeEmails: emails,
         groupId: auth.group.id,
       });
@@ -151,6 +194,10 @@ export async function POST(request) {
     return NextResponse.json({ configured: true, eventId, attendees: emails.length });
   } catch (e) {
     await reportError(e, "calendar-event/create");
+    // טוקן פג/בוטל (400/401) — נופלים בחזרה לזימוני אימייל במקום שגיאה מתה
+    if (/calendar_token_failed:(400|401)/.test(e.message || "")) {
+      return NextResponse.json({ configured: false, code: "calendar_token_expired" });
+    }
     return NextResponse.json(
       { error: "יצירת האירוע ביומן נכשלה", code: "calendar_failed", detail: e.message },
       { status: 502 }
