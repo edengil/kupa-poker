@@ -37,13 +37,11 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
     const ys = headToHeadYears(db);
     return ys.includes(currentYear) ? ys : [currentYear, ...ys];
   }, [db, currentYear]);
-  /* שיאים לפי תקופה: חודש / רבעון / חצי שנה / שנה (ברירת מחדל — התקופה האחרונה עם ערבים) */
+  /* שיאים לפי תקופה: חודש נבחר או שנה נבחרת (ברירת מחדל — התקופה האחרונה עם ערבים) */
   const periods = useMemo(() => recordPeriods(db), [db]);
-  const [periodKind, setPeriodKind] = useState("month"); // "month" | "quarter" | "half" | "year"
+  const [periodKind, setPeriodKind] = useState("month"); // "month" | "year"
   const [periodMonthKey, setPeriodMonthKey] = useState("");
   const [periodYear, setPeriodYear] = useState(null);
-  const [periodQ, setPeriodQ] = useState(null); // 1..4
-  const [periodH, setPeriodH] = useState(null); // 1..2
   const effMonthKey = periods.months.some((m) => m.key === periodMonthKey)
     ? periodMonthKey
     : periods.months[0]?.key;
@@ -51,28 +49,13 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
     periodYear != null && periods.years.includes(periodYear)
       ? periodYear
       : periods.years[0] ?? currentYear;
-  const effQ = periodQ >= 1 && periodQ <= 4 ? periodQ : null;
-  const effH = periodH >= 1 && periodH <= 2 ? periodH : null;
   const scoped = useMemo(() => {
     if (periodKind === "month") {
       const m = periods.months.find((x) => x.key === effMonthKey);
       return m ? computePeriodRecords(db, { kind: "month", y: m.y, mo: m.mo }) : null;
     }
-    if (periodKind === "quarter" && effQ) {
-      return computePeriodRecords(db, { kind: "quarter", y: effPeriodYear, q: effQ });
-    }
-    if (periodKind === "half" && effH) {
-      return computePeriodRecords(db, { kind: "half", y: effPeriodYear, h: effH });
-    }
     return computePeriodRecords(db, { kind: "year", y: effPeriodYear });
-  }, [db, periodKind, periods, effMonthKey, effPeriodYear, effQ, effH]);
-  const cardScope = useMemo(() => {
-    if (!scoped) return null;
-    if (periodKind === "month") return { kind: "month", y: scoped.y, mo: scoped.mo };
-    if (periodKind === "quarter") return { kind: "quarter", y: scoped.y, q: scoped.q };
-    if (periodKind === "half") return { kind: "half", y: scoped.y, h: scoped.h };
-    return { kind: "year", y: scoped.y };
-  }, [scoped, periodKind]);
+  }, [db, periodKind, periods, effMonthKey, effPeriodYear]);
   const paymentSpeed = useMemo(() => computePaymentSpeed(db), [db]);
   const busts = useMemo(() => computeBustRecords(db), [db]);
   const attendance = useMemo(() => computeAttendance(db), [db]);
@@ -259,15 +242,13 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
         <div style={sectionTitle({ margin: "12px 2px 0" })}>
           🗓️ שיאים לפי תקופה
         </div>
-        <div style={{ display: "flex", gap: 6, margin: "0 2px 10px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, margin: "0 2px 10px" }}>
           <ScopeChip active={periodKind === "month"} onClick={() => setPeriodKind("month")}>חודשי</ScopeChip>
-          <ScopeChip active={periodKind === "quarter"} onClick={() => setPeriodKind("quarter")}>רבעוני</ScopeChip>
-          <ScopeChip active={periodKind === "half"} onClick={() => setPeriodKind("half")}>חצי שנתי</ScopeChip>
           <ScopeChip active={periodKind === "year"} onClick={() => setPeriodKind("year")}>שנתי</ScopeChip>
         </div>
         <label style={{ display: "block", margin: "0 2px 12px" }}>
           <div style={{ fontSize: 12, color: C.dim, marginBottom: 5 }}>
-            {periodKind === "month" ? "חודש" : periodKind === "quarter" ? "רבעון" : periodKind === "half" ? "חציון" : "שנה"}
+            {periodKind === "month" ? "חודש" : "שנה"}
           </div>
           {periodKind === "month" ? (
             <select
@@ -288,85 +269,6 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
                 <option key={m.key} value={m.key}>{m.label}</option>
               ))}
             </select>
-          ) : periodKind === "quarter" ? (
-            <div style={{ display: "flex", gap: 6 }}>
-              <select
-                value={effPeriodYear}
-                onChange={(e) => { setPeriodYear(Number(e.target.value)); setPeriodQ(null); }}
-                style={{
-                  flex: 1,
-                  background: C.card,
-                  color: C.cream,
-                  border: `1px solid ${C.line}`,
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                }}
-              >
-                {periods.years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <select
-                value={effQ || ""}
-                onChange={(e) => setPeriodQ(Number(e.target.value))}
-                style={{
-                  flex: 1,
-                  background: C.card,
-                  color: C.cream,
-                  border: `1px solid ${C.line}`,
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                }}
-              >
-                <option value="">בחר רבעון</option>
-                {[1, 2, 3, 4].map((q) => (
-                  <option key={q} value={q}>רבעון {q}</option>
-                ))}
-              </select>
-            </div>
-          ) : periodKind === "half" ? (
-            <div style={{ display: "flex", gap: 6 }}>
-              <select
-                value={effPeriodYear}
-                onChange={(e) => { setPeriodYear(Number(e.target.value)); setPeriodH(null); }}
-                style={{
-                  flex: 1,
-                  background: C.card,
-                  color: C.cream,
-                  border: `1px solid ${C.line}`,
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                }}
-              >
-                {periods.years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <select
-                value={effH || ""}
-                onChange={(e) => setPeriodH(Number(e.target.value))}
-                style={{
-                  flex: 1,
-                  background: C.card,
-                  color: C.cream,
-                  border: `1px solid ${C.line}`,
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                }}
-              >
-                <option value="">בחר חציון</option>
-                <option value={1}>חציון 1 (ינו׳–יוני)</option>
-                <option value={2}>חציון 2 (יולי–דצמ׳)</option>
-              </select>
-            </div>
           ) : (
             <select
               value={effPeriodYear}
@@ -404,7 +306,11 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
             </p>
             <SummaryCardButton
               db={db}
-              scope={cardScope}
+              scope={
+                periodKind === "month"
+                  ? { kind: "month", y: scoped.y, mo: scoped.mo }
+                  : { kind: "year", y: scoped.y }
+              }
             />
             {periodKind === "month" ? (
               <>

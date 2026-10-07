@@ -58,6 +58,9 @@ const SessionsTab = lazy(() =>
 const RecordsTab = lazy(() =>
   import("./poker/RecordsTab").then((m) => ({ default: m.RecordsTab }))
 );
+const SummariesTab = lazy(() =>
+  import("./poker/SummariesTab").then((m) => ({ default: m.SummariesTab }))
+);
 const PlayersTab = lazy(() =>
   import("./poker/PlayersTab").then((m) => ({ default: m.PlayersTab }))
 );
@@ -460,6 +463,8 @@ function App({
             statsPanel
           ) : tab === "records" ? (
             <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} allowPick={!readOnly} />
+          ) : tab === "summaries" ? (
+            <SummariesTab db={db} />
           ) : (
             <PlayersTab db={db} onPlayer={setProfile} />
           )}
