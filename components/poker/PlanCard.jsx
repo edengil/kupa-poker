@@ -183,11 +183,17 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     // ההזמנה יוצאת לקבוצת הוואטסאפ עם הלינק — שהחברים יאשרו הגעה
     await announce(next, isUpdate);
     // זימון ביומן גוגל לכל מי שיש לו כתובת שמורה (אם היומן מחובר) —
-    // אחרת נופל בחזרה לזימון אישי באימייל. כשלון כאן לא חוסם את פתיחת הערב.
+    // אחרת נופל בחזרה לזימון אישי באימייל. כשלון כאן לא חוסם את פתיחת הערב
+    // ולא את הזימון באימייל — כל כשל בקריאת היומן נופל בחזרה לאימייל.
     try {
       await flushStore();
-      const cal = await requestCalendarEvent(next.iso);
-      if (cal.configured && cal.eventId) {
+      let cal = null;
+      try {
+        cal = await requestCalendarEvent(next.iso);
+      } catch {
+        cal = null;
+      }
+      if (cal?.configured && cal.eventId) {
         setInviteNote(`📅 נוצר אירוע ביומן ונשלח זימון ל־${cal.attendees || 0} שחקנים`);
       } else {
         const r = await requestEmailInvites(next.iso);
