@@ -56,7 +56,7 @@ async function resolveOwner(request) {
     }
   }
 
-  const supabase = getServerSupabase();
+  const supabase = await getServerSupabase();
   const {
     data: { user },
     error: authError,

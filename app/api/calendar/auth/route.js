@@ -30,7 +30,7 @@ async function resolveOwnerId(request) {
     const { data } = await supabase.auth.getUser(bearer);
     user = data?.user || null;
   } else {
-    supabase = getServerSupabase();
+    supabase = await getServerSupabase();
     const { data } = await supabase.auth.getUser();
     user = data?.user || null;
   }

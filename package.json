@@ -19,18 +19,18 @@
     "@amplitude/analytics-browser": "^2.47.2",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
-    "next": "14.2.35",
+    "next": "16.0.0",
     "nodemailer": "^10.0.10",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "sharp": "^0.35.3",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.35",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.0.0",
     "prettier": "^3.6.2",
     "vitest": "^2.1.9"
   },

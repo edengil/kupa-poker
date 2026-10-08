@@ -37,7 +37,7 @@ function userClientFromBearer(bearer) {
 async function resolveOwner(request) {
   const authHeader = request.headers.get("authorization") || "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const supabase = bearer ? userClientFromBearer(bearer) : getServerSupabase();
+  const supabase = bearer ? userClientFromBearer(bearer) : await getServerSupabase();
   const { data, error } = bearer
     ? await supabase.auth.getUser(bearer)
     : await supabase.auth.getUser();

@@ -85,7 +85,7 @@ async function resolveOwner(request) {
     return { user: userData.user, group, supabase };
   }
 
-  const supabase = getServerSupabase();
+  const supabase = await getServerSupabase();
   const {
     data: { user },
     error: authError,
