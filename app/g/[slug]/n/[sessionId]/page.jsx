@@ -2,8 +2,9 @@ import PublicApp from "@/components/PublicApp";
 
 export const dynamic = "force-dynamic";
 
-export default function NightPage({ params }) {
-  return <PublicApp slug={params.slug} nightId={params.sessionId} />;
+export default async function NightPage({ params }) {
+  const { slug, sessionId } = await params;
+  return <PublicApp slug={slug} nightId={sessionId} />;
 }
 
 export const metadata = { title: "קופה — ערב" };
