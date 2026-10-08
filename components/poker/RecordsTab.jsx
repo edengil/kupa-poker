@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { C } from "../../lib/poker/colors";
+import { ScopeChip } from "./ScopeChip";
 import { fmt, MONTHS } from "../../lib/poker/format";
 import { computeRecords, computePeriodRecords, recordPeriods } from "../../lib/poker/computeRecords";
 import { computeHeadToHead, headToHeadYears } from "../../lib/poker/headToHead";
@@ -1027,24 +1028,4 @@ export function RecordsTab({ db, viewerName = null, showMine = false, allowPick 
   );
 }
 
-function ScopeChip({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        border: `1px solid ${active ? C.brass : C.line}`,
-        background: active ? C.brass : "transparent",
-        color: active ? C.feltDeep : C.dim,
-        borderRadius: 999,
-        padding: "5px 12px",
-        fontSize: 12.5,
-        fontWeight: active ? 700 : 500,
-        cursor: "pointer",
-        fontFamily: "inherit",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
+
