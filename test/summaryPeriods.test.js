@@ -6,7 +6,7 @@ import {
   completedYears,
   summaryPeriods,
   periodToScope,
-} from "../lib/poker/summaryPeriods.js";
+} from "../lib/poker/summaryPeriods.ts";
 
 const S = (iso) => ({
   id: iso,

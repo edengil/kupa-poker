@@ -4,9 +4,47 @@
 import { yearNum } from "./totals.js";
 import { MONTHS } from "./format.js";
 
-function sessionKeys(db) {
-  const months = new Set();
-  const years = new Set();
+interface Session {
+  y?: unknown;
+  mo?: unknown;
+}
+
+interface Db {
+  sessions?: Session[];
+}
+
+interface PeriodBase {
+  kind: "month" | "quarter" | "half" | "year";
+  y: number;
+  key: string;
+  label: string;
+}
+
+export interface MonthPeriod extends PeriodBase {
+  kind: "month";
+  mo: number;
+}
+
+export interface QuarterPeriod extends PeriodBase {
+  kind: "quarter";
+  q: number;
+}
+
+export interface HalfPeriod extends PeriodBase {
+  kind: "half";
+  h: number;
+}
+
+export interface YearPeriod extends PeriodBase {
+  kind: "year";
+}
+
+export type Period = MonthPeriod | QuarterPeriod | HalfPeriod | YearPeriod;
+export type PeriodFilter = "month" | "quarter" | "half" | "year";
+
+function sessionKeys(db: Db | null | undefined): { months: Set<string>; years: Set<number> } {
+  const months = new Set<string>();
+  const years = new Set<number>();
   for (const s of db?.sessions || []) {
     const y = yearNum(s?.y);
     const mo = Number(s?.mo);
@@ -17,7 +55,7 @@ function sessionKeys(db) {
   return { months, years };
 }
 
-function nowParts() {
+function nowParts(): { y: number; mo: number; q: number; h: number } {
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));
   const y = now.getFullYear();
   const mo = now.getMonth() + 1;
@@ -25,23 +63,23 @@ function nowParts() {
 }
 
 /** חודשים שהסתיימו ויש בהם ערבים — מהחדש לישן. */
-export function completedMonths(db) {
+export function completedMonths(db: Db | null | undefined): MonthPeriod[] {
   const { months } = sessionKeys(db);
   const { y: cy, mo: cmo } = nowParts();
   return [...months]
     .map((k) => {
       const [y, mo] = k.split("-").map(Number);
-      return { kind: "month", y, mo, key: k, label: `${MONTHS[mo - 1]} ${y}` };
+      return { kind: "month" as const, y, mo, key: k, label: `${MONTHS[mo - 1]} ${y}` };
     })
     .filter((p) => p.y < cy || (p.y === cy && p.mo < cmo))
     .sort((a, b) => b.y - a.y || b.mo - a.mo);
 }
 
 /** רבעונים שהסתיימו ויש בהם ערבים — מהחדש לישן. */
-export function completedQuarters(db) {
+export function completedQuarters(db: Db | null | undefined): QuarterPeriod[] {
   const { months } = sessionKeys(db);
   const { y: cy, q: cq } = nowParts();
-  const set = new Set();
+  const set = new Set<string>();
   for (const k of months) {
     const [y, mo] = k.split("-").map(Number);
     set.add(`${y}-Q${Math.floor((mo - 1) / 3) + 1}`);
@@ -49,17 +87,17 @@ export function completedQuarters(db) {
   return [...set]
     .map((k) => {
       const [y, q] = k.split("-Q").map(Number);
-      return { kind: "quarter", y, q, key: k, label: `רבעון ${q} · ${y}` };
+      return { kind: "quarter" as const, y, q, key: k, label: `רבעון ${q} · ${y}` };
     })
     .filter((p) => p.y < cy || (p.y === cy && p.q < cq))
     .sort((a, b) => b.y - a.y || b.q - a.q);
 }
 
 /** חציונים שהסתיימו ויש בהם ערבים — מהחדש לישן. */
-export function completedHalves(db) {
+export function completedHalves(db: Db | null | undefined): HalfPeriod[] {
   const { months } = sessionKeys(db);
   const { y: cy, h: ch } = nowParts();
-  const set = new Set();
+  const set = new Set<string>();
   for (const k of months) {
     const [y, mo] = k.split("-").map(Number);
     set.add(`${y}-H${mo <= 6 ? 1 : 2}`);
@@ -67,24 +105,24 @@ export function completedHalves(db) {
   return [...set]
     .map((k) => {
       const [y, h] = k.split("-H").map(Number);
-      return { kind: "half", y, h, key: k, label: `חציון ${h} · ${y}` };
+      return { kind: "half" as const, y, h, key: k, label: `חציון ${h} · ${y}` };
     })
     .filter((p) => p.y < cy || (p.y === cy && p.h < ch))
     .sort((a, b) => b.y - a.y || b.h - a.h);
 }
 
 /** שנים שהסתיימו ויש בהן ערבים — מהחדש לישן. */
-export function completedYears(db) {
+export function completedYears(db: Db | null | undefined): YearPeriod[] {
   const { years } = sessionKeys(db);
   const { y: cy } = nowParts();
   return [...years]
-    .map((y) => ({ kind: "year", y, key: `${y}`, label: `${y}` }))
+    .map((y) => ({ kind: "year" as const, y, key: `${y}`, label: `${y}` }))
     .filter((p) => p.y < cy)
     .sort((a, b) => b.y - a.y);
 }
 
 /** כל התקופות הזמינות לפי סוג סינון. */
-export function summaryPeriods(db, filter) {
+export function summaryPeriods(db: Db | null | undefined, filter: PeriodFilter): Period[] {
   if (filter === "quarter") return completedQuarters(db);
   if (filter === "half") return completedHalves(db);
   if (filter === "year") return completedYears(db);
@@ -92,7 +130,7 @@ export function summaryPeriods(db, filter) {
 }
 
 /** המרת תקופה ל-scope של summaryCardData. */
-export function periodToScope(p) {
+export function periodToScope(p: Period): { kind: string; y: number; mo?: number; q?: number; h?: number } {
   if (p.kind === "quarter") return { kind: "quarter", y: p.y, q: p.q };
   if (p.kind === "half") return { kind: "half", y: p.y, h: p.h };
   if (p.kind === "year") return { kind: "year", y: p.y };
