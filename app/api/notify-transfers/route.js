@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { pushToTargets } from "@/lib/push";
 import { paymentPlan } from "@/lib/paymentTracking";
+import { subscriptionPlayer } from "@/lib/notifications";
 import { reportError } from "@/lib/monitor";
 
 export const dynamic = "force-dynamic";
@@ -23,12 +24,11 @@ async function userFromRequest(request) {
   return data.user;
 }
 
-async function subsForPlayer(supabase, groupId, playerName) {
+async function allSubs(supabase, groupId) {
   const { data } = await supabase
     .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth")
-    .eq("group_id", groupId)
-    .eq("player_name", playerName);
+    .select("id, endpoint, p256dh, auth, name, player_name")
+    .eq("group_id", groupId);
   return data || [];
 }
 
@@ -100,13 +100,22 @@ export async function POST(request) {
       }
 
       let sent = 0;
+      // אבטחה: לא סומכים על player_name שהקליינט קבע — מזהים שחקן דרך החשבון
+      const subs = await allSubs(supabase, row.id);
+      const subsByPlayer = new Map();
+      for (const s of subs) {
+        const player = subscriptionPlayer(row.data, s);
+        if (!player) continue;
+        if (!subsByPlayer.has(player)) subsByPlayer.set(player, []);
+        subsByPlayer.get(player).push(s);
+      }
       for (const [name, { pay, receive }] of perPlayer) {
-        const subs = await subsForPlayer(supabase, row.id, name);
-        if (!subs.length) continue;
+        const playerSubs = subsByPlayer.get(name);
+        if (!playerSubs?.length) continue;
         const lines = [];
         for (const p of pay) lines.push(`אתה מעביר ${fmt(p.amount)} ל־${p.to}`);
         for (const r of receive) lines.push(`${r.from} מעביר אליך ${fmt(r.amount)}`);
-        const res = await pushToTargets(subs, {
+        const res = await pushToTargets(playerSubs, {
           title: "🃏 החלוקה מוכנה — קופה פוקר",
           body: lines.join("\n"),
           url,
