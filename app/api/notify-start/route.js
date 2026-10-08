@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { notifyGameStart } from "@/lib/push";
+import { reportError } from "@/lib/monitor";
 
 /* ============================================================================
    "המשחק התחיל" — נקרא מהאפליקציה כשנוסף השחקן הראשון לשולחן.
@@ -40,6 +41,9 @@ export async function POST(request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const result = await notifyGameStart(row, slug);
+  const result = await notifyGameStart(row, slug).catch(async (err) => {
+    await reportError(err, "notify-start");
+    return { ok: false, error: "push failed" };
+  });
   return NextResponse.json({ ok: true, ...result });
 }
