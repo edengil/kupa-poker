@@ -116,7 +116,8 @@ export function PokerTable({
         const ang = Math.PI / 2 + (i * 2 * Math.PI) / Math.max(n, 1); // מתחיל למטה — עדן
         const x = cx + rx * Math.cos(ang);
         const y = cy + ry * Math.sin(ang);
-        const chips = (+p.buyin || 0) * cps;
+        const potCut = (p.buyinEvents || []).reduce((s, e) => s + (Number(e.pot) || 0), 0);
+        const chips = Math.round(((+p.buyin || 0) - potCut) * cps);
         return (
           <button
             key={p.name}

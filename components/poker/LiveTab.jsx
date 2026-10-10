@@ -302,17 +302,16 @@ export function LiveTab({
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
       }
-      // 5% לקופה הצדדית אם הערב מוגדר כך
+      // 5% לקופה הצדדית אם הערב מוגדר כך — החוב נשאר מלא, הקופה נצברת בצד
       const toPot = savings5 ? r2(addAmt * 0.05) : 0;
-      const toPlayer = r2(addAmt - toPot);
       if (toPot > 0) setSavingsPot((s) => r2(s + toPot));
       return [
         ...p,
         {
           name: nm,
-          buyin: toPlayer,
+          buyin: addAmt,
           cashout: "",
-          buyinEvents: [{ amount: toPlayer, at: Date.now(), total: toPlayer }],
+          buyinEvents: [{ amount: addAmt, at: Date.now(), total: addAmt, pot: toPot || undefined }],
         },
       ];
     });
@@ -323,18 +322,17 @@ export function LiveTab({
   const bump = (i, amt) => {
     const at = Date.now();
     const nm = players[i] && players[i].name;
-    // 5% לקופה הצדדית אם הערב מוגדר כך (רק בקנייה חיובית)
+    // 5% לקופה הצדדית אם הערב מוגדר כך (רק בקנייה חיובית) — החוב נשאר מלא
     const toPot = savings5 && amt > 0 ? r2(amt * 0.05) : 0;
-    const toPlayer = r2(amt - toPot);
     if (toPot > 0) setSavingsPot((s) => r2(s + toPot));
     setPlayers((p) =>
       p.map((x, j) => {
         if (j !== i) return x;
-        const buyin = Math.max(0, r2((+x.buyin || 0) + toPlayer));
+        const buyin = Math.max(0, r2((+x.buyin || 0) + amt));
         const next = { ...x, buyin };
         if (amt > 0) {
           const events = [...(x.buyinEvents || [])];
-          events.push({ amount: amt, at, total: buyin });
+          events.push({ amount: amt, at, total: buyin, pot: toPot || undefined });
           next.buyinEvents = events;
         }
         return next;
@@ -393,7 +391,12 @@ export function LiveTab({
   };
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
   const rebuyBoard = useMemo(() => computeLiveRebuys(players, A), [players, A]);
-  const potChips = pot * cps;
+  // גיטונים בפועל = (חוב - תרומה לקופה) * cps
+  const playerChips = (p) => {
+    const potCut = (p.buyinEvents || []).reduce((s, e) => s + (Number(e.pot) || 0), 0);
+    return Math.round((r2((+p.buyin || 0) - potCut)) * cps);
+  };
+  const potChips = players.reduce((s, p) => s + playerChips(p), 0);
   const nets = players.map((p) => ({
     name: p.name,
     net: p.cashout === "" ? null : r2((+p.cashout || 0) / cps - (+p.buyin || 0)),
@@ -1157,7 +1160,7 @@ export function LiveTab({
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          {(+p.buyin || 0) * cps} ג&apos;יטונים
+                          {playerChips(p)} ג&apos;יטונים
                         </div>
                       </div>
                       <RoundBtn onClick={() => bump(i, addAmt)}>
