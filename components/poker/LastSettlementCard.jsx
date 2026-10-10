@@ -7,6 +7,7 @@ import { C } from "../../lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
 import { settlementTextForSession } from "../../lib/nightShare";
 import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
+import { r2 } from "../../lib/poker/helpers";
 import { settlementVersionLabel } from "../../lib/savedSettlement";
 import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "../../lib/nightConfirmations";
 import { latestSession, pastSettlementSessions } from "../../lib/lastSession";
@@ -43,6 +44,26 @@ export function LastSettlementCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(null);
+  const [editingPot, setEditingPot] = useState(false);
+  const [potValue, setPotValue] = useState("");
+
+  const savePot = () => {
+    const v = Number(potValue);
+    if (!Number.isFinite(v) || v < 0) {
+      alert("סכום לא תקין");
+      return;
+    }
+    const sid = sessionId || session?.id;
+    if (!sid || !commit) return;
+    commit({
+      ...db,
+      sessions: db.sessions.map((s) =>
+        s.id === sid ? { ...s, savingsPot: v > 0 ? r2(v) : undefined } : s
+      ),
+    });
+    setEditingPot(false);
+    setPotValue("");
+  };
   const [open, setOpen] = useState(defaultOpen);
   const A = useMemo(() => AL(db), [db]);
   const me = viewerName ? canon(viewerName, A) : null;
@@ -198,9 +219,78 @@ export function LastSettlementCard({
           )}
         </span>
         <b>{transfer.amount}₪</b>
-        {showPot && (
+        {showPot && !editingPot && (
           <span style={{ color: C.brass, fontSize: 11 }}>
             (קופה: {pot}₪)
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setPotValue(String(pot));
+                setEditingPot(true);
+              }}
+              style={{
+                marginRight: 4,
+                fontSize: 10,
+                padding: "2px 6px",
+                borderRadius: 6,
+                cursor: "pointer",
+                border: `1px solid ${C.line}`,
+                background: "transparent",
+                color: C.dim,
+              }}
+            >
+              ערוך
+            </button>
+          </span>
+        )}
+        {showPot && editingPot && (
+          <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <input
+              type="number"
+              value={potValue}
+              onChange={(e) => setPotValue(e.target.value)}
+              style={{
+                width: 70,
+                padding: "2px 6px",
+                borderRadius: 6,
+                border: `1px solid ${C.line}`,
+                background: C.felt,
+                color: C.cream,
+                fontSize: 12,
+              }}
+            />
+            <button
+              type="button"
+              onClick={savePot}
+              style={{
+                fontSize: 11,
+                padding: "2px 8px",
+                borderRadius: 6,
+                cursor: "pointer",
+                border: "none",
+                background: C.brass,
+                color: C.feltDeep,
+                fontWeight: 700,
+              }}
+            >
+              שמור
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingPot(false)}
+              style={{
+                fontSize: 11,
+                padding: "2px 8px",
+                borderRadius: 6,
+                cursor: "pointer",
+                border: `1px solid ${C.line}`,
+                background: "transparent",
+                color: C.dim,
+              }}
+            >
+              ביטול
+            </button>
           </span>
         )}
         <span style={{ color: closed ? C.win : C.dim, fontSize: 12 }}>

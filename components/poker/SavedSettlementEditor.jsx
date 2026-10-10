@@ -1,7 +1,8 @@
 "use client";
 
 import { LiveSettlementBuilder } from "./LiveSettlementBuilder";
-import { playersFromSession, sessionHasBuyinChips, nightSummaryText } from "../../lib/nightShare";
+import { sessionHasBuyinChips, nightSummaryText } from "../../lib/nightShare";
+import { playersWithPot } from "../../lib/paymentTracking";
 import { savedSettlement } from "../../lib/savedSettlement";
 import { saveManualPayments } from "../../lib/paymentTracking";
 import { settlementEditNotice } from "../../lib/settlementEditNotice";
@@ -21,7 +22,7 @@ import { AL } from "../../lib/poker/helpers";
 export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
   const session = db.sessions.find((s) => s.id === sessionId);
   if (!session) return null;
-  const players = playersFromSession(session);
+  const players = playersWithPot(session);
   const cps = sessionHasBuyinChips(session) ? session.cps || 2 : 1;
   const saved = savedSettlement(players, cps, session.manualSettlement);
   const notice = settlementEditNotice(session);
