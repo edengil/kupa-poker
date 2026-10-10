@@ -656,6 +656,38 @@ export function LiveTab({
             style={{
               display: "flex",
               alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginBottom: 10,
+              fontSize: 13,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setSavings5((v) => !v)}
+              style={{
+                fontSize: 13,
+                padding: "6px 12px",
+                borderRadius: 8,
+                cursor: "pointer",
+                border: "none",
+                fontWeight: savings5 ? 700 : 500,
+                background: savings5 ? C.brass : C.card,
+                color: savings5 ? C.feltDeep : C.cream,
+              }}
+            >
+              {savings5 ? "✓ " : ""}5% לקופה הצדדית
+            </button>
+            {savings5 && (
+              <span style={{ color: C.brass, fontSize: 12 }}>
+                נצבר הערב: {savingsPot}₪ · השחקן מקבל {Math.round(addAmt * 0.95 * cps)} ג&apos;יטונים
+              </span>
+            )}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
               gap: 8,
               marginBottom: 10,
               fontSize: 13,
@@ -683,38 +715,6 @@ export function LiveTab({
             <span style={{ color: C.dim, fontSize: 12 }}>
               = {addAmt * cps} ג&apos;יטונים
             </span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              flexWrap: "wrap",
-              marginTop: 8,
-              fontSize: 13,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setSavings5((v) => !v)}
-              style={{
-                fontSize: 13,
-                padding: "6px 12px",
-                borderRadius: 8,
-                cursor: "pointer",
-                border: "none",
-                fontWeight: savings5 ? 700 : 500,
-                background: savings5 ? C.brass : C.card,
-                color: savings5 ? C.feltDeep : C.cream,
-              }}
-            >
-              {savings5 ? "✓ " : ""}5% לקופה הצדדית
-            </button>
-            {savings5 && (
-              <span style={{ color: C.brass, fontSize: 12 }}>
-                נצבר הערב: {savingsPot}₪ · השחקן מקבל {Math.round(addAmt * 0.95 * cps)} ג&apos;יטונים
-              </span>
-            )}
           </div>
 
           <PokerTable
