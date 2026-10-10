@@ -176,7 +176,12 @@ export function LiveTab({
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
           if (d.savings5) setSavings5(true);
-          if (typeof d.savingsPot === "number") setSavingsPot(d.savingsPot);
+          // מחשב מחדש את הקופה מ-buyinEvents — לא סומך על הערך השמור (תיקון באג)
+          if (Array.isArray(d.players)) {
+            const recalc = r2(d.players.reduce((s, p) =>
+              s + (Array.isArray(p.buyinEvents) ? p.buyinEvents.reduce((s2, e) => s2 + (Number(e.pot) || 0), 0) : 0), 0));
+            setSavingsPot(recalc);
+          } else if (typeof d.savingsPot === "number") setSavingsPot(d.savingsPot);
           if (d.startedAt) setStartedAt(d.startedAt);
           if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
