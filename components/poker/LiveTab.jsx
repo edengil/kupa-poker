@@ -131,7 +131,6 @@ export function LiveTab({
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
   const [savings5, setSavings5] = useState(false); // ערב עם 5% לקופה הצדדית
-  const [savingsPot, setSavingsPot] = useState(0); // כמה נצבר הערב לקופה
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
   const [share, setShare] = useState(null);
   const [settleBuilder, setSettleBuilder] = useState(null);
@@ -176,12 +175,6 @@ export function LiveTab({
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
           if (d.savings5) setSavings5(true);
-          // מחשב מחדש את הקופה מ-buyinEvents — לא סומך על הערך השמור (תיקון באג)
-          if (Array.isArray(d.players)) {
-            const recalc = r2(d.players.reduce((s, p) =>
-              s + (Array.isArray(p.buyinEvents) ? p.buyinEvents.reduce((s2, e) => s2 + (Number(e.pot) || 0), 0) : 0), 0));
-            setSavingsPot(recalc);
-          } else if (typeof d.savingsPot === "number") setSavingsPot(d.savingsPot);
           if (d.startedAt) setStartedAt(d.startedAt);
           if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
@@ -224,7 +217,6 @@ export function LiveTab({
         entriesCount,
         addAmt,
         savings5,
-        savingsPot,
         startedAt,
         tips,
         coupleFills,
@@ -236,7 +228,7 @@ export function LiveTab({
         editedAt: Date.now(),
       })
     );
-  }, [players, entriesCount, addAmt, savings5, savingsPot, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
+  }, [players, entriesCount, addAmt, savings5, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
 
   // שיא חי נשבר באמצע הערב → הכרזה בקבוצה פעם אחת לכל שיא+שחקן.
   // רק כשהבוט דלוק; נכשל בשקט כמו שאר ההכרזות — המשחק חשוב יותר.
@@ -307,9 +299,8 @@ export function LiveTab({
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
       }
-      // 5% לקופה הצדדית אם הערב מוגדר כך — החוב נשאר מלא, הקופה נצברת בצד
+      // 5% לקופה הצדדית — החוב נשאר מלא, הקופה מחושבת כ-5% מסך הקניות
       const toPot = savings5 ? r2(addAmt * 0.05) : 0;
-      if (toPot > 0) setSavingsPot((s) => r2(s + toPot));
       return [
         ...p,
         {
@@ -327,9 +318,8 @@ export function LiveTab({
   const bump = (i, amt) => {
     const at = Date.now();
     const nm = players[i] && players[i].name;
-    // 5% לקופה הצדדית אם הערב מוגדר כך (רק בקנייה חיובית) — החוב נשאר מלא
+    // 5% לקופה הצדדית (רק בקנייה חיובית) — החוב נשאר מלא
     const toPot = savings5 && amt > 0 ? r2(amt * 0.05) : 0;
-    if (toPot > 0) setSavingsPot((s) => r2(s + toPot));
     setPlayers((p) =>
       p.map((x, j) => {
         if (j !== i) return x;
@@ -395,6 +385,8 @@ export function LiveTab({
     setActionLog(out.actionLog);
   };
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
+  // הקופה הצדדית = 5% מסך הקופה כשהמתג דלוק — חישוב ישיר
+  const savingsPot = savings5 ? r2(pot * 0.05) : 0;
   const rebuyBoard = useMemo(() => computeLiveRebuys(players, A), [players, A]);
   // גיטונים בפועל = (חוב - תרומה לקופה) * cps
   const playerChips = (p) => {
@@ -559,7 +551,6 @@ export function LiveTab({
     setEntriesCount("");
     setStartedAt(null);
     setSavings5(false);
-    setSavingsPot(0);
     setTips([]);
     setCoupleFills([]);
     setActionLog([]);
