@@ -158,6 +158,9 @@ export function LastSettlementCard({
     const mineRow = isMine(transfer);
     const statusRow = confirmations?.rows[index];
     const closed = !!statusRow?.closed;
+    // קופה צדדית בסוגריים — רק האדמין רואה
+    const pot = Number(session.savingsPot) || 0;
+    const showPot = isAdmin && pot > 0 && (transfer.from === "עדן גיל" || transfer.to === "עדן גיל");
     return (
       <label
         key={index}
@@ -195,6 +198,11 @@ export function LastSettlementCard({
           )}
         </span>
         <b>{transfer.amount}₪</b>
+        {showPot && (
+          <span style={{ color: C.brass, fontSize: 11 }}>
+            (קופה: {pot}₪)
+          </span>
+        )}
         <span style={{ color: closed ? C.win : C.dim, fontSize: 12 }}>
           {confirmationStatusText(statusRow)}
         </span>
