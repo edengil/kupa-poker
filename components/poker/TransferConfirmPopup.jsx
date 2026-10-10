@@ -3,6 +3,7 @@
 import React from "react";
 import { C } from "../../lib/poker/colors";
 import { canon, DEFAULT_ALIASES } from "../../lib/poker/helpers";
+import { couplePartner } from "../../lib/paymentAccess";
 import { brassCta } from "../../lib/poker/festive";
 
 const COPY = {
@@ -44,6 +45,7 @@ export function TransferConfirmPopup({
 }) {
   const copy = COPY[kind] || COPY.paid;
   const me = viewerName ? canon(viewerName, aliases) : null;
+  const partner = me ? couplePartner(me, aliases) : null;
   const dateLabel = `${session.d}.${session.mo}.${session.y}`;
 
   return (
@@ -83,8 +85,8 @@ export function TransferConfirmPopup({
         </p>
         <ul style={{ listStyle: "none", margin: "0 0 16px", padding: 0 }}>
           {rows.map((row) => {
-            const self =
-              me && canon(kind === "received" ? row.to : row.from, aliases) === me;
+            const target = canon(kind === "received" ? row.to : row.from, aliases);
+            const self = me && (target === me || target === partner);
             return (
               <li
                 key={row.index}
