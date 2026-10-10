@@ -947,7 +947,7 @@ export function LiveTab({
                       >
                         סה״כ טיפים עד כה: {tipShownFor(p, tips, A)}
                       </span>
-                      {[10, 20, 50, 100].map((v) => (
+                      {[5, 10, 15, 20, 25, 30].map((v) => (
                         <button
                           key={v}
                           type="button"
