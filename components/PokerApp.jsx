@@ -432,15 +432,17 @@ function App({
           {tab === "input" ? (
             <InputTab db={db} commit={commit} years={years} />
           ) : tab === "live" ? (
-            <LiveTab
-              db={db}
-              commit={commit}
-              onGameStart={onGameStart}
-              renderRsvps={renderRsvps}
-              onRecords={handleRecords}
-              onPlanShared={onPlanShared}
-            />
-            <SavingsPotCard db={db} commit={commit} isAdmin={isAdmin} />
+            <>
+              <LiveTab
+                db={db}
+                commit={commit}
+                onGameStart={onGameStart}
+                renderRsvps={renderRsvps}
+                onRecords={handleRecords}
+                onPlanShared={onPlanShared}
+              />
+              <SavingsPotCard db={db} commit={commit} isAdmin={isAdmin} />
+            </>
           ) : tab === "sessions" ? (
             <SessionsTab db={db} commit={commit} />
           ) : tab === "table" ? (
