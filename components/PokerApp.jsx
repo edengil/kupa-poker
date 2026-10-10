@@ -16,6 +16,7 @@ import { normalize } from "../lib/poker/db";
 import { setPlayerEmail } from "../lib/poker/emailRsvp";
 import { brokenRecords } from "../lib/poker/brokenRecords";
 import { RecordsAlert } from "./poker/RecordsAlert.jsx";
+import { SavingsPotCard } from "./poker/SavingsPotCard.jsx";
 import { normalizeRecordAlertLines } from "../lib/poker/recordsAlert";
 import { DB_KEY, loadConfig } from "../lib/poker/config";
 import { applyChipBackfill } from "../lib/poker/chipBackfill";
@@ -439,6 +440,7 @@ function App({
               onRecords={handleRecords}
               onPlanShared={onPlanShared}
             />
+            <SavingsPotCard db={db} commit={commit} isAdmin={isAdmin} />
           ) : tab === "sessions" ? (
             <SessionsTab db={db} commit={commit} />
           ) : tab === "table" ? (

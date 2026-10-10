@@ -130,6 +130,8 @@ export function LiveTab({
   }, [players, activity, db, anyCash, cps]);
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
+  const [savings5, setSavings5] = useState(false); // ערב עם 5% לקופה הצדדית
+  const [savingsPot, setSavingsPot] = useState(0); // כמה נצבר הערב לקופה
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
   const [share, setShare] = useState(null);
   const [settleBuilder, setSettleBuilder] = useState(null);
@@ -173,6 +175,8 @@ export function LiveTab({
           }
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
+          if (d.savings5) setSavings5(true);
+          if (typeof d.savingsPot === "number") setSavingsPot(d.savingsPot);
           if (d.startedAt) setStartedAt(d.startedAt);
           if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
@@ -214,6 +218,8 @@ export function LiveTab({
         players,
         entriesCount,
         addAmt,
+        savings5,
+        savingsPot,
         startedAt,
         tips,
         coupleFills,
@@ -225,7 +231,7 @@ export function LiveTab({
         editedAt: Date.now(),
       })
     );
-  }, [players, entriesCount, addAmt, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
+  }, [players, entriesCount, addAmt, savings5, savingsPot, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
 
   // שיא חי נשבר באמצע הערב → הכרזה בקבוצה פעם אחת לכל שיא+שחקן.
   // רק כשהבוט דלוק; נכשל בשקט כמו שאר ההכרזות — המשחק חשוב יותר.
@@ -296,13 +302,17 @@ export function LiveTab({
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
       }
+      // 5% לקופה הצדדית אם הערב מוגדר כך
+      const toPot = savings5 ? r2(addAmt * 0.05) : 0;
+      const toPlayer = r2(addAmt - toPot);
+      if (toPot > 0) setSavingsPot((s) => r2(s + toPot));
       return [
         ...p,
         {
           name: nm,
-          buyin: addAmt,
+          buyin: toPlayer,
           cashout: "",
-          buyinEvents: [{ amount: addAmt, at: Date.now(), total: addAmt }],
+          buyinEvents: [{ amount: toPlayer, at: Date.now(), total: toPlayer }],
         },
       ];
     });
@@ -313,10 +323,14 @@ export function LiveTab({
   const bump = (i, amt) => {
     const at = Date.now();
     const nm = players[i] && players[i].name;
+    // 5% לקופה הצדדית אם הערב מוגדר כך (רק בקנייה חיובית)
+    const toPot = savings5 && amt > 0 ? r2(amt * 0.05) : 0;
+    const toPlayer = r2(amt - toPot);
+    if (toPot > 0) setSavingsPot((s) => r2(s + toPot));
     setPlayers((p) =>
       p.map((x, j) => {
         if (j !== i) return x;
-        const buyin = Math.max(0, r2((+x.buyin || 0) + amt));
+        const buyin = Math.max(0, r2((+x.buyin || 0) + toPlayer));
         const next = { ...x, buyin };
         if (amt > 0) {
           const events = [...(x.buyinEvents || [])];
@@ -451,6 +465,20 @@ export function LiveTab({
       cps,
     });
     if (!confirmSaveIfUnbalanced(balCheck)) return;
+    /* חוסר בגיטונים — יורד מהמרוויחים (ברירת מחדל לפי עדן) */
+    const chipsShortage = balCheck.chipsGapShekels != null && balCheck.chipsGapShekels < -0.01
+      ? r2(-balCheck.chipsGapShekels)
+      : 0;
+    if (chipsShortage > 0) {
+      const winners = entries.filter((e) => e.amount > 0).sort((a, b) => b.amount - a.amount);
+      let remaining = chipsShortage;
+      for (const w of winners) {
+        if (remaining <= 0) break;
+        const deduct = Math.min(w.amount, remaining);
+        w.amount = r2(w.amount - deduct);
+        remaining = r2(remaining - deduct);
+      }
+    }
     /* תאריך הערב = תחילת המשחק בשעון ישראל (לא חצות אחרי סגירה מאוחרת). */
     const endedAt = Date.now();
     const { d, mo, y, iso } = nightDateParts(startedAt, endedAt);
@@ -485,8 +513,13 @@ export function LiveTab({
       actionLog: actionLog.length ? actionLog : undefined,
       handOfNight: handOfNight.trim() || undefined,
       attendance,
+      savings5: savings5 || undefined,
+      savingsPot: savingsPot > 0 ? r2(savingsPot) : undefined,
     };
     const roster = [...new Set([...(db.roster || []), ...players.map((p) => p.name)])];
+    // הקופה הצדדית מצטברת ברמת הקבוצה (רק האדמין רואה)
+    const prevPot = Number(db.savingsPot) || 0;
+    const newPot = r2(prevPot + (savingsPot > 0 ? savingsPot : 0));
     // שבירת שיאים נבדקת מול ה-db שלפני ההוספה — ואם נשבר משהו, הבוט מכריז בקבוצה
     if (typeof onRecords === "function") {
       try {
@@ -501,6 +534,7 @@ export function LiveTab({
       sessions: [...db.sessions, rec].sort((a, b) => a.iso.localeCompare(b.iso)),
       roster,
       plan: null, // הערב התקיים — ההזמנה כבר לא רלוונטית
+      savingsPot: newPot > 0 ? newPot : undefined,
     });
     store.set(LIVE_KEY, "");
     const saved = await flushStore();
@@ -516,6 +550,8 @@ export function LiveTab({
     setPlayers([]);
     setEntriesCount("");
     setStartedAt(null);
+    setSavings5(false);
+    setSavingsPot(0);
     setTips([]);
     setCoupleFills([]);
     setActionLog([]);
@@ -647,6 +683,38 @@ export function LiveTab({
             <span style={{ color: C.dim, fontSize: 12 }}>
               = {addAmt * cps} ג&apos;יטונים
             </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginTop: 8,
+              fontSize: 13,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setSavings5((v) => !v)}
+              style={{
+                fontSize: 13,
+                padding: "6px 12px",
+                borderRadius: 8,
+                cursor: "pointer",
+                border: "none",
+                fontWeight: savings5 ? 700 : 500,
+                background: savings5 ? C.brass : C.card,
+                color: savings5 ? C.feltDeep : C.cream,
+              }}
+            >
+              {savings5 ? "✓ " : ""}5% לקופה הצדדית
+            </button>
+            {savings5 && (
+              <span style={{ color: C.brass, fontSize: 12 }}>
+                נצבר הערב: {savingsPot}₪ · השחקן מקבל {Math.round(addAmt * 0.95 * cps)} ג&apos;יטונים
+              </span>
+            )}
           </div>
 
           <PokerTable
