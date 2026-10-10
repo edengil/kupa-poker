@@ -3,11 +3,13 @@ import PreviewViewerApp from "../../../components/PreviewViewerApp";
 
 export const dynamic = "force-dynamic";
 
-export default function PreviewViewerPage({ searchParams }) {
+export default async function PreviewViewerPage({ searchParams }) {
   if (process.env.NODE_ENV !== "development" && process.env.ALLOW_PREVIEW !== "1") {
     notFound();
   }
-  const shareHistory = searchParams?.history !== "0";
-  const withLive = searchParams?.live === "1";
+  // Next 16: searchParams הוא Promise — חובה await
+  const params = await searchParams;
+  const shareHistory = params?.history !== "0";
+  const withLive = params?.live === "1";
   return <PreviewViewerApp shareHistory={shareHistory} withLive={withLive} />;
 }
