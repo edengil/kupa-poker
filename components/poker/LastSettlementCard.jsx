@@ -180,7 +180,7 @@ export function LastSettlementCard({
     const statusRow = confirmations?.rows[index];
     const closed = !!statusRow?.closed;
     // קופה צדדית בסוגריים — רק האדמין רואה (כולל העברות זוגיות)
-    const pot = r2((Number(session.savingsPot) || 0) + (Number(session.shortageDistributed) || 0));
+    const pot = r2(Number(session.savingsPot) || 0);
     const showPot = isAdmin && pot > 0 && (String(transfer.from || "").includes("עדן גיל") || String(transfer.to || "").includes("עדן גיל"));
     return (
       <label
