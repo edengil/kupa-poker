@@ -150,10 +150,14 @@ export function SessionsTab({ db, commit }) {
               style={{
                 marginTop: 9,
                 fontSize: 12.5,
-                color: b.gap === 0 ? C.dim : C.brass,
+                color: b.gap === 0 ? C.dim : b.gap < 0 ? C.dim : C.brass,
               }}
             >
-              {b.gap === 0 ? "✓ מאוזן" : `⚠ פער ${fmtGap(b.gap)}`}
+              {b.gap === 0
+                ? "✓ מאוזן"
+                : b.gap < 0
+                  ? `קופה צדדית ${Math.abs(b.gap).toLocaleString("en-US")}₪`
+                  : `⚠ פער ${fmtGap(b.gap)}`}
               {even.length > 0 ? ` · ${even.length} סגרו באפס` : ""}
             </div>
             {s.id === latestId && latestView && (
