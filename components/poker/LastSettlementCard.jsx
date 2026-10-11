@@ -89,7 +89,7 @@ export function LastSettlementCard({
 
   if (!card) return null;
 
-  const { session, isLatest, text, transfers } = card;
+  const { session, isLatest, text, transfers, problems } = card;
   const dateLabel = `${session.d}.${session.mo}.${session.y}`;
   const heading = isLatest ? `חלוקה · ערב אחרון · ${dateLabel}` : `חלוקה · ערב ${dateLabel}`;
   const expanded = !collapsible || open;
@@ -401,6 +401,28 @@ export function LastSettlementCard({
           </button>
         )}
         {canSendLink && transfers.length > 0 && <SendSettlementLink session={session} />}
+        {isAdmin && problems?.length > 0 && (
+          <div
+            data-testid="settlement-validation-warning"
+            style={{
+              background: "#7f1d1d",
+              border: "1px solid #ef4444",
+              borderRadius: 10,
+              padding: "9px 12px",
+              marginBottom: 8,
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: "#fecaca",
+            }}
+          >
+            <b>⚠️ החלוקה לא מאוזנת — לבדיקה:</b>
+            <ul style={{ margin: "4px 0 0", paddingInlineStart: 18 }}>
+              {problems.map((p, i) => (
+                <li key={i}>{p}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div
           dir="rtl"
           style={{
