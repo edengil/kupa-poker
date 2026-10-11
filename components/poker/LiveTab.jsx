@@ -465,19 +465,24 @@ export function LiveTab({
       cps,
     });
     if (!confirmSaveIfUnbalanced(balCheck)) return;
-    /* חוסר בגיטונים — יורד מהמרוויחים (ברירת מחדל לפי עדן) */
+    /* חוסר בגיטונים — יורד מהמרוויחים באופן יחסי, בשקלים שלמים (לפי עדן) */
     const chipsShortage = balCheck.chipsGapShekels != null && balCheck.chipsGapShekels < -0.01
-      ? r2(-balCheck.chipsGapShekels)
+      ? Math.round(-balCheck.chipsGapShekels)
       : 0;
     if (chipsShortage > 0) {
       const winners = entries.filter((e) => e.amount > 0).sort((a, b) => b.amount - a.amount);
-      let remaining = chipsShortage;
-      for (const w of winners) {
-        if (remaining <= 0) break;
-        const deduct = Math.min(w.amount, remaining);
+      const totalWin = winners.reduce((s, w) => s + w.amount, 0);
+      let distributed = 0;
+      winners.forEach((w, i) => {
+        let deduct;
+        if (i === winners.length - 1) {
+          deduct = chipsShortage - distributed;
+        } else {
+          deduct = Math.round((w.amount / totalWin) * chipsShortage);
+          distributed += deduct;
+        }
         w.amount = r2(w.amount - deduct);
-        remaining = r2(remaining - deduct);
-      }
+      });
     }
     /* תאריך הערב = תחילת המשחק בשעון ישראל (לא חצות אחרי סגירה מאוחרת). */
     const endedAt = Date.now();
