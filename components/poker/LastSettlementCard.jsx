@@ -179,8 +179,8 @@ export function LastSettlementCard({
     const mineRow = isMine(transfer);
     const statusRow = confirmations?.rows[index];
     const closed = !!statusRow?.closed;
-    // קופה צדדית בסוגריים — רק האדמין רואה (כולל העברות זוגיות, סכום מלא עם עודף)
-    const pot = r2((Number(session.savingsPot) || 0) + Math.max(0, r2((session.entries || []).reduce((s, e) => s + (+e.amount || 0), 0) * -1)));
+    // קופה צדדית בסוגריים — רק האדמין רואה (כולל העברות זוגיות)
+    const pot = r2((Number(session.savingsPot) || 0) + (Number(session.shortageDistributed) || 0));
     const showPot = isAdmin && pot > 0 && (String(transfer.from || "").includes("עדן גיל") || String(transfer.to || "").includes("עדן גיל"));
     return (
       <label
