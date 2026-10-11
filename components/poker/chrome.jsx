@@ -186,11 +186,16 @@ export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false }) {
   );
 }
 
-/** מד איזון מגיע/חייב בהזנת ערב. */
+/** מד איזון מגיע/חייב בהזנת ערב.
+    עודף חייב (חייב > מגיע) אינו פער אמיתי — זה כסף הקופה הצדדית
+    (5% מהקניות; השחקנים מקבלים ג׳יטונים בשווי 95%) שנשמר אצל עדן גיל.
+    מוצג רק במסכי ההזנה/עריכה — מוסתר מצופי הלינק הציבורי. */
 export function BalanceMeter({ bal }) {
   const { pos, neg, gap } = bal;
   const total = Math.max(pos, neg, 1);
   const ok = gap === 0;
+  const isPot = gap < 0;
+  const pot = isPot ? Math.abs(gap) : 0;
   return (
     <div
       style={{
@@ -250,10 +255,12 @@ export function BalanceMeter({ bal }) {
           color: ok ? C.win : C.brass,
         }}
       >
-        {ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+        {ok || isPot ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
         {ok
           ? "הערב סגור מדויק"
-          : `פער ${fmtGap(gap)} (${gap > 0 ? "עודף מגיע" : "עודף חייב"})`}
+          : isPot
+            ? `קופה צדדית: ${pot.toLocaleString("en-US")}₪ (נשמרת אצל עדן גיל)`
+            : `פער ${fmtGap(gap)} (עודף מגיע)`}
       </div>
     </div>
   );
