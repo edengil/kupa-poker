@@ -10,6 +10,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardPaste,
+  Coins,
   Eye,
   Bell,
   Images,
@@ -111,7 +112,7 @@ export function Header({ noticeCount = 0, onOpenNotices }) {
 /* גובה שמור קבוע לסרגל התחתון, כולל מרווח נשימה מעליו. */
 export const TABBAR_H = 90;
 
-export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false }) {
+export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false, isAdmin = false }) {
   const WRITE_TABS = ["live", "input", "sessions"];
   const items = [
     ["table", "טבלה", BarChart3],
@@ -122,6 +123,8 @@ export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false }) {
     ["input", "הזנה", ClipboardPaste],
     ["sessions", "ערבים", CalendarDays],
     ...(hasStats ? [["stats", "צפיות", Eye]] : []),
+    // דשבורד קופה צדדית — אדמין בלבד (דורש commit, לכן לא ב-readOnly)
+    ...(!readOnly && isAdmin ? [["pot", "קופה", Coins]] : []),
   ].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));
 
   return (

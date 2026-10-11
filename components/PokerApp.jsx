@@ -56,6 +56,9 @@ const InputTab = lazy(() =>
 const SessionsTab = lazy(() =>
   import("./poker/SessionsTab").then((m) => ({ default: m.SessionsTab }))
 );
+const PotDashboard = lazy(() =>
+  import("./poker/PotDashboard").then((m) => ({ default: m.PotDashboard }))
+);
 const RecordsTab = lazy(() =>
   import("./poker/RecordsTab").then((m) => ({ default: m.RecordsTab }))
 );
@@ -445,6 +448,8 @@ function App({
             </>
           ) : tab === "sessions" ? (
             <SessionsTab db={db} commit={commit} />
+          ) : tab === "pot" && isAdmin && !readOnly ? (
+            <PotDashboard db={db} commit={commit} isAdmin={isAdmin} />
           ) : tab === "table" ? (
             <TableTab
               db={db}
@@ -495,6 +500,7 @@ function App({
         n={db.sessions.length}
         readOnly={readOnly}
         hasStats={!!statsPanel}
+        isAdmin={isAdmin}
       />
     </div>
   );
