@@ -182,6 +182,13 @@ export function LastSettlementCard({
     // קופה צדדית בסוגריים — רק האדמין רואה (כולל העברות זוגיות)
     const pot = r2(Number(session.savingsPot) || 0);
     const showPot = isAdmin && pot > 0 && (String(transfer.from || "").includes("עדן גיל") || String(transfer.to || "").includes("עדן גיל"));
+    // חלקו האישי של עדן בהעברה זוגית — רק האדמין רואה (שיראה שהקופה ירדה ממנו)
+    let edenShare = null;
+    if (isAdmin && transfer.fromSplit && typeof transfer.fromSplit === "object") {
+      for (const [n, a] of Object.entries(transfer.fromSplit)) {
+        if (canon(n, A) === "עדן גיל") { edenShare = a; break; }
+      }
+    }
     return (
       <label
         key={index}
@@ -219,6 +226,9 @@ export function LastSettlementCard({
           )}
         </span>
         <b>{transfer.amount}₪</b>
+        {edenShare != null && (
+          <span style={{ color: C.brass, fontSize: 11 }}>(חלקך: {edenShare}₪)</span>
+        )}
         {showPot && !editingPot && (
           <span style={{ color: C.brass, fontSize: 11 }}>
             (קופה: {pot}₪)
