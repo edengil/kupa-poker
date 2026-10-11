@@ -684,7 +684,7 @@ export function LiveTab({
             </button>
             {savings5 && (
               <span style={{ color: C.brass, fontSize: 12 }}>
-                נצבר הערב: {savingsPot}₪ · השחקן מקבל {Math.round(addAmt * 0.95 * cps)} ג&apos;יטונים
+                השחקן מקבל {Math.round(addAmt * 0.95 * cps)} ג&apos;יטונים
               </span>
             )}
           </div>
