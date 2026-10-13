@@ -36,11 +36,11 @@ export function PotDashboard({ db, commit, isAdmin }) {
     setPotValue("");
   };
 
-  const stat = (label, value, sub) => (
+  const stat = (label, value, sub, accent = false) => (
     <div
       style={{
         background: C.feltDeep,
-        border: `1px solid ${C.line}`,
+        border: `1px solid ${accent ? `${C.brass}66` : C.line}`,
         borderRadius: 10,
         padding: "10px 12px",
         flex: "1 1 0",
@@ -48,7 +48,7 @@ export function PotDashboard({ db, commit, isAdmin }) {
       }}
     >
       <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: C.cream, fontVariantNumeric: "tabular-nums" }}>
+      <div style={{ fontSize: 20, fontWeight: 800, color: accent ? C.brass : C.cream, fontVariantNumeric: "tabular-nums" }}>
         {value}₪
       </div>
       {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{sub}</div>}
@@ -62,7 +62,7 @@ export function PotDashboard({ db, commit, isAdmin }) {
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {stat("יתרה מתועדת", overview.balance, "מתועד פחות נמשך")}
+        {stat("יתרה מתועדת", overview.balance, "מתועד פחות נמשך", true)}
         {stat("יושם בחלוקות", overview.totalApplied, "ירד מהתשלום שלך")}
         {stat("נמשך", overview.withdrawn)}
       </div>

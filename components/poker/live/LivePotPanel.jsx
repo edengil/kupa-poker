@@ -35,7 +35,7 @@ export function LivePotPanel({
         }}
       >
         <span style={{ color: C.dim }}>בקופה</span>
-        <b style={{ fontVariantNumeric: "tabular-nums" }}>
+        <b style={{ fontVariantNumeric: "tabular-nums", color: C.brass, fontSize: 16, fontWeight: 800 }}>
           {pot}₪ · {potChips} ג&apos;יטונים
         </b>
       </div>

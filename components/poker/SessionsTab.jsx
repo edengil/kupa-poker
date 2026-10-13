@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { C } from "../../lib/poker/colors";
 import { fmt, fmtGap } from "../../lib/poker/format";
 import { AL, balance, canon } from "../../lib/poker/helpers";
-import { Empty, IconBtn } from "./ui";
+import { Empty, IconBtn, StatusChip } from "./ui";
 import { ChevronDown, Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
@@ -58,7 +58,7 @@ export function SessionsTab({ db, commit }) {
         marginTop: 4,
         display: "flex",
         flexDirection: "column",
-        gap: 10,
+        gap: 12,
       }}
     >
       {list.map((s) => {
@@ -72,7 +72,7 @@ export function SessionsTab({ db, commit }) {
             key={s.id}
             style={{
               background: C.card,
-              border: `1px solid ${b.gap === 0 ? C.line : C.brass}`,
+              border: `1px solid ${b.gap === 0 ? C.line : `${C.brass}88`}`,
               borderRadius: 12,
               padding: 13,
             }}
@@ -141,7 +141,8 @@ export function SessionsTab({ db, commit }) {
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {canon(e.name, A)} {zero ? "באפס" : fmt(e.amount)}
+                    {canon(e.name, A)}{" "}
+                    {zero ? "באפס" : <b style={{ fontWeight: 800 }}>{fmt(e.amount)}</b>}
                   </span>
                 );
               })}
@@ -224,12 +225,9 @@ export function SessionsTab({ db, commit }) {
                         {row.from} אל {row.to}
                       </span>
                       <b>{row.amount}₪</b>
-                      <span
-                        data-testid={`night-confirm-state-${row.index}`}
-                        style={{ color: row.closed ? C.win : C.dim, fontSize: 12 }}
-                      >
+                      <StatusChip closed={row.closed} testId={`night-confirm-state-${row.index}`}>
                         {confirmationStatusText(row)}
-                      </span>
+                      </StatusChip>
                     </div>
                   ))}
               </div>

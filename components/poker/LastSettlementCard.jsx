@@ -23,6 +23,7 @@ import {
   voteForPlayer,
 } from "../../lib/poker/playerOfNight";
 import { ChevronDown } from "./icons";
+import { StatusChip } from "./ui";
 
 /**
  * כרטיס «חלוקה אחרונה» בראש טאב הטבלה — מי מעביר למי.
@@ -303,9 +304,7 @@ export function LastSettlementCard({
             </button>
           </span>
         )}
-        <span style={{ color: closed ? C.win : C.dim, fontSize: 12 }}>
-          {confirmationStatusText(statusRow)}
-        </span>
+        <StatusChip closed={closed}>{confirmationStatusText(statusRow)}</StatusChip>
       </label>
     );
   };

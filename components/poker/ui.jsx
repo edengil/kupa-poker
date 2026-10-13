@@ -37,6 +37,30 @@ export function IconBtn({ children, onClick, danger, ...rest }) {
   );
 }
 
+/** צ׳יפ סטטוס העברה — סגור בירוק, ממתין בפליז. אותו רכיב בכל המסכים. */
+export function StatusChip({ closed, children, testId }) {
+  const color = closed ? C.win : C.brass;
+  return (
+    <span
+      data-testid={testId}
+      style={{
+        flexShrink: 0,
+        fontSize: 11.5,
+        fontWeight: 700,
+        lineHeight: 1.4,
+        color,
+        background: `${color}1c`,
+        border: `1px solid ${color}55`,
+        borderRadius: 999,
+        padding: "2px 9px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 /** מצב ריק — טקסט מרוכז בתוך כרטיס מקווקו חגיגי. */
 export function Empty({ text }) {
   return (
