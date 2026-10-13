@@ -29,6 +29,7 @@ function allWhole(transfers) {
 describe("1. עדן מרוויח + יש עודף — העודף מגדיל את זכייתו", () => {
   const night = {
     id: "edge-eden-wins",
+  iso: "2026-10-10",
     entries: [
       { name: "עדן גיל", amount: 100 },
       { name: "אבי כהן", amount: -60 },
@@ -50,6 +51,7 @@ describe("1. עדן מרוויח + יש עודף — העודף מגדיל את 
 describe("2. עדן לא משתתף + יש עודף — הוולידטור מתריע", () => {
   const night = {
     id: "edge-no-eden",
+  iso: "2026-10-10",
     entries: [
       { name: "אבי כהן", amount: 150 },
       { name: "משה לוי", amount: -100 },
@@ -118,6 +120,7 @@ describe("4. חוסר אמיתי — מתחלק בין הזוכים יחסית, 
 describe("5. עיגול אגורות — כל ההעברות בשקלים שלמים", () => {
   const night = {
     id: "edge-rounding",
+  iso: "2026-10-10",
     entries: [
       { name: "עדן גיל", amount: -100.4 },
       { name: "דן ינקלויץ", amount: 60.3 },
@@ -139,6 +142,7 @@ describe("5. עיגול אגורות — כל ההעברות בשקלים שלמ
 describe("6. חלוקה ידנית — עובדת עם לוגיקת הקופה החדשה", () => {
   const night = {
     id: "edge-manual",
+  iso: "2026-10-10",
     entries: [
       { name: "עדן גיל", amount: -280 },
       { name: "דן ינקלויץ", amount: 100 },
@@ -191,6 +195,7 @@ describe("7. העברה זוגית — הפיצול נשמר והוולידטו�
 describe("8. זוג (עדן+אורן) עם עודף — עדן משלם פחות, אורן מלא", () => {
   const night = {
     id: "edge-couple-pot",
+  iso: "2026-10-10",
     entries: [
       { name: "עדן גיל", amount: -200 },
       { name: "אורן גיל", amount: -100 },

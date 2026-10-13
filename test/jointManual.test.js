@@ -4,6 +4,7 @@ import { paymentPlan, validateTransfers, saveManualPayments } from "../lib/payme
 
 const NIGHT_1010 = {
   id: "live_1791669733765",
+  iso: "2026-10-10",
   entries: [
     { name: "דן ינקלויץ", amount: 530 },
     { name: "אופיר סנה", amount: 260 },

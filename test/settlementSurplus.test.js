@@ -10,6 +10,7 @@ import { playersWithPot } from "../lib/nightShare.js";
 
 const NIGHT_1010 = {
   id: "live_1791669733765",
+  iso: "2026-10-10",
   entries: [
     { name: "דן ינקלויץ", amount: 530 },
     { name: "אופיר סנה", amount: 260 },
@@ -100,6 +101,7 @@ describe("כלל העודף → עדן גיל (ערב 10.10.2026)", () => {
 
   it("עדן מרוויח — העודף מגדיל את זכייתו", () => {
     const session = {
+      iso: "2026-10-10",
       entries: [
         { name: "עדן גיל", amount: 100 },
         { name: "דן ינקלויץ", amount: 50 },
@@ -115,6 +117,7 @@ describe("כלל העודף → עדן גיל (ערב 10.10.2026)", () => {
 
   it("עדן לא בערב — הוולידטור מתריע במקום לשתוק", () => {
     const session = {
+      iso: "2026-10-10",
       entries: [
         { name: "דן ינקלויץ", amount: 100 },
         { name: "אורן גיל", amount: -150 },

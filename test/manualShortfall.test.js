@@ -6,6 +6,7 @@ import { playersWithPot } from "../lib/nightShare.js";
 
 const NIGHT_1010 = {
   id: "live_1791669733765",
+  iso: "2026-10-10",
   entries: [
     { name: "דן ינקלויץ", amount: 535 },
     { name: "אופיר סנה", amount: 260 },
