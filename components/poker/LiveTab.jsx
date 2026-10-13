@@ -7,7 +7,7 @@ import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
 import { r2, AL, canon, waSend } from "../../lib/poker/helpers";
-import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor } from "../../lib/liveMerge";
+import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor, liveAlreadySaved } from "../../lib/liveMerge";
 import { applyManualTip, removeManualTip, playerTipEvents, isManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
@@ -168,6 +168,12 @@ export function LiveTab({
       if (alive && raw) {
         try {
           const d = JSON.parse(raw);
+          /* שריד של ערב שכבר נסגר ונשמר — לא משחזרים; מנקים את מצב הלייב */
+          if (liveAlreadySaved(d, db?.sessions)) {
+            store.set(LIVE_KEY, "");
+            if (alive) setHydrated(true);
+            return;
+          }
           const liveTips = Array.isArray(d.tips) ? d.tips : [];
           if (Array.isArray(d.players)) {
             setPlayers(applyTipTotalsToPlayers(canonLivePlayers(d.players, A), liveTips, A));
@@ -229,6 +235,23 @@ export function LiveTab({
       })
     );
   }, [players, entriesCount, addAmt, savings5, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
+
+  // שריד לייב של ערב שכבר נשמר — אם ה-db נטען רק אחרי שהלייב שוחזר,
+  // מנקים את המשחק המת ברגע שמתגלה שהוא כבר קיים כערב שמור.
+  useEffect(() => {
+    if (!hydrated || !startedAt || players.length === 0) return;
+    if (!liveAlreadySaved({ startedAt }, db?.sessions)) return;
+    store.set(LIVE_KEY, "");
+    setPlayers([]);
+    setEntriesCount("");
+    setStartedAt(null);
+    setSavings5(false);
+    setTips([]);
+    setCoupleFills([]);
+    setActionLog([]);
+    setHandOfNight("");
+    setPlanSnap(null);
+  }, [hydrated, startedAt, players.length, db?.sessions]);
 
   // שיא חי נשבר באמצע הערב → הכרזה בקבוצה פעם אחת לכל שיא+שחקן.
   // רק כשהבוט דלוק; נכשל בשקט כמו שאר ההכרזות — המשחק חשוב יותר.

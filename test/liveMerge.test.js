@@ -11,6 +11,7 @@ import {
   mergeTipLogs,
   applyTipTotalsToPlayers,
   tipShownFor,
+  liveAlreadySaved,
 } from "../lib/liveMerge.js";
 
 const row = (players, short) => players.find((p) => p.name === livePlayerKey(short));
@@ -611,3 +612,21 @@ describe("tip log totals", () => {
   });
 });
 
+
+describe("liveAlreadySaved — שריד לייב של ערב שכבר נסגר", () => {
+  const sessions = [
+    { id: "live_1791669733765", startedAt: 1791664830000 },
+    { id: "s2" },
+  ];
+  it("מזהה משחק שכבר נשמר לפי startedAt", () => {
+    expect(liveAlreadySaved({ startedAt: 1791664830000, players: [{}] }, sessions)).toBe(true);
+  });
+  it("משחק פעיל אמיתי (עוד לא נשמר) — לא שריד", () => {
+    expect(liveAlreadySaved({ startedAt: 1792000000000, players: [{}] }, sessions)).toBe(false);
+  });
+  it("בלי startedAt או בלי לייב — לא שריד", () => {
+    expect(liveAlreadySaved({ players: [{}] }, sessions)).toBe(false);
+    expect(liveAlreadySaved(null, sessions)).toBe(false);
+    expect(liveAlreadySaved("", sessions)).toBe(false);
+  });
+});
