@@ -130,7 +130,7 @@ export function LiveTab({
   }, [players, activity, db, anyCash, cps]);
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
-  const [savings5, setSavings5] = useState(false); // ערב עם 5% לקופה הצדדית
+  const [savings5, setSavings5] = useState(true); // 5% לקופה הצדדית — דלוק אוטומטית בכל משחק (עדן, 2026-10-14); הכפתור מכבה לערב ספציפי
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
   const [share, setShare] = useState(null);
   const [settleBuilder, setSettleBuilder] = useState(null);
@@ -180,7 +180,7 @@ export function LiveTab({
           }
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
-          if (d.savings5) setSavings5(true);
+          if (d.savings5 !== undefined) setSavings5(d.savings5 !== false);
           if (d.startedAt) setStartedAt(d.startedAt);
           if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
@@ -245,7 +245,7 @@ export function LiveTab({
     setPlayers([]);
     setEntriesCount("");
     setStartedAt(null);
-    setSavings5(false);
+    setSavings5(true); // הערב הבא מתחיל שוב עם 5% אוטומטי
     setTips([]);
     setCoupleFills([]);
     setActionLog([]);
@@ -578,7 +578,7 @@ export function LiveTab({
     setPlayers([]);
     setEntriesCount("");
     setStartedAt(null);
-    setSavings5(false);
+    setSavings5(true); // הערב הבא מתחיל שוב עם 5% אוטומטי
     setTips([]);
     setCoupleFills([]);
     setActionLog([]);
