@@ -14,7 +14,7 @@ import {
   formatFirstPlaceLine,
   formatNonTipperLine,
 } from "../lib/tipSummaryCopy.js";
-import { isFemaleName } from "../lib/settlement.js";
+import { isFemaleName } from "../lib/settlement";
 import { BOT_MARK, withBotMark } from "../lib/botMark.js";
 
 describe("withBotMark", () => {

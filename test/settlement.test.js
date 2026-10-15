@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { settle, isCashOnly, transferVerb, COUPLES } from "../lib/settlement.js";
+import { settle, isCashOnly, transferVerb, COUPLES } from "../lib/settlement";
 
 /* cps=2 → net = cashout/2 - buyin. */
 

@@ -6,10 +6,33 @@ import { partitionByNet } from "./report";
  * כדי שתהיה ניתנת לבדיקה בנפרד מהרכיב. אין כאן שום state.
  */
 
+export interface LivePlayer {
+  name: string;
+  buyin?: number | string;
+  cashout?: number | string;
+  buyinEvents?: { amount?: number; pot?: number }[];
+}
+
+export interface PlayersViewOpts {
+  recent?: Record<string, number>;
+  allc?: Record<string, number>;
+  aliases?: string[];
+  anyCash?: boolean;
+  cps?: number;
+}
+
+export type ViewGroup = "play" | "win" | "even" | "lose" | "open";
+
+export interface PlayerViewRow {
+  p: LivePlayer;
+  index: number;
+  group: ViewGroup;
+}
+
 /** ג'יטונים בפועל של שחקן = (חוב − תרומת 5% לקופה) × ג'יטונים לשקל. */
-export function playerChips(p, cps) {
+export function playerChips(p: LivePlayer, cps: number): number {
   const potCut = (p.buyinEvents || []).reduce((s, e) => s + (Number(e.pot) || 0), 0);
-  return Math.round(r2((+p.buyin || 0) - potCut) * cps);
+  return Math.round(r2((+p.buyin! || 0) - potCut) * cps);
 }
 
 /**
@@ -17,8 +40,8 @@ export function playerChips(p, cps) {
  * במשחק (אין יציאות): לפי פעילות אחרונה. בסגירה: זוכים → אפס → חייבים → פתוחים.
  * מחזיר [{ p, index, group }] כש־index הוא האינדקס המקורי במערך השחקנים.
  */
-export function buildPlayersView(players, { recent = {}, allc = {}, aliases = [], anyCash = false, cps = 2 } = {}) {
-  const activityRank = (a, b) => {
+export function buildPlayersView(players: LivePlayer[], { recent = {}, allc = {}, aliases = [], anyCash = false, cps = 2 }: PlayersViewOpts = {}): PlayerViewRow[] {
+  const activityRank = (a: PlayerViewRow, b: PlayerViewRow) => {
     const na = canon(a.p.name, aliases);
     const nb = canon(b.p.name, aliases);
     return (
@@ -29,21 +52,21 @@ export function buildPlayersView(players, { recent = {}, allc = {}, aliases = []
   };
   if (!anyCash) {
     return players
-      .map((p, index) => ({ p, index, group: "play" }))
+      .map((p, index) => ({ p, index, group: "play" as ViewGroup }))
       .sort(activityRank);
   }
   const { winners, even, losers, open } = partitionByNet(players, cps);
-  const row = (item, group) => {
-    const p = item.p || item;
+  const row = (item: any, group: ViewGroup): PlayerViewRow => {
+    const p: LivePlayer = item.p || item;
     return { p, index: players.indexOf(p), group };
   };
-  const openRows = open
-    .map((p) => ({ p, index: players.indexOf(p), group: "open" }))
+  const openRows: PlayerViewRow[] = open
+    .map((p: LivePlayer) => ({ p, index: players.indexOf(p), group: "open" as ViewGroup }))
     .sort(activityRank);
   return [
-    ...winners.map((x) => row(x, "win")),
-    ...even.map((x) => row(x, "even")),
-    ...losers.map((x) => row(x, "lose")),
+    ...winners.map((x: any) => row(x, "win")),
+    ...even.map((x: any) => row(x, "even")),
+    ...losers.map((x: any) => row(x, "lose")),
     ...openRows,
   ];
 }

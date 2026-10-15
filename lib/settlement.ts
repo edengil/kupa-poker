@@ -16,20 +16,48 @@ import { FEMALE, canonName, isFemaleName } from "./gender.js";
 
 export { FEMALE, canonName, isFemaleName };
 
+export interface SettlePlayer {
+  name: string;
+  buyin?: number | string;
+  cashout?: number | string;
+}
+
+export interface Transfer {
+  from: string;
+  to: string;
+  amount: number;
+  pair?: boolean;
+  joint?: boolean;
+  fromSplit?: Record<string, number>;
+}
+
+export interface SettleResult {
+  transfers: Transfer[];
+  shortfall: number;
+  surplus: number;
+  unfinished: string[];
+  nets: { name: string; net: number; raw: number }[];
+}
+
+export interface SettleOpts {
+  /** זוכים שנשמר להם יותר כשיש חוסר (חותכים קודם מאחרים). */
+  preferCreditors?: string[];
+}
+
 /* מי שמקבל רק פייבוקס או מזומן, ולא ביט */
-export const CASH_ONLY = ["עדן", "אורן", "עדן גיל", "אורן גיל"];
+export const CASH_ONLY: string[] = ["עדן", "אורן", "עדן גיל", "אורן גיל"];
 
 /* מי שלא אוהב להעביר בפייבוקס — יש להתאים אותו קודם למקבלי ביט */
-export const AVOID_CASH_PAY = ["נתנאל", "נתנאל כהן"];
+export const AVOID_CASH_PAY: string[] = ["נתנאל", "נתנאל כהן"];
 
 /* זוגות שמכסים אחד את השני ואחר כך יכולים לשלם יחד */
-export const COUPLES = [
+export const COUPLES: [string, string][] = [
   ["עדן גיל", "אורן גיל"],
   ["דור לירז", "עדן לירז"],
 ];
 
 /** "מעביר" או "מעבירה" לפי השם */
-export const transferVerb = (name) => {
+export const transferVerb = (name: string): string => {
   const raw = String(name).trim();
   // העברה משותפת של זוג
   if (raw.includes(" ו")) {
@@ -40,14 +68,14 @@ export const transferVerb = (name) => {
   return isFemaleName(raw) ? "מעבירה" : "מעביר";
 };
 
-const r0 = (v) => Math.round(v);
+const r0 = (v: number): number => Math.round(v);
 
-const findByCoupleName = (names, target) => {
+const findByCoupleName = (names: string[], target: string): number => {
   const t = canonName(target);
   return names.findIndex((n) => canonName(n) === t);
 };
 
-function roundPreservingSum(values) {
+function roundPreservingSum(values: number[]): number[] {
   const floors = values.map(Math.floor);
   const target = r0(values.reduce((s, v) => s + v, 0));
   let drift = target - floors.reduce((s, v) => s + v, 0);
@@ -60,28 +88,21 @@ function roundPreservingSum(values) {
 }
 
 /** האם מקבל התשלום מוגבל לפייבוקס או מזומן */
-export function isCashOnly(name) {
+export function isCashOnly(name: string): boolean {
   const n = String(name).trim();
   return CASH_ONLY.includes(n) || CASH_ONLY.includes(canonName(n));
 }
 
-function avoidsCashPay(name) {
+function avoidsCashPay(name: string): boolean {
   const n = String(name).trim();
   return AVOID_CASH_PAY.includes(n) || AVOID_CASH_PAY.includes(canonName(n));
 }
 
-/**
- * @param {object[]} players
- * @param {number} [cps]
- * @param {{ preferCreditors?: string[] }} [opts]
- *   preferCreditors — זוכים שנשמר להם יותר כשיש חוסר (חותכים קודם מאחרים).
- * @returns {{ transfers, shortfall, surplus, nets, unfinished }}
- */
-export function settle(players = [], cps = CPS, opts = {}) {
+export function settle(players: SettlePlayer[] = [], cps: number = CPS, opts: SettleOpts = {}): SettleResult {
   const unfinished = players.filter((p) => p.cashout === "" || p.cashout == null).map((p) => p.name);
 
   const names = players.map((p) => p.name);
-  const exact = players.map((p) => (+p.cashout || 0) / cps - (+p.buyin || 0));
+  const exact = players.map((p) => (+p.cashout! || 0) / cps - (+p.buyin! || 0));
   const nets = roundPreservingSum(exact);
 
   const total = nets.reduce((s, v) => s + v, 0);
@@ -97,7 +118,7 @@ export function settle(players = [], cps = CPS, opts = {}) {
     const others = winners.filter((x) => !preferSet.has(canonName(names[x.i])));
     const preferred = winners.filter((x) => preferSet.has(canonName(names[x.i])));
 
-    const cutGroup = (group, amount) => {
+    const cutGroup = (group: { i: number; v: number }[], amount: number): number => {
       if (amount <= 0 || !group.length) return amount;
       const totalWins = group.reduce((s, x) => s + Math.max(0, adjusted[x.i]), 0);
       if (totalWins <= 0) return amount;
@@ -116,15 +137,15 @@ export function settle(players = [], cps = CPS, opts = {}) {
   }
 
   const bal = [...adjusted];
-  const transfers = [];
-  const move = (from, to, amount, extra = {}) => {
+  const transfers: Transfer[] = [];
+  const move = (from: number, to: number, amount: number, extra: Partial<Transfer> = {}) => {
     if (amount <= 0) return;
     transfers.push({ from: names[from], to: names[to], amount, ...extra });
     bal[from] += amount;
     bal[to] -= amount;
   };
 
-  const moveJoint = (i, j, to, amount) => {
+  const moveJoint = (i: number, j: number, to: number, amount: number) => {
     if (amount <= 0) return;
     const debtI = bal[i] < 0 ? -bal[i] : 0;
     const debtJ = bal[j] < 0 ? -bal[j] : 0;
@@ -218,16 +239,16 @@ export function settle(players = [], cps = CPS, opts = {}) {
   }
 
   // 4) שאר ההעברות — נתנאל לפייבוקס רק אם לא נשאר מקבל ביט
-  const findBestPair = () => {
-    const losers = [];
-    const winners = [];
+  const findBestPair = (): [number, number] | null => {
+    const losers: number[] = [];
+    const winners: number[] = [];
     bal.forEach((v, i) => {
       if (v < 0) losers.push(i);
       if (v > 0) winners.push(i);
     });
     if (!losers.length || !winners.length) return null;
 
-    const tiers = [
+    const tiers: ((l: number, w: number) => boolean)[] = [
       (l, w) => !avoidsCashPay(names[l]),
       (l, w) => avoidsCashPay(names[l]) && !isCashOnly(names[w]),
       (l, w) => avoidsCashPay(names[l]) && isCashOnly(names[w]),
