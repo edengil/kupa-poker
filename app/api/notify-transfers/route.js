@@ -9,7 +9,7 @@ import { reportError } from "@/lib/monitor";
 export const dynamic = "force-dynamic";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 async function userFromRequest(request) {
   const authHeader = request.headers.get("authorization") || "";
