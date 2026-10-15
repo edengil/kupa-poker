@@ -17,7 +17,7 @@ vi.mock("@/lib/cronAuth", () => ({ authorizedCron: (req) => req.headers.get("x-t
 vi.mock("@/lib/monitor", () => ({ reportError: vi.fn(async () => {}) }));
 vi.mock("@/lib/env", () => ({
   envValue: (name) =>
-    ({ KUPA_GROUP_SLUG: "g1", WHAPI_TOKEN: "tok", WHATSAPP_OWNER: "972500000000", WHAPI_GROUP_ID: "grp@g.us" })[name] || "",
+    ({ KUPA_GROUP_SLUG: "g1", WHAPI_TOKEN: "tok", WHATSAPP_OWNER: "972500000000", WHAPI_GROUP_ID: "grp@g.us", WA_REMINDERS_TOKEN: "remind-tok" })[name] || "",
 }));
 vi.mock("@/lib/whatsapp", () => ({
   sendToGroup: h.sendToGroup,
@@ -44,8 +44,14 @@ vi.mock("@/lib/supabaseAdmin", () => ({
 import { GET } from "../app/api/wa-reminders/route.js";
 
 
-function makeReq(auth) {
-  const headers = { get: (k) => (k === "x-test-auth" ? (auth ? "1" : "0") : null) };
+function makeReq(auth, bearer) {
+  const headers = {
+    get: (k) => {
+      if (k === "x-test-auth") return auth ? "1" : "0";
+      if (k === "authorization") return bearer ? `Bearer ${bearer}` : null;
+      return null;
+    },
+  };
   return { url: "https://x/api/wa-reminders", headers };
 }
 
@@ -62,6 +68,13 @@ describe("wa-reminders route", () => {
     const res = await GET(makeReq(false));
     expect(res.status).toBe(403);
     expect(h.sendToGroup).not.toHaveBeenCalled();
+  });
+
+  it("טוקן ייעודי (WA_REMINDERS_TOKEN) מאשר גם בלי cron רגיל", async () => {
+    const res = await GET(makeReq(false, "remind-tok"));
+    expect(res.status).toBe(200);
+    const bad = await GET(makeReq(false, "wrong-tok"));
+    expect(bad.status).toBe(403);
   });
 
   it("בוט כבוי — מדלג", async () => {

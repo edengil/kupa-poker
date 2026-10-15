@@ -4,7 +4,7 @@
 -- גם כשהקבוצה שקטה (עד היום הן רצו רק כתופעת לוואי של הודעות נכנסות).
 --
 -- איך מריצים: Supabase → SQL Editor → מדביקים את הקובץ → מחליפים את
--- <CRON_SECRET> בערך של CRON_SECRET מהגדרות Vercel → Run.
+-- <WA_REMINDERS_TOKEN> בערך של WA_REMINDERS_TOKEN מהגדרות Vercel → Run.
 -- דרישות מקדימות: הרחבות pg_cron ו־pg_net פעילות (Database → Extensions).
 -- ============================================================================
 
@@ -17,7 +17,7 @@ select cron.schedule(
   $$
   select net.http_get(
     url := 'https://kupa-poker.vercel.app/api/wa-reminders',
-    headers := '{"Authorization": "Bearer <CRON_SECRET>"}'::jsonb
+    headers := '{"Authorization": "Bearer <WA_REMINDERS_TOKEN>"}'::jsonb
   );
   $$
 );

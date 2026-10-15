@@ -14,8 +14,16 @@ import { sendToGroup, maybeRemindPending, maybeRemindBitIdle } from "@/lib/whats
 
 export const dynamic = "force-dynamic";
 
+/** הרשאה: authorizedCron הרגיל, או הטוקן הייעודי של הנתיב הזה (pg_cron במסד). */
+function authorized(request) {
+  const token = envValue("WA_REMINDERS_TOKEN");
+  const header = request.headers.get("authorization") || "";
+  if (token && header === `Bearer ${token}`) return true;
+  return authorizedCron(request);
+}
+
 export async function GET(request) {
-  if (!authorizedCron(request)) {
+  if (!authorized(request)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
   try {
