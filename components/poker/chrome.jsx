@@ -285,6 +285,8 @@ export function Style() {
     .hscroll::-webkit-scrollbar{height:5px;}
     option{background:${C.feltDeep};color:${C.cream};}
     @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+    ::view-transition-old(*),::view-transition-new(*){animation-duration:.18s;}
+    @media (prefers-reduced-motion:reduce){::view-transition-old(*),::view-transition-new(*){animation:none!important;}}
   `,
       }}
     />

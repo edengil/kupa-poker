@@ -6,7 +6,7 @@
    לוגיקה ב-lib/poker, ומסכים ב-components/poker. כאן נשארת רק מעטפת ה-App.
    טאבים כבדים נטענים lazy כדי שהמסך הראשון (טבלה) יעלה מהר.
    ============================================================================ */
-import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback } from "react";
+import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback, ViewTransition, startTransition } from "react";
 import { store } from "../lib/store";
 import { C } from "../lib/poker/colors";
 import { Header, TabBar, Style, TABBAR_H } from "./poker/chrome";
@@ -142,7 +142,8 @@ function App({
   const [tab, setTabState] = useState(initialTab);
   // מעבר טאב מדווח החוצה — ככה יומן הצפיות יודע במה כל צופה הסתכל
   const setTab = (id) => {
-    setTabState(id);
+    // startTransition — נדרש כדי שמעבר המסך (ViewTransition) יתנגן
+    startTransition(() => setTabState(id));
     track("tab_viewed", { tab: id });
     if (typeof onTabChange === "function") onTabChange(id);
   };
@@ -432,6 +433,7 @@ function App({
           </>
         )}
         <Suspense fallback={<TabFallback />}>
+          <ViewTransition key={tab}>
           {tab === "input" ? (
             <InputTab db={db} commit={commit} years={years} />
           ) : tab === "live" ? (
@@ -477,6 +479,7 @@ function App({
           ) : (
             <PlayersTab db={db} onPlayer={setProfile} />
           )}
+          </ViewTransition>
         </Suspense>
         <EGFooter />
       </div>
