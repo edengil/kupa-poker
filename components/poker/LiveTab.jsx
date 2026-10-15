@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store, flushStore } from "../../lib/store";
-import { buildReport, nightDateParts, partitionByNet } from "../../lib/report";
+import { buildReport, nightDateParts } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
@@ -11,6 +11,7 @@ import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor, liveAlreadySave
 import { applyManualTip, removeManualTip, playerTipEvents, isManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
+import { buildPlayersView, playerChips } from "../../lib/liveView";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
 import { notifyTransfersSettlement } from "../../lib/poker/notifyTransfersClient";
 import { detectLiveRecords, liveRecordAnnouncement } from "../../lib/poker/liveRecords";
@@ -34,6 +35,7 @@ import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { LiveExitField } from "./live/LiveExitField";
 import { LiveDistributionPanel } from "./live/LiveDistributionPanel";
 import { LivePlayerSetupPanel } from "./live/LivePlayerSetupPanel";
+import { LiveBuyinControls } from "./live/LiveBuyinControls";
 import { LivePotPanel } from "./live/LivePotPanel";
 import { LiveRebuysBoard } from "./live/LiveRebuysBoard";
 import { LiveBitShare, LiveShareSheet, LiveSendPrompt } from "./live/LiveShare";
@@ -96,38 +98,17 @@ export function LiveTab({
   const [players, setPlayers] = useState([]); // {name, buyin(₪), cashout(chips string), tipsGiven?}
   const anyCash = players.some((p) => p.cashout !== "");
   /** במשחק: לפי פעילות. בסגירה: זוכים → שורה → חייבים → פתוחים למטה. */
-  const playersView = useMemo(() => {
-    const aliases = AL(db);
-    const { recent, allc } = activity;
-    const activityRank = (a, b) => {
-      const na = canon(a.p.name, aliases);
-      const nb = canon(b.p.name, aliases);
-      return (
-        (recent[nb] || 0) - (recent[na] || 0) ||
-        (allc[nb] || 0) - (allc[na] || 0) ||
-        a.index - b.index
-      );
-    };
-    if (!anyCash) {
-      return players
-        .map((p, index) => ({ p, index, group: "play" }))
-        .sort(activityRank);
-    }
-    const { winners, even, losers, open } = partitionByNet(players, cps);
-    const row = (item, group) => {
-      const p = item.p || item;
-      return { p, index: players.indexOf(p), group };
-    };
-    const openRows = open
-      .map((p) => ({ p, index: players.indexOf(p), group: "open" }))
-      .sort(activityRank);
-    return [
-      ...winners.map((x) => row(x, "win")),
-      ...even.map((x) => row(x, "even")),
-      ...losers.map((x) => row(x, "lose")),
-      ...openRows,
-    ];
-  }, [players, activity, db, anyCash, cps]);
+  const playersView = useMemo(
+    () =>
+      buildPlayersView(players, {
+        recent: activity.recent,
+        allc: activity.allc,
+        aliases: AL(db),
+        anyCash,
+        cps,
+      }),
+    [players, activity, db, anyCash, cps]
+  );
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
   const [savings5, setSavings5] = useState(true); // 5% לקופה הצדדית — דלוק אוטומטית בכל משחק (עדן, 2026-10-14); הכפתור מכבה לערב ספציפי
@@ -411,12 +392,7 @@ export function LiveTab({
   // הקופה הצדדית = 5% מסך הקופה כשהמתג דלוק — חישוב ישיר
   const savingsPot = savings5 ? r2(pot * 0.05) : 0;
   const rebuyBoard = useMemo(() => computeLiveRebuys(players, A), [players, A]);
-  // גיטונים בפועל = (חוב - תרומה לקופה) * cps
-  const playerChips = (p) => {
-    const potCut = (p.buyinEvents || []).reduce((s, e) => s + (Number(e.pot) || 0), 0);
-    return Math.round((r2((+p.buyin || 0) - potCut)) * cps);
-  };
-  const potChips = players.reduce((s, p) => s + playerChips(p), 0);
+  const potChips = players.reduce((s, p) => s + playerChips(p, cps), 0);
   const nets = players.map((p) => ({
     name: p.name,
     net: p.cashout === "" ? null : r2((+p.cashout || 0) / cps - (+p.buyin || 0)),
@@ -679,70 +655,13 @@ export function LiveTab({
           <div style={sectionTitle({ marginBottom: 8 })}>
             ♠ שחקנים בשולחן · {players.length}
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              flexWrap: "wrap",
-              marginBottom: 10,
-              fontSize: 13,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setSavings5((v) => !v)}
-              style={{
-                fontSize: 13,
-                padding: "6px 12px",
-                borderRadius: 8,
-                cursor: "pointer",
-                border: "none",
-                fontWeight: savings5 ? 700 : 500,
-                background: savings5 ? C.brass : C.card,
-                color: savings5 ? C.feltDeep : C.cream,
-              }}
-            >
-              {savings5 ? "✓ " : ""}5% לקופה הצדדית
-            </button>
-            {savings5 && (
-              <span style={{ color: C.brass, fontSize: 12 }}>
-                השחקן מקבל {Math.round(addAmt * 0.95 * cps)} ג&apos;יטונים
-              </span>
-            )}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 10,
-              fontSize: 13,
-            }}
-          >
-            <span style={{ color: C.dim }}>סכום כניסה:</span>
-            {[25, 50, 100].map((u) => (
-              <button
-                key={u}
-                onClick={() => setAddAmt(u)}
-                style={{
-                  fontSize: 13,
-                  padding: "6px 12px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  border: "none",
-                  fontWeight: addAmt === u ? 700 : 500,
-                  background: addAmt === u ? C.brass : C.card,
-                  color: addAmt === u ? C.feltDeep : C.cream,
-                }}
-              >
-                {u}₪
-              </button>
-            ))}
-            <span style={{ color: C.dim, fontSize: 12 }}>
-              = {addAmt * cps} ג&apos;יטונים
-            </span>
-          </div>
+          <LiveBuyinControls
+            savings5={savings5}
+            onToggleSavings={() => setSavings5((v) => !v)}
+            addAmt={addAmt}
+            onAddAmt={setAddAmt}
+            cps={cps}
+          />
 
           <PokerTable
             players={players}
@@ -1184,7 +1103,7 @@ export function LiveTab({
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          {playerChips(p)} ג&apos;יטונים
+                          {playerChips(p, cps)} ג&apos;יטונים
                         </div>
                       </div>
                       <RoundBtn onClick={() => bump(i, addAmt)}>
