@@ -8,7 +8,7 @@ import {
 import {
   computePersonalStats,
   personalStatRows,
-} from "../lib/poker/personalStats.js";
+} from "../lib/poker/personalStats";
 import { sessionsToCsv, playersToCsv } from "../lib/poker/csvExport.js";
 
 function dbOf(sessions, aliases = {}) {

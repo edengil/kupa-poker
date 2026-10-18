@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeMonthHeroes, currentCalendarMonth } from "../lib/poker/monthHeroes.js";
 import { playerBalanceBreakdown, availableYears } from "../lib/poker/totals.js";
-import { computePersonalStats } from "../lib/poker/personalStats.js";
+import { computePersonalStats } from "../lib/poker/personalStats";
 
 function dbMulti() {
   return {

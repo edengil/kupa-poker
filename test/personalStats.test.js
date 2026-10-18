@@ -4,7 +4,7 @@ import {
   personalStatRows,
   rebuyGapsMs,
   formatGapMs,
-} from "../lib/poker/personalStats.js";
+} from "../lib/poker/personalStats";
 
 function dbOf(nights) {
   return {

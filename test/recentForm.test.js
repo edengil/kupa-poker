@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { playerRecentForm, groupHotForm } from "../lib/poker/recentForm.js";
-import { computePersonalStats, personalStatRows } from "../lib/poker/personalStats.js";
+import { computePersonalStats, personalStatRows } from "../lib/poker/personalStats";
 
 function dbForm() {
   return {

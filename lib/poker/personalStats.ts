@@ -6,7 +6,7 @@ import { AL, canon, r2 } from "./helpers.js";
 import { fmt } from "./format.js";
 import { ENTRY } from "../report.js";
 import { sessionDurationMs } from "./durationRecords.js";
-import { chatNightsFor } from "./entryTimings.js";
+import { chatNightsFor, CHAT_ENTRY_NIGHTS } from "./entryTimings.js";
 import { resolveEntryChips, resolveEntryBuyin } from "./reconstructChips.js";
 import {
   computePartnerEdges,
@@ -19,19 +19,192 @@ import {
 import { playerBalanceBreakdown } from "./totals.js";
 import { paymentSpeedForPlayer, formatPaymentDelay } from "./paymentSpeed.js";
 
-function dt(n) {
+export interface BuyinEvent {
+  at?: number | string;
+  amount?: number;
+  total?: number;
+  pot?: number;
+}
+
+export interface StatsEntry {
+  name: string;
+  amount?: number | string;
+  tipsGiven?: number;
+  buyinEvents?: BuyinEvent[];
+}
+
+export interface StatsTip {
+  name: string;
+  amount?: number | string;
+}
+
+export interface StatsSession {
+  iso: string;
+  d?: number;
+  mo?: number;
+  y?: number;
+  entries?: StatsEntry[];
+  tips?: StatsTip[];
+}
+
+export interface StatsDb {
+  sessions?: StatsSession[];
+}
+
+/** תאריך ערב כפי שהוא נשמר על הסשן/הערב — כל החלקים אופציונליים בנתונים ישנים. */
+export interface NightDate {
+  d?: number;
+  mo?: number;
+  y?: number;
+}
+
+export interface PersonalNight extends NightDate {
+  iso: string;
+  amount: number;
+  buyin: number | null;
+  chips: number | null;
+  entries: number | null;
+  events: BuyinEvent[];
+  tips: number;
+  durationMs: number | null;
+}
+
+export interface IsoParts {
+  iso: string;
+  y: number;
+  mo: number;
+  d: number;
+}
+
+/** שורת צ'אט לערב אחד — חותמות כניסה מייצוא הוואטסאפ. */
+export interface ChatNightRow {
+  n?: number | null;
+  t?: number[];
+  a?: number[];
+  b?: number;
+}
+
+export type ChatNightsMap = Record<string, ChatNightRow>;
+
+export interface MergedEntrySource {
+  entries: number | null;
+  events: BuyinEvent[];
+  fromChat: boolean;
+}
+
+export interface Comeback {
+  jump: number;
+  from: number;
+  to: number;
+  iso: string;
+}
+
+export interface BiggestTip extends NightDate {
+  amount: number;
+}
+
+export interface YearlyAdjustment {
+  y?: number;
+  gap: number;
+  tableNet?: number;
+  sessionsNet?: number;
+}
+
+export interface PartnerEdge {
+  name: string;
+  n: number;
+  avg: number;
+  sum?: number;
+}
+
+export interface PartnerEdges {
+  myNights?: number;
+  best: PartnerEdge | null;
+  best2?: PartnerEdge | null;
+  worst?: PartnerEdge | null;
+}
+
+export interface PaymentSpeed {
+  medianHours: number;
+  samples: number;
+  fastestHours?: number;
+}
+
+export interface PersonalStats {
+  name: string;
+  year: number | null;
+  nights: number;
+  wins: number;
+  losses: number;
+  even: number;
+  winRate: number;
+  totalNet: number;
+  sessionsNet: number;
+  yearlyGap: number;
+  yearlyAdjustments: YearlyAdjustment[];
+  avgNet: number;
+  sd: number;
+  bestNight: PersonalNight;
+  worstNight: PersonalNight;
+  maxWinStreak: number;
+  currentWinStreak: number;
+  maxLossStreak: number;
+  currentLossStreak: number;
+  attendMax: number;
+  comeback: Comeback | null;
+  peakCum: number;
+  maxDrawdown: number;
+  avgEntries: number | null;
+  entriesNights: number;
+  chatEntryNights: number;
+  mostEntries: PersonalNight | (IsoParts & { entries: number }) | null;
+  avgRebuyGapMs: number | null;
+  rebuyGapNights: number;
+  totalTips: number;
+  biggestTip: BiggestTip | null;
+  lifetimeRoi: number | null;
+  roiNights: number;
+  totalBuyin: number;
+  avgHourly: number | null;
+  hourlyNights: number;
+  bestChips: PersonalNight | null;
+  lastNight: PersonalNight;
+  recentForm: (NightDate & { iso: string; amount: number })[];
+  avgFirstMins: number | null;
+  arrivalNights: number;
+  partners: PartnerEdges | null;
+  hostedCount: number;
+  hostedNet: number | null;
+  paymentSpeed: PaymentSpeed | null;
+}
+
+export interface PersonalStatsOpts {
+  year?: number | string | null;
+  chat?: boolean;
+  chatNights?: ChatNightsMap | null;
+}
+
+export interface StatRow {
+  icon: string;
+  title: string;
+  detail: string;
+  tone?: string;
+  note?: string | null;
+}
+
+function dt(n: NightDate | null | undefined): string {
   if (!n || n.d == null) return "";
   return `${n.d}.${n.mo}.${String(n.y).slice(2)}`;
 }
 
-function impliedEntries(buyin) {
+function impliedEntries(buyin: number | string | null | undefined): number | null {
   const n = +buyin;
   if (!Number.isFinite(n) || n <= 0) return null;
   return r2(n / ENTRY);
 }
 
 /** מרווח ממוצע בין כניסות נוספות בערב אחד (חותמות זמן). */
-export function rebuyGapsMs(events) {
+export function rebuyGapsMs(events: { at?: number | string }[] | null | undefined): number[] {
   const times = (events || [])
     .map((e) => +e.at)
     .filter((t) => Number.isFinite(t))
@@ -45,7 +218,7 @@ export function rebuyGapsMs(events) {
   return gaps;
 }
 
-export function formatGapMs(ms) {
+export function formatGapMs(ms: number | null | undefined): string | null {
   if (ms == null || !Number.isFinite(ms) || ms < 0) return null;
   const mins = Math.round(ms / 60000);
   if (mins < 1) return "פחות מדקה";
@@ -57,12 +230,12 @@ export function formatGapMs(ms) {
   return m ? `${h} שעות ו-${m} דק׳` : `${h} שעות`;
 }
 
-function isoParts(iso) {
+function isoParts(iso: string): IsoParts {
   const [y, mo, d] = String(iso).split("-").map(Number);
   return { iso, y, mo, d };
 }
 
-function eventsFromChatRow(row) {
+function eventsFromChatRow(row: ChatNightRow | null | undefined): BuyinEvent[] {
   const times = row?.t || [];
   return times.map((at, i) => ({ at, amount: row.a?.[i] }));
 }
@@ -71,8 +244,8 @@ function eventsFromChatRow(row) {
  * מאחד כניסות מהלייב (sessions) עם חותמות מהצ'אט.
  * ערב עם buyinEvents בלייב מנצח; אחרת לוקחים את הצ'אט.
  */
-function mergeEntrySources(nights, chatMap) {
-  const byIso = {};
+function mergeEntrySources(nights: PersonalNight[], chatMap: ChatNightsMap | null | undefined): Record<string, MergedEntrySource> {
+  const byIso: Record<string, MergedEntrySource> = {};
   for (const [iso, row] of Object.entries(chatMap || {})) {
     byIso[iso] = { entries: row.n, events: eventsFromChatRow(row), fromChat: true };
   }
@@ -91,7 +264,7 @@ function mergeEntrySources(nights, chatMap) {
 /**
  * @returns {null | object}
  */
-export function computePersonalStats(db, playerName, opts = {}) {
+export function computePersonalStats(db: StatsDb | null | undefined, playerName: string | null | undefined, opts: PersonalStatsOpts = {}): PersonalStats | null {
   if (!db || !playerName) return null;
   const A = AL(db);
   const name = canon(playerName, A);
@@ -102,7 +275,7 @@ export function computePersonalStats(db, playerName, opts = {}) {
       ? allSessions.filter((s) => Number(s.y) === onlyY)
       : allSessions;
 
-  const nights = [];
+  const nights: PersonalNight[] = [];
   for (const s of sessions) {
     let amount = 0;
     let has = false;
@@ -110,18 +283,20 @@ export function computePersonalStats(db, playerName, opts = {}) {
     let hasBuyin = false;
     let chips = 0;
     let hasChips = false;
-    let events = [];
-    const nightsMap = opts.chat === false ? {} : undefined;
+    let events: BuyinEvent[] = [];
+    // מפה ריקה = "בלי צ'אט" — הקאסט הוא לטיפוס בלבד; בזמן ריצה זה בדיוק {} כמו שהיה
+    const nightsMap = opts.chat === false ? ({} as typeof CHAT_ENTRY_NIGHTS) : undefined;
     for (const e of s.entries || []) {
       if (canon(e.name, A) !== name) continue;
       has = true;
       amount = r2(amount + (+e.amount || 0));
-      const buy = resolveEntryBuyin(e, { iso: s.iso, aliases: A, nightsMap });
+      // הקאסטים: הטיפוס המוסק של opts בפונקציות ה־JS חסר את iso (אין לו ברירת מחדל) — טיפוס בלבד, בלי שינוי ריצה
+      const buy = resolveEntryBuyin(e, { iso: s.iso, aliases: A, nightsMap } as Parameters<typeof resolveEntryBuyin>[1]);
       if (buy.buyin != null) {
         buyin = r2(buyin + buy.buyin);
         hasBuyin = true;
       }
-      const resolved = resolveEntryChips(e, { iso: s.iso, aliases: A, nightsMap });
+      const resolved = resolveEntryChips(e, { iso: s.iso, aliases: A, nightsMap } as Parameters<typeof resolveEntryChips>[1]);
       if (resolved.chips != null) {
         chips = r2(chips + resolved.chips);
         hasChips = true;
@@ -207,7 +382,7 @@ export function computePersonalStats(db, playerName, opts = {}) {
     } else attendCur = 0;
   }
 
-  let comeback = null;
+  let comeback: Comeback | null = null;
   for (let i = 1; i < nights.length; i++) {
     if (nights[i - 1].amount < 0 && nights[i].amount > 0) {
       const jump = r2(nights[i].amount - nights[i - 1].amount);
@@ -239,7 +414,7 @@ export function computePersonalStats(db, playerName, opts = {}) {
   const avgEntries = entryRows.length
     ? r2(entryRows.reduce((s, n) => s + n.entries, 0) / entryRows.length)
     : null;
-  let mostEntries = null;
+  let mostEntries: PersonalNight | (IsoParts & { entries: number }) | null = null;
   for (const n of withEntries) {
     if (!mostEntries || n.entries > mostEntries.entries) mostEntries = n;
   }
@@ -264,7 +439,7 @@ export function computePersonalStats(db, playerName, opts = {}) {
     : null;
 
   const totalTips = r2(nights.reduce((s, n) => s + n.tips, 0));
-  let biggestTip = null;
+  let biggestTip: BiggestTip | null = null;
   for (const s of sessions) {
     for (const t of s.tips || []) {
       if (canon(t.name, A) !== name) continue;
@@ -288,7 +463,7 @@ export function computePersonalStats(db, playerName, opts = {}) {
     : null;
 
   const withChips = nights.filter((n) => n.chips != null);
-  let bestChips = null;
+  let bestChips: PersonalNight | null = null;
   for (const n of withChips) {
     if (!bestChips || n.chips > bestChips.chips) bestChips = n;
   }
@@ -376,10 +551,10 @@ export function computePersonalStats(db, playerName, opts = {}) {
 }
 
 /** שורות תצוגה לשיאים האישיים — כולל הערות כנות כשחסרים נתונים. */
-export function personalStatRows(stats, { compact = false } = {}) {
+export function personalStatRows(stats: PersonalStats | null | undefined, { compact = false }: { compact?: boolean } = {}): StatRow[] {
   if (!stats) return [];
-  const rows = [];
-  const push = (row) => rows.push(row);
+  const rows: StatRow[] = [];
+  const push = (row: StatRow) => rows.push(row);
 
   push({
     icon: "💰",
