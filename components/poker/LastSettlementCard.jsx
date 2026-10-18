@@ -23,6 +23,7 @@ import {
   voteForPlayer,
 } from "../../lib/poker/playerOfNight";
 import { ChevronDown } from "./icons";
+import { playerPhone } from "../../lib/poker/phones";
 import { StatusChip } from "./ui";
 
 /**
@@ -45,6 +46,7 @@ export function LastSettlementCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(null);
+  const [copiedIdx, setCopiedIdx] = useState(null);
   const [editingPot, setEditingPot] = useState(false);
   const [potValue, setPotValue] = useState("");
 
@@ -227,6 +229,36 @@ export function LastSettlementCard({
           )}
         </span>
         <b>{transfer.amount}₪</b>
+        {playerPhone(db, transfer.to) && (isAdmin || isSelf(transfer)) && (
+          <button
+            type="button"
+            aria-label={`העתק מספר וסכום: ${transfer.to}, ${transfer.amount} שקלים`}
+            onClick={async (e) => {
+              e.preventDefault();
+              const text = `להעברה בביט: ${playerPhone(db, transfer.to)} · ${transfer.amount}₪`;
+              try {
+                await navigator.clipboard.writeText(text);
+                setCopiedIdx(index);
+                setTimeout(() => setCopiedIdx((c) => (c === index ? null : c)), 1600);
+              } catch {
+                alert(text);
+              }
+            }}
+            style={{
+              fontSize: 11,
+              padding: "3px 8px",
+              borderRadius: 6,
+              cursor: "pointer",
+              border: `1px solid ${C.line}`,
+              background: "transparent",
+              color: copiedIdx === index ? C.win : C.dim,
+              fontFamily: "inherit",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {copiedIdx === index ? "הועתק ✓" : "📋 מספר"}
+          </button>
+        )}
         {edenShare != null && (
           <span style={{ color: C.brass, fontSize: 11 }}>(חלקך: {edenShare}₪)</span>
         )}

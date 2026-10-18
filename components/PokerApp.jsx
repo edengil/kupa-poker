@@ -14,6 +14,7 @@ import { Banner } from "./poker/Banner";
 import { TableTab } from "./poker/TableTab";
 import { normalize } from "../lib/poker/db";
 import { setPlayerEmail } from "../lib/poker/emailRsvp";
+import { setPlayerPhone } from "../lib/poker/phones";
 import { brokenRecords } from "../lib/poker/brokenRecords";
 import { RecordsAlert } from "./poker/RecordsAlert.jsx";
 import { SavingsPotCard } from "./poker/SavingsPotCard.jsx";
@@ -493,6 +494,11 @@ function App({
               readOnly
                 ? undefined
                 : (email) => commit(setPlayerEmail(db, profile, email))
+            }
+            onSavePhone={
+              readOnly
+                ? undefined
+                : (phone) => commit(setPlayerPhone(db, profile, phone))
             }
           />
         </Suspense>
