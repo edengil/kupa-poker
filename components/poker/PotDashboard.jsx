@@ -25,11 +25,16 @@ export function PotDashboard({ db, commit, isAdmin }) {
       return;
     }
     if (!commit) return;
+    /* B5 (עדן, 18.10): העריכה מעדכנת גם את היתרה המצטברת של הקבוצה בהפרש —
+       אחרת התיעוד של הערב והיתרה האמיתית מתפצלים. */
+    const old = Number(db.sessions.find((s) => s.id === sessionId)?.savingsPot) || 0;
+    const newTotal = r2((Number(db.savingsPot) || 0) + r2(v - old));
     commit({
       ...db,
       sessions: db.sessions.map((s) =>
         s.id === sessionId ? { ...s, savingsPot: v > 0 ? r2(v) : undefined } : s
       ),
+      savingsPot: newTotal > 0 ? newTotal : undefined,
     });
     void flushStore().catch(() => {});
     setEditingId(null);
