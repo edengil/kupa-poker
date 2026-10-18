@@ -41,7 +41,7 @@ export interface WaCmd {
 
 export interface WaApplyOpts {
   now?: number;
-  lastSession?: unknown;
+  lastSession?: Record<string, unknown> | null;
   knownNames?: Set<string> | string[] | null;
   [k: string]: unknown;
 }

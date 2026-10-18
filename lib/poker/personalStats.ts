@@ -546,7 +546,7 @@ export function computePersonalStats(db: StatsDb | null | undefined, playerName:
     partners,
     hostedCount: hostedNights.length,
     hostedNet: hostedNights.length ? hostedNet : null,
-    paymentSpeed: paymentSpeedForPlayer(db, name),
+    paymentSpeed: paymentSpeedForPlayer(db, name) as PaymentSpeed | null,
   };
 }
 
