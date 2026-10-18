@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 const MAX = 4000; // גבול סביר להודעת וואטסאפ
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 function userClientFromBearer(bearer) {
   return createClient(URL, ANON, {

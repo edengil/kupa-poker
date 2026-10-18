@@ -12,7 +12,7 @@ import { getServerSupabase } from "@/lib/supabaseServer";
 export const dynamic = "force-dynamic";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SITE = "https://kupa-poker.vercel.app";
 const REDIRECT_URI = `${SITE}/api/calendar/callback`;
 const SCOPES = ["https://www.googleapis.com/auth/calendar.events"].join(" ");

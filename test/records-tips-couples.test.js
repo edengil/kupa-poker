@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { parseCommands, applyCommands, BOT_MARK } from "../lib/whatsapp.js";
 import { nextTipCompliment, formatTipCompliment, TIP_COMPLIMENTS } from "../lib/tipCompliments.js";
 import { computeChipRecords, bestChipCashout } from "../lib/poker/chipRecords.js";
@@ -10,6 +10,15 @@ import {
   timedSessions,
   computeDurationRecords,
 } from "../lib/poker/durationRecords.js";
+
+// דטרמיניזם מלא בקובץ: כל שליפת מחמאה/אקראיות עוברת Math.random — בלי הקיבוע הזה
+// הבדיקות רעידות (שליפה אקראית שינתה תשובות מדי כמה ריצות).
+beforeEach(() => {
+  vi.spyOn(Math, "random").mockReturnValue(0);
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("tip commands", () => {
   it("parses אופיר טיפ 10", () => {
