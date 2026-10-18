@@ -14,7 +14,7 @@ import { SessionEditSheet } from "./SessionEditSheet";
 import { confirmationStatusText, confirmationsStartOpen, latestNightConfirmations } from "../../lib/nightConfirmations";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function SessionsTab({ db, commit }) {
+export function SessionsTab({ db, commit, isAdmin }) {
   const [share, setShare] = useState(null);
   const [settlementId, setSettlementId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -154,10 +154,10 @@ export function SessionsTab({ db, commit }) {
                 color: b.gap === 0 ? C.dim : b.gap < 0 ? C.dim : C.brass,
               }}
             >
-              {b.gap === 0
+              {b.gap === 0 || (b.gap < 0 && !isAdmin)
                 ? "✓ מאוזן"
                 : b.gap < 0
-                  ? `קופה צדדית ${Math.abs(b.gap).toLocaleString("en-US")}₪`
+                  ? `קופת חיסכון ${Math.abs(b.gap).toLocaleString("en-US")}₪`
                   : `⚠ פער ${fmtGap(b.gap)}`}
               {even.length > 0 ? ` · ${even.length} סגרו באפס` : ""}
             </div>

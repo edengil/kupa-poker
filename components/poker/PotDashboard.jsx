@@ -7,7 +7,7 @@ import { potOverview } from "../../lib/paymentTracking";
 import { flushStore } from "../../lib/store";
 
 /**
- * דשבורד קופה צדדית — אדמין בלבד.
+ * דשבורד קופת חיסכון — אדמין בלבד.
  * לכל ערב: הקופה שיושמה בפועל בחלוקה (מחושבת מהיתרות — זה מה שירד
  * מהתשלום של עדן) והקופה המתועדת (ניתנת לעריכה, למעקב מזומן).
  */
@@ -63,7 +63,7 @@ export function PotDashboard({ db, commit, isAdmin }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: C.brass }}>
-        💰 קופה צדדית — דשבורד מנהל
+        💰 קופת חיסכון — דשבורד מנהל
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

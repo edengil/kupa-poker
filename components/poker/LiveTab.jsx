@@ -105,7 +105,7 @@ export function LiveTab({
   );
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
-  const [savings5, setSavings5] = useState(true); // 5% לקופה הצדדית — דלוק אוטומטית בכל משחק (עדן, 2026-10-14); הכפתור מכבה לערב ספציפי
+  const [savings5, setSavings5] = useState(true); // 5% לקופת החיסכון — דלוק אוטומטית בכל משחק (עדן, 2026-10-14); הכפתור מכבה לערב ספציפי
   const [potDraft, setPotDraft] = useState(""); // עריכת המנהל לסכום קופת הערב — ריק = המחושב האוטומטי (עדן, 19.10)
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
   const [share, setShare] = useState(null);
@@ -300,7 +300,7 @@ export function LiveTab({
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
       }
-      // 5% לקופה הצדדית — החוב נשאר מלא, הקופה מחושבת כ-5% מסך הקניות
+      // 5% לקופת החיסכון — החוב נשאר מלא, הקופה מחושבת כ-5% מסך הקניות
       const toPot = savings5 ? r2(addAmt * 0.05) : 0;
       return [
         ...p,
@@ -319,7 +319,7 @@ export function LiveTab({
   const bump = (i, amt) => {
     const at = Date.now();
     const nm = players[i] && players[i].name;
-    // 5% לקופה הצדדית (רק בקנייה חיובית) — החוב נשאר מלא
+    // 5% לקופת החיסכון (רק בקנייה חיובית) — החוב נשאר מלא
     const toPot = savings5 && amt > 0 ? r2(amt * 0.05) : 0;
     setPlayers((p) =>
       p.map((x, j) => {
@@ -386,7 +386,7 @@ export function LiveTab({
     setActionLog(out.actionLog);
   };
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
-  // הקופה הצדדית = 5% מסך הקופה כשהמתג דלוק — חישוב ישיר
+  // קופת החיסכון = 5% מסך הקופה כשהמתג דלוק — חישוב ישיר
   const savingsPot = savings5 ? r2(pot * 0.05) : 0;
   const rebuyBoard = useMemo(() => computeLiveRebuys(players, A), [players, A]);
   const potChips = players.reduce((s, p) => s + playerChips(p, cps), 0);
@@ -520,7 +520,7 @@ export function LiveTab({
       savingsPot: potFinal > 0 ? potFinal : undefined,
     };
     const roster = [...new Set([...(db.roster || []), ...players.map((p) => p.name)])];
-    // הקופה הצדדית מצטברת ברמת הקבוצה (רק האדמין רואה) — לפי הסכום שאושר
+    // קופת החיסכון מצטברת ברמת הקבוצה (רק האדמין רואה) — לפי הסכום שאושר
     const prevPot = Number(db.savingsPot) || 0;
     const newPot = r2(prevPot + potFinal);
     // שבירת שיאים נבדקת מול ה-db שלפני ההוספה — ואם נשבר משהו, הבוט מכריז בקבוצה
@@ -753,7 +753,7 @@ export function LiveTab({
                 fontSize: 13.5,
               }}
             >
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>🏦 קופה צדדית מהערב — לאישורך</div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>🏦 קופת חיסכון מהערב — לאישורך</div>
               <div style={{ color: C.dim, fontSize: 12.5, marginBottom: 8 }}>
                 מחושב אוטומטית: {Math.round(savingsPot)}₪ (5% מהקניות). אם השדה ריק — יישמר המחושב.
               </div>

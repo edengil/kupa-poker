@@ -5,7 +5,7 @@ import { C } from "../../../lib/poker/colors";
 
 /**
  * פקדי קנייה בלייב — חולצו מ־LiveTab.jsx (פיצול 2026-10-16):
- * מתג 5% לקופה הצדדית + בורר סכום כניסה. מצגת טהורה, בלי state משלה.
+ * מתג 5% לקופת החיסכון + בורר סכום כניסה. מצגת טהורה, בלי state משלה.
  */
 export function LiveBuyinControls({ savings5, onToggleSavings, addAmt, onAddAmt, cps }) {
   return (
@@ -34,7 +34,7 @@ export function LiveBuyinControls({ savings5, onToggleSavings, addAmt, onAddAmt,
             color: savings5 ? C.feltDeep : C.cream,
           }}
         >
-          {savings5 ? "✓ " : ""}5% לקופה הצדדית
+          {savings5 ? "✓ " : ""}5% לקופת החיסכון
         </button>
         {savings5 && (
           <span style={{ color: C.brass, fontSize: 12 }}>

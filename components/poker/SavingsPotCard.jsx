@@ -5,7 +5,7 @@ import { C } from "../../lib/poker/colors";
 import { r2 } from "../../lib/poker/helpers";
 
 /**
- * ניהול הקופה הצדדית — אדמין בלבד.
+ * ניהול קופת החיסכון — אדמין בלבד.
  * מציג יתרה, היסטוריית משיכות, וטופס משיכה חדשה.
  */
 export function SavingsPotCard({ db, commit, isAdmin }) {
@@ -61,7 +61,7 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
       }}
     >
       <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8, color: C.brass }}>
-        💰 קופה צדדית (רק אתה רואה)
+        💰 קופת חיסכון (רק אתה רואה)
       </div>
       <div style={{ fontSize: 24, fontWeight: 800, color: C.cream, marginBottom: 4 }}>
         {balance}₪

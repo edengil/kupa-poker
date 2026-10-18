@@ -182,7 +182,7 @@ export function LastSettlementCard({
     const mineRow = isMine(transfer);
     const statusRow = confirmations?.rows[index];
     const closed = !!statusRow?.closed;
-    // קופה צדדית בסוגריים — רק האדמין רואה (כולל העברות זוגיות)
+    // קופת חיסכון בסוגריים — רק האדמין רואה (כולל העברות זוגיות)
     const pot = r2(Number(session.savingsPot) || 0);
     const showPot = isAdmin && pot > 0 && (String(transfer.from || "").includes("עדן גיל") || String(transfer.to || "").includes("עדן גיל"));
     // חלקו האישי של עדן בהעברה זוגית — רק האדמין רואה (שיראה שהקופה ירדה ממנו)
@@ -264,7 +264,7 @@ export function LastSettlementCard({
         )}
         {showPot && !editingPot && (
           <span style={{ color: C.brass, fontSize: 11 }}>
-            (קופה: {pot}₪)
+            (קופת חיסכון: {pot}₪)
             <button
               type="button"
               onClick={(e) => {

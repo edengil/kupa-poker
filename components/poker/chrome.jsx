@@ -123,7 +123,7 @@ export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false, isA
     ["input", "הזנה", ClipboardPaste],
     ["sessions", "ערבים", CalendarDays],
     ...(hasStats ? [["stats", "צפיות", Eye]] : []),
-    // דשבורד קופה צדדית — אדמין בלבד (דורש commit, לכן לא ב-readOnly)
+    // דשבורד קופת חיסכון — אדמין בלבד (דורש commit, לכן לא ב-readOnly)
     ...(!readOnly && isAdmin ? [["pot", "קופה", Coins]] : []),
   ].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));
 
@@ -190,7 +190,7 @@ export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false, isA
 }
 
 /** מד איזון מגיע/חייב בהזנת ערב.
-    עודף חייב (חייב > מגיע) אינו פער אמיתי — זה כסף הקופה הצדדית
+    עודף חייב (חייב > מגיע) אינו פער אמיתי — זה כסף קופת החיסכון
     (5% מהקניות; השחקנים מקבלים ג׳יטונים בשווי 95%) שנשמר אצל עדן גיל.
     מוצג רק במסכי ההזנה/עריכה — מוסתר מצופי הלינק הציבורי. */
 export function BalanceMeter({ bal }) {
@@ -262,7 +262,7 @@ export function BalanceMeter({ bal }) {
         {ok
           ? "הערב סגור מדויק"
           : isPot
-            ? `קופה צדדית: ${pot.toLocaleString("en-US")}₪ (נשמרת אצל עדן גיל)`
+            ? `קופת חיסכון: ${pot.toLocaleString("en-US")}₪ (נשמרת אצל עדן גיל)`
             : `פער ${fmtGap(gap)} (עודף מגיע)`}
       </div>
     </div>
