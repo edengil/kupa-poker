@@ -5,15 +5,26 @@ import { byGender } from "../gender.js";
 import { nightSummaryText, sessionFromLive, tipSummaryForSession } from "../nightShare.js";
 import { assignPodiumMedals } from "../podiumMedals.js";
 import { settlementAppUrl, withSettlementLink } from "../settlementInvite.js";
-import { r2 } from "./state.js";
+import { r2, type WaLiveState, type WaPlayer } from "./state";
 
-function siteFromCmds(cmds) {
+interface SiteCmd {
+  siteUrl?: string;
+  slug?: string;
+}
+
+function siteFromCmds(cmds: SiteCmd[]): { siteUrl?: string; slug?: string } {
   const hit = (cmds || []).find((c) => c.siteUrl && c.slug);
   return hit ? { siteUrl: hit.siteUrl, slug: hit.slug } : {};
 }
 
 /** אותו סיכום כמו גיליון השיתוף באפליקציה (נטו + טיפים) + לינק לדף הקבוצה. */
-export function finalSummary(state, cps, cmds, aliases, now) {
+export function finalSummary(
+  state: WaLiveState,
+  cps: number,
+  cmds: SiteCmd[],
+  aliases: unknown,
+  now: number,
+): string {
   const summary = nightSummaryText(sessionFromLive(state, { cps, now }), aliases);
   return withSettlementLink(summary, settlementAppUrl(siteFromCmds(cmds)));
 }
@@ -21,7 +32,7 @@ export function finalSummary(state, cps, cmds, aliases, now) {
 /* כשהאחרון יצא — רק אישור קצר. הסיכום המלא ולינק הערב נשלחים פעם אחת,
    מהאפליקציה, אחרי שעדן שומר את הערב ומאשר את ההעברות. בלי המילים
    «חלוקה» / «חשבון סופי» — אחרת ההודעה הקצרה הזו הייתה ננעצת כסיכום ערב. */
-export function allClosedNote(state) {
+export function allClosedNote(state: WaLiveState): string {
   const pot = r2(state.players.reduce((t, p) => t + (+p.buyin || 0), 0));
   return [
     `✅ כולם סגורים · קופה ${pot}₪`,
@@ -34,7 +45,7 @@ export function allClosedNote(state) {
    מה שאי אפשר לקרוא מרשימת הביט לבד: כמה עוד בשולחן, כמה מהמלאי יצא,
    וכמה זמן משחקים.
    ---------------------------------------------------------------- */
-export function snapshot(state, cps = CPS) {
+export function snapshot(state: WaLiveState, cps: number = CPS): string {
   const ps = state.players;
   const closed = ps.filter((p) => p.cashout !== "" && p.cashout != null);
   const pot = r2(ps.reduce((t, p) => t + (+p.buyin || 0), 0));
@@ -55,18 +66,18 @@ export function snapshot(state, cps = CPS) {
 /* ------------------------ מצב ביניים בסגירה ------------------------
    נשלח עם "סיום משחק" ואחרי כל שחקן שנסגר: כמה כל אחד נכנס, מי כבר סגור
    ועם מה, ומי עוד פתוח — כדי שאפשר יהיה להמשיך בלי לגלול אחורה. */
-export function closingStatus(state, cps = CPS) {
+export function closingStatus(state: WaLiveState, cps: number = CPS): string {
   const pot = r2(state.players.reduce((t, p) => t + (+p.buyin || 0), 0));
-  const netWord = (p) => {
+  const netWord = (p: WaPlayer): string => {
     const net = netOf(p, cps);
-    const g = (male, female) => byGender(p.name, male, female);
+    const g = (male: string, female: string): string => byGender(p.name, male, female);
     if (net === 0) return `${g("סגר", "סגרה")} באפס`;
     return net > 0 ? `${g("מגיע", "מגיעה")} ${net}₪` : `${g("חייב", "חייבת")} ${-net}₪`;
   };
   const { winners, even, losers, open } = partitionByNet(state.players, cps);
-  const closedLine = (x) =>
+  const closedLine = (x: { p: WaPlayer }): string =>
     `✅ ${x.p.name} · ${byGender(x.p.name, "נכנס", "נכנסה")} ${r2(+x.p.buyin || 0)}₪ · ${byGender(x.p.name, "יצא", "יצאה")} ${r2(+x.p.cashout || 0)} ג׳ · ${netWord(x.p)}`;
-  const openLine = (p) =>
+  const openLine = (p: WaPlayer): string =>
     `⏳ ${p.name} · ${byGender(p.name, "נכנס", "נכנסה")} ${r2(+p.buyin || 0)}₪`;
   const groups = [
     winners.map(closedLine),
@@ -82,10 +93,15 @@ export function closingStatus(state, cps = CPS) {
    זוכים קודם (הגדול קודם + מדליות 1–3), אחריהם מי שסגר באפס, ובסוף
    החייבים (החוב הקטן קודם, הגדול אחרון) — עם שורת רווח בין הקבוצות.
    בסוף בלוק טיפים: שבח למי שנתן, צחוק על מי שלא. */
-export function settleSummary(state, cps = CPS) {
+export function settleSummary(state: WaLiveState, cps: number = CPS): string {
   const withNet = state.players.map((p) => ({ p, net: netOf(p, cps) }));
   const winSorted = withNet.filter((x) => x.net > 0).sort((a, b) => b.net - a.net);
-  const win = assignPodiumMedals(winSorted, (x) => x.net).map(({ item: x, medal }) => {
+  const win = (
+    assignPodiumMedals(winSorted, (x: { net: number }) => x.net) as Array<{
+      item: { p: WaPlayer; net: number };
+      medal: string;
+    }>
+  ).map(({ item: x, medal }) => {
     const line = settleLine(x.p, cps);
     return medal ? `${medal} ${line}` : line;
   });

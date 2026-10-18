@@ -2,16 +2,87 @@
 
 import { ALIASES, findPlayer, resolveAlias } from "./parse.js";
 
-export const r2 = (v) => Math.round(v * 100) / 100;
+export const r2 = (v: number): number => Math.round(v * 100) / 100;
 
-export function knownSetOf(list) {
+export interface WaBuyinEvent {
+  amount: number;
+  at?: number;
+  total?: number;
+  pot?: number;
+}
+
+export interface WaPlayer {
+  name: string;
+  buyin?: number | string;
+  cashout?: string | number;
+  tipsGiven?: number;
+  buyinEvents?: WaBuyinEvent[];
+}
+
+export interface WaTip {
+  id?: string | number;
+  name: string;
+  amount?: number;
+}
+
+export interface WaPendingApproval {
+  name: string;
+  amount: number;
+  at: number;
+}
+
+export interface WaLiveState {
+  entriesCount: string | number;
+  addAmt: number;
+  startedAt: number | null;
+  players: WaPlayer[];
+  applied: Record<string, unknown>;
+  pending: string | null;
+  closing: boolean;
+  pendingApprovals: WaPendingApproval[];
+  approvedNames: string[];
+  pendingRemindedAt: number | null;
+  bitIdleRemindedAt: number | null;
+  tips: WaTip[];
+  tipComplimentBag: number[];
+  tipComplimentLast: number | null;
+  coupleFills: Array<Record<string, unknown>>;
+  savings5: boolean;
+  savingsPot: number;
+}
+
+export interface UndoEntry {
+  t: string;
+  name?: string;
+  delta?: number;
+  created?: boolean;
+  before?: string;
+  amount?: number;
+  tipId?: string | number;
+  bagBefore?: number[];
+  lastBefore?: number | null;
+  at?: number;
+  pending?: WaPendingApproval;
+  player?: WaPlayer;
+  to?: string;
+  from?: string;
+}
+
+type AliasTable = typeof ALIASES;
+
+export function knownSetOf(list: Set<string> | string[] | null | undefined): Set<string> | null {
   if (!list) return null;
   if (list instanceof Set) return list.size ? list : null;
   if (Array.isArray(list)) return list.length ? new Set(list) : null;
   return null;
 }
 
-export function isKnownName(raw, known, extra = [], aliases = ALIASES) {
+export function isKnownName(
+  raw: string,
+  known: Set<string> | string[] | null | undefined,
+  extra: string[] = [],
+  aliases: AliasTable = ALIASES,
+): boolean {
   const set = knownSetOf(known);
   if (!set) return true; // בלי רשימה (בדיקות ישנות) — לא חוסמים
   const trimmed = String(raw || "").trim();
@@ -23,7 +94,11 @@ export function isKnownName(raw, known, extra = [], aliases = ALIASES) {
   return hits.length === 1;
 }
 
-export function pickPending(list, rawName, aliases = ALIASES) {
+export function pickPending(
+  list: Array<{ name: string }>,
+  rawName: string,
+  aliases: AliasTable = ALIASES,
+): number {
   if (!list.length) return -1;
   if (!rawName) return list.length === 1 ? 0 : -2; // -2 = צריך לדייק
   const name = resolveAlias(rawName, aliases);
@@ -39,7 +114,12 @@ export function pickPending(list, rawName, aliases = ALIASES) {
 }
 
 /** מרחיב שם קצר בשולחן לשם המלא מהכינויים — בלי לדרוס מישהו אחר. */
-function expandSeatedName(state, index, canonical, aliases) {
+function expandSeatedName(
+  state: WaLiveState,
+  index: number,
+  canonical: string,
+  aliases: AliasTable,
+): void {
   if (index < 0 || !canonical) return;
   const current = state.players[index]?.name;
   if (!current || current === canonical) return;
@@ -50,7 +130,11 @@ function expandSeatedName(state, index, canonical, aliases) {
   renameEverywhere(state, current, canonical);
 }
 
-export function findInState(state, rawName, aliases) {
+export function findInState(
+  state: WaLiveState,
+  rawName: string,
+  aliases: AliasTable,
+): ReturnType<typeof findPlayer> {
   const found = findPlayer(state.players, rawName, aliases);
   if (found.index !== -1 && found.resolved) {
     expandSeatedName(state, found.index, found.resolved, aliases);
@@ -58,14 +142,14 @@ export function findInState(state, rawName, aliases) {
   return found;
 }
 
-export function stampBuyin(player, delta, at = Date.now()) {
+export function stampBuyin(player: WaPlayer, delta: number, at: number = Date.now()): WaPlayer {
   if (!(delta > 0)) return player;
   const events = [...(player.buyinEvents || [])];
   events.push({ amount: delta, at, total: r2(+player.buyin || 0) });
   return { ...player, buyinEvents: events };
 }
 
-export function blank(live) {
+export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
   return {
     entriesCount: live?.entriesCount ?? "",
     addAmt: live?.addAmt || 50,
@@ -91,11 +175,11 @@ export function blank(live) {
   };
 }
 
-export const openPlayers = (state) =>
+export const openPlayers = (state: WaLiveState): WaPlayer[] =>
   state.players.filter((p) => p.cashout === "" || p.cashout == null);
 
 /** מבטל את מה שהודעה קודמת עם אותו מזהה כבר עשתה. */
-export function undo(state, entries) {
+export function undo(state: WaLiveState, entries: UndoEntry[]): void {
   for (const e of [...entries].reverse()) {
     const i = state.players.findIndex((p) => p.name === e.name);
     if (i === -1) continue;
@@ -104,12 +188,12 @@ export function undo(state, entries) {
       else
         state.players[i] = {
           ...state.players[i],
-          buyin: r2((+state.players[i].buyin || 0) - e.delta),
+          buyin: r2((+state.players[i].buyin || 0) - (e.delta as number)),
         };
     } else if (e.t === "out") {
       state.players[i] = { ...state.players[i], cashout: e.before };
     } else if (e.t === "tip") {
-      const tipsGiven = Math.max(0, r2((+state.players[i].tipsGiven || 0) - e.amount));
+      const tipsGiven = Math.max(0, r2((+state.players[i].tipsGiven || 0) - (e.amount as number)));
       state.players[i] = { ...state.players[i], tipsGiven };
       if (e.tipId != null) {
         state.tips = (state.tips || []).filter((t) => t.id !== e.tipId);
@@ -128,18 +212,18 @@ export function undo(state, entries) {
       if (e.pending) state.pendingApprovals = [...(state.pendingApprovals || []), e.pending];
       state.approvedNames = (state.approvedNames || []).filter((n) => n !== e.name);
     } else if (e.t === "rename") {
-      renameEverywhere(state, e.to, e.from);
+      renameEverywhere(state, e.to as string, e.from as string);
     }
   }
   // הסרה מוחזרת בסוף, אחרי שכל השאר חזר למקומו
   for (const e of [...entries].reverse()) {
-    if (e.t === "remove") state.players.splice(e.at, 0, e.player);
-    if (e.t === "entries") state.entriesCount = e.before;
+    if (e.t === "remove") state.players.splice(e.at as number, 0, e.player as WaPlayer);
+    if (e.t === "entries") state.entriesCount = e.before as string;
   }
 }
 
 /** מחליף שם בכל מקומות הלייב של ערב פעיל (שולחן, ממתינים, טיפים…). */
-export function renameEverywhere(state, from, to) {
+export function renameEverywhere(state: WaLiveState, from: string, to: string): void {
   for (const p of state.players || []) {
     if (p.name === from) p.name = to;
   }
