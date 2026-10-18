@@ -11,7 +11,7 @@ import { applyTipTotalsToPlayers, canonLivePlayers, tipShownFor, liveAlreadySave
 import { applyManualTip, removeManualTip, playerTipEvents, isManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
-import { buildPlayersView, playerChips } from "../../lib/liveView";
+import { buildPlayersView, playerChips, chipBalanceDiff } from "../../lib/liveView";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
 import { notifyTransfersSettlement } from "../../lib/poker/notifyTransfersClient";
 import { detectLiveRecords, liveRecordAnnouncement } from "../../lib/poker/liveRecords";
@@ -436,6 +436,15 @@ export function LiveTab({
     if (players.some((p) => p.cashout === "")) {
       alert("יש שחקנים שעדיין לא הוזנו להם ג׳יטונים ביציאה. יש להשלים את כולם לפני סיום הערב (גם 0).");
       return;
+    }
+    /* אזהרת איזון ג'יטונים (B4): פער של 5+ ג'יטונים בין מה שהונפק למה שנספר
+       ביציאה מעיד כמעט תמיד על טעות ספירה — שואלים לפני ששומרים ערב לא מאוזן. */
+    const diffChips = chipBalanceDiff(players, cps);
+    if (Math.abs(diffChips) >= 5) {
+      const ok = confirm(
+        `פער ג'יטונים: נספרו ביציאה ${diffChips > 0 ? "יותר" : "פחות"} ${Math.abs(diffChips)} ג'יטונים מהצפוי (${Math.abs(r2(diffChips / cps))}₪). ייתכן שטעות ספירה — להמשיך בשמירת הערב בכל זאת?`
+      );
+      if (!ok) return;
     }
     /* נטו ב־₪ כמו תמיד; בנוסף chips / tipsGiven על כל רשומה כדי ששיאי
        ג'יטונים וטיפים יעבדו מכאן והלאה. */

@@ -36,6 +36,20 @@ export function playerChips(p: LivePlayer, cps: number): number {
 }
 
 /**
+ * פער איזון ג'יטונים בסגירת ערב: סך הג'יטונים שנספרו ביציאה פחות סך הג'יטונים
+ * שהונפקו בפועל (אחרי קיצוץ הקופה, לפי playerChips). 0 = הערב מאוזן.
+ * חיובי = נספרו יותר ג'יטונים ממה שהונפקו (חשד לטעות ספירה, כמו פער ה־+5₪ של 13.10.2026).
+ */
+export function chipBalanceDiff(players: LivePlayer[], cps: number): number {
+  const issued = players.reduce((s, p) => s + playerChips(p, cps), 0);
+  const out = players.reduce(
+    (s, p) => s + (p.cashout === "" || p.cashout == null ? 0 : +p.cashout || 0),
+    0
+  );
+  return out - issued;
+}
+
+/**
  * סדר השורות בשולחן החי.
  * במשחק (אין יציאות): לפי פעילות אחרונה. בסגירה: זוכים → אפס → חייבים → פתוחים.
  * מחזיר [{ p, index, group }] כש־index הוא האינדקס המקורי במערך השחקנים.
