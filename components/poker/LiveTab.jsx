@@ -11,7 +11,7 @@ import { applyTipTotalsToPlayers, canonLivePlayers, liveAlreadySaved } from "../
 import { applyManualTip, removeManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
-import { buildPlayersView, playerChips } from "../../lib/liveView";
+import { buildPlayersView, playerChips, effectivePot } from "../../lib/liveView";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
 import { notifyTransfersSettlement } from "../../lib/poker/notifyTransfersClient";
 import { detectLiveRecords, liveRecordAnnouncement } from "../../lib/poker/liveRecords";
@@ -106,6 +106,7 @@ export function LiveTab({
   const [name, setName] = useState("");
   const [addAmt, setAddAmt] = useState(50);
   const [savings5, setSavings5] = useState(true); // 5% לקופה הצדדית — דלוק אוטומטית בכל משחק (עדן, 2026-10-14); הכפתור מכבה לערב ספציפי
+  const [potDraft, setPotDraft] = useState(""); // עריכת המנהל לסכום קופת הערב — ריק = המחושב האוטומטי (עדן, 19.10)
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
   const [share, setShare] = useState(null);
   const [settleBuilder, setSettleBuilder] = useState(null);
@@ -156,6 +157,7 @@ export function LiveTab({
           if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
           if (d.addAmt) setAddAmt(d.addAmt);
           if (d.savings5 !== undefined) setSavings5(d.savings5 !== false);
+          if (typeof d.potDraft === "string") setPotDraft(d.potDraft);
           if (d.startedAt) setStartedAt(d.startedAt);
           if (Array.isArray(d.tips)) setTips(liveTips);
           if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
@@ -198,6 +200,7 @@ export function LiveTab({
         entriesCount,
         addAmt,
         savings5,
+        potDraft,
         startedAt,
         tips,
         coupleFills,
@@ -209,7 +212,7 @@ export function LiveTab({
         editedAt: Date.now(),
       })
     );
-  }, [players, entriesCount, addAmt, savings5, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
+  }, [players, entriesCount, addAmt, savings5, potDraft, startedAt, tips, coupleFills, actionLog, handOfNight, liveAnnounced, planSnap, cps, hydrated]);
 
   // שריד לייב של ערב שכבר נשמר — אם ה-db נטען רק אחרי שהלייב שוחזר,
   // מנקים את המשחק המת ברגע שמתגלה שהוא כבר קיים כערב שמור.
@@ -493,6 +496,7 @@ export function LiveTab({
           aliases: A,
         })
       : undefined;
+    const potFinal = effectivePot(savingsPot, potDraft);
     const rec = {
       id: "live_" + Date.now(),
       iso,
@@ -512,12 +516,13 @@ export function LiveTab({
       handOfNight: handOfNight.trim() || undefined,
       attendance,
       savings5: savings5 || undefined,
-      savingsPot: savingsPot > 0 ? r2(savingsPot) : undefined,
+      /* סכום הקופה שהמנהל אישר/ערך בסוף הערב — הוא מה שנרשם ומה שמצטבר (עדן, 19.10) */
+      savingsPot: potFinal > 0 ? potFinal : undefined,
     };
     const roster = [...new Set([...(db.roster || []), ...players.map((p) => p.name)])];
-    // הקופה הצדדית מצטברת ברמת הקבוצה (רק האדמין רואה)
+    // הקופה הצדדית מצטברת ברמת הקבוצה (רק האדמין רואה) — לפי הסכום שאושר
     const prevPot = Number(db.savingsPot) || 0;
-    const newPot = r2(prevPot + (savingsPot > 0 ? savingsPot : 0));
+    const newPot = r2(prevPot + potFinal);
     // שבירת שיאים נבדקת מול ה-db שלפני ההוספה — ואם נשבר משהו, הבוט מכריז בקבוצה
     if (typeof onRecords === "function") {
       try {
@@ -737,6 +742,59 @@ export function LiveTab({
             />
           </label>
 
+          {savings5 && players.length > 0 && (
+            <div
+              style={{
+                background: C.card,
+                border: `1px solid ${C.brass}66`,
+                borderRadius: 12,
+                padding: 13,
+                margin: "0 0 12px",
+                fontSize: 13.5,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>🏦 קופה צדדית מהערב — לאישורך</div>
+              <div style={{ color: C.dim, fontSize: 12.5, marginBottom: 8 }}>
+                מחושב אוטומטית: {Math.round(savingsPot)}₪ (5% מהקניות). אם השדה ריק — יישמר המחושב.
+              </div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="number"
+                  min="0"
+                  value={potDraft}
+                  onChange={(e) => setPotDraft(e.target.value)}
+                  placeholder={String(Math.round(savingsPot))}
+                  aria-label="סכום קופה מאושר לערב"
+                  style={{ ...inputStyle, width: 110 }}
+                />
+                <span>₪</span>
+                {potDraft.trim() !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => setPotDraft("")}
+                    style={{
+                      fontSize: 11.5,
+                      padding: "4px 10px",
+                      borderRadius: 7,
+                      cursor: "pointer",
+                      border: `1px solid ${C.line}`,
+                      background: "transparent",
+                      color: C.dim,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    אפס למחושב
+                  </button>
+                )}
+              </div>
+              {potDraft.trim() !== "" && (
+                <div style={{ fontSize: 12.5, color: C.brass, marginTop: 6 }}>
+                  יישמר: {effectivePot(savingsPot, potDraft)}₪
+                </div>
+              )}
+            </div>
+          )}
+
           <LiveDistributionPanel
             anyCash={anyCash}
             netSum={netSum}
@@ -754,6 +812,7 @@ export function LiveTab({
                 setCoupleFills([]);
                 setActionLog([]);
                 setHandOfNight("");
+                setPotDraft("");
                 setPlanSnap(null);
                 setMenuIdx(null);
                 setTipPickerIdx(null);

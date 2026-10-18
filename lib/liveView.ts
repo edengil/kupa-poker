@@ -70,3 +70,16 @@ export function buildPlayersView(players: LivePlayer[], { recent = {}, allc = {}
     ...openRows,
   ];
 }
+
+/**
+ * סכום הקופה הסופי לערב: ברירת המחדל היא המחושב (5% מהקניות), מעוגל לשקלים
+ * שלמים; אם המנהל ערך את השדה בסוף הערב — הערך שלו מנצח (עדן, 19.10:
+ * "בסוף כל ערב אני אאשר את הסכום הנצבר או אערוך אותו").
+ */
+export function effectivePot(computed: number, draft: string | null | undefined): number {
+  const fallback = Math.max(0, Math.round(computed || 0));
+  const d = String(draft ?? "").trim();
+  if (d === "") return fallback;
+  const v = Number(d);
+  return Number.isFinite(v) && v >= 0 ? Math.round(v) : fallback;
+}

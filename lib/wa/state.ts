@@ -51,6 +51,7 @@ export interface WaLiveState {
   coupleFills: Array<Record<string, unknown>>;
   savings5: boolean;
   savingsPot: number;
+  potDraft?: string;
 }
 
 export interface UndoEntry {
@@ -175,6 +176,9 @@ export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
        במפורש באפליקציה. חייב לעבור דרך blank, אחרת כל כתיבת בוט מוחקת אותו. */
     savings5: live?.savings5 !== false,
     savingsPot: Number(live?.savingsPot) || 0,
+    /* עריכת המנהל לסכום הקופה של הערב (אישור בסוף ערב) — חייבת לעבור דרך
+       blank, אחרת כל כתיבת בוט מוחקת אותה, כמו שקרה ל־savings5 בעבר. */
+    potDraft: typeof live?.potDraft === "string" ? live.potDraft : "",
   };
 }
 
