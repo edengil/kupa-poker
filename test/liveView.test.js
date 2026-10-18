@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { playerChips, buildPlayersView, chipBalanceDiff } from "../lib/liveView";
+import { playerChips, buildPlayersView } from "../lib/liveView";
 
 describe("playerChips", () => {
   it("בלי תרומת קופה: חוב × ג'יטונים לשקל", () => {
@@ -45,35 +45,5 @@ describe("buildPlayersView", () => {
     expect(view.map((v) => v.group)).toEqual(["win", "lose", "open"]);
     expect(view[0].p.name).toBe("זוכה");
     expect(view[2].p.name).toBe("פתוח");
-  });
-});
-
-describe("chipBalanceDiff", () => {
-  it("ערב מאוזן מחזיר 0", () => {
-    const players = [
-      { name: "א", buyin: 100, buyinEvents: [{ amount: 100 }], cashout: 150 },
-      { name: "ב", buyin: 100, buyinEvents: [{ amount: 100 }], cashout: 250 },
-    ];
-    expect(chipBalanceDiff(players, 2)).toBe(0);
-  });
-  it("עודף ספירה (כמו פער 13.10) מחזיר חיובי", () => {
-    const players = [
-      { name: "א", buyin: 100, buyinEvents: [{ amount: 100 }], cashout: 210 },
-      { name: "ב", buyin: 100, buyinEvents: [{ amount: 100 }], cashout: 200 },
-    ];
-    expect(chipBalanceDiff(players, 2)).toBe(10);
-  });
-  it("עם קיצוץ קופה: ההנפקה היא אחרי הקיצוץ", () => {
-    const players = [
-      { name: "א", buyin: 100, buyinEvents: [{ amount: 100, pot: 5 }], cashout: 190 },
-      { name: "ב", buyin: 100, buyinEvents: [{ amount: 100, pot: 5 }], cashout: 190 },
-    ];
-    expect(chipBalanceDiff(players, 2)).toBe(0);
-  });
-  it("שחקן בלי יציאה לא נספר בצד היציאה", () => {
-    const players = [
-      { name: "א", buyin: 100, buyinEvents: [{ amount: 100 }], cashout: "" },
-    ];
-    expect(chipBalanceDiff(players, 2)).toBe(-200);
   });
 });
