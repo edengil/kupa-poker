@@ -23,6 +23,7 @@ export interface WaTip {
   id?: string | number;
   name: string;
   amount?: number;
+  at?: number;
 }
 
 export interface WaPendingApproval {
@@ -42,7 +43,8 @@ export interface WaLiveState {
   pendingApprovals: WaPendingApproval[];
   approvedNames: string[];
   pendingRemindedAt: number | null;
-  bitIdleRemindedAt: number | null;
+  bitIdleRemindedAt?: number | null;
+  ts?: number;
   tips: WaTip[];
   tipComplimentBag: number[];
   tipComplimentLast: number | null;
@@ -56,11 +58,12 @@ export interface UndoEntry {
   name?: string;
   delta?: number;
   created?: boolean;
-  before?: string;
+  before?: string | number;
   amount?: number;
   tipId?: string | number;
   bagBefore?: number[];
   lastBefore?: number | null;
+  female?: boolean;
   at?: number;
   pending?: WaPendingApproval;
   player?: WaPlayer;

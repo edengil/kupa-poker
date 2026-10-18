@@ -23,6 +23,29 @@ import { helpText, ownerAskText } from "./help.js";
 
 export { helpText } from "./help.js";
 
+import type { UndoEntry, WaLiveState, WaPlayer } from "./state";
+
+export interface WaCmd {
+  kind: string;
+  name?: string;
+  chips?: number;
+  amount?: number;
+  from?: string;
+  to?: string;
+  left?: number;
+  count?: number;
+  delta?: number;
+  siteUrl?: string;
+  slug?: string;
+}
+
+export interface WaApplyOpts {
+  now?: number;
+  lastSession?: unknown;
+  knownNames?: Set<string> | string[] | null;
+  [k: string]: unknown;
+}
+
 /* קובי מקבל פתיח משלו לפני משפט המחמאה על כל טיפ */
 const KOBI = "קובי סעדה";
 const KOBI_TIP_OPENER = "יא חאלייה";
@@ -38,17 +61,17 @@ const KOBI_TIP_OPENER = "יא חאלייה";
    הייתה נספרת פעמיים, וזה באג ששקט ומגלים אותו רק בסוף הערב.
    -------------------------------------------------------------------- */
 
-export function applyCommands(live, cmds, msgId, cps = CPS, opts = {}) {
+export function applyCommands(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: string | null, cps: number = CPS, opts: WaApplyOpts = {}) {
   const now = opts.now ?? Date.now();
   return decoratePendingReminder(applyCommandsCore(live, cmds, msgId, cps, { ...opts, now }), now);
 }
 
-function applyCommandsCore(live, cmds, msgId, cps = CPS, opts = {}) {
+function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: string | null, cps: number = CPS, opts: WaApplyOpts = {}) {
   const now = opts.now ?? Date.now();
   const aliases = aliasesOf(opts);
   const state = blank(live);
   const report = () =>
-    buildReport({ players: state.players, entriesCount: state.entriesCount, startedAt: state.startedAt, cps });
+    buildReport({ players: state.players, entriesCount: state.entriesCount as string, startedAt: state.startedAt, cps });
 
   // פקודות מידע — לא נוגעות בנתונים ולכן יוצאות כאן
   if (cmds.length === 1 && READ_ONLY.has(cmds[0].kind)) {
@@ -106,11 +129,11 @@ function applyCommandsCore(live, cmds, msgId, cps = CPS, opts = {}) {
   }
 
   if (msgId && state.applied[msgId]) {
-    undo(state, state.applied[msgId]);
+    undo(state, state.applied[msgId] as UndoEntry[]);
     delete state.applied[msgId];
   }
 
-  const record = [];
+  const record: UndoEntry[] = [];
   const acks = [];
   const problems = [];
 
@@ -352,9 +375,15 @@ function applyCommandsCore(live, cmds, msgId, cps = CPS, opts = {}) {
       const bagBefore = [...(state.tipComplimentBag || [])];
       const lastBefore = state.tipComplimentLast;
       const female = isFemaleName(p.name);
-      const { template, bag, last, bagKey, lastKey } = nextTipCompliment(state, { female });
-      state[bagKey] = bag;
-      state[lastKey] = last;
+      const { template, bag, last, bagKey, lastKey } = nextTipCompliment(state, { female }) as unknown as {
+        template: string;
+        bag: number[];
+        last: number;
+        bagKey: string;
+        lastKey: string;
+      };
+      (state as unknown as Record<string, unknown>)[bagKey] = bag;
+      (state as unknown as Record<string, unknown>)[lastKey] = last;
       // תאימות לאחור לשדות הישנים
       if (!female) {
         state.tipComplimentBag = bag;
@@ -442,7 +471,7 @@ function applyCommandsCore(live, cmds, msgId, cps = CPS, opts = {}) {
     const p = state.players[found.index];
     const buyin = Math.max(0, r2((+p.buyin || 0) + cmd.amount));
     const delta = r2(buyin - (+p.buyin || 0));
-    let next = { ...p, buyin };
+    let next: WaPlayer = { ...p, buyin };
     if (delta > 0) next = stampBuyin(next, delta, now);
     state.players[found.index] = next;
     record.push({ t: "add", name: p.name, delta });
@@ -503,7 +532,7 @@ function applyCommandsCore(live, cmds, msgId, cps = CPS, opts = {}) {
 }
 
 /** תאימות לאחור — פקודה בודדת. */
-export function applyCommand(live, cmd, cps = CPS) {
+export function applyCommand(live: Partial<WaLiveState>, cmd: WaCmd, cps: number = CPS) {
   return applyCommands(live, [cmd], null, cps);
 }
 
