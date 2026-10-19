@@ -64,7 +64,7 @@ export function EGByline({ style }) {
     <div
       dir="ltr"
       style={{
-        fontFamily: "'Outfit','Rubik',system-ui,sans-serif",
+        fontFamily: "var(--font-outfit),var(--font-rubik),system-ui,sans-serif",
         fontSize: 11,
         fontWeight: 600,
         letterSpacing: "0.22em",
@@ -89,7 +89,7 @@ export function EGFooter() {
       <EGMark size={24} style={{ margin: "0 auto 9px", opacity: 0.9 }} />
       <div
         style={{
-          fontFamily: "'Outfit','Rubik',system-ui,sans-serif",
+          fontFamily: "var(--font-outfit),var(--font-rubik),system-ui,sans-serif",
           fontSize: 11.5,
           fontWeight: 700,
           letterSpacing: "0.2em",
@@ -134,7 +134,7 @@ export function EGSplash() {
           dir="ltr"
           style={{
             marginTop: 20,
-            fontFamily: "'Outfit','Rubik',system-ui,sans-serif",
+            fontFamily: "var(--font-outfit),var(--font-rubik),system-ui,sans-serif",
             fontSize: 27,
             fontWeight: 800,
             letterSpacing: "-0.03em",

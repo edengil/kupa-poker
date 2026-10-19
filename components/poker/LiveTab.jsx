@@ -40,6 +40,9 @@ import { Plus, Minus, UserPlus, Coins, X } from "./icons";
 import { brassCta, sectionEyebrow, sectionTitle } from "../../lib/poker/festive";
 import { checkNightBalance, confirmSaveIfUnbalanced } from "../../lib/poker/nightBalance";
 
+/* שעון לפעולות משתמש בתוך handlers (לא לרינדור) — saveNight ודומיו. */
+const nowMs = () => Date.now();
+
 /* טאב לייב — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function LiveTab({
   db,
@@ -113,7 +116,7 @@ export function LiveTab({
   const [hydrated, setHydrated] = useState(false);
   const [startedAt, setStartedAt] = useState(null); // חותמת זמן התחלת המשחק
   const [prompt, setPrompt] = useState(null); // הצעה לשלוח עדכון אחרי כניסה
-  const [nowTs, setNowTs] = useState(Date.now()); // מתקתק לטיימר החי
+  const [nowTs, setNowTs] = useState(() => Date.now()); // מתקתק לטיימר החי
   /* טיפים + מילוי זוגי — נשמרים בלייב; מילוי זוגי רק מהאפליקציה (לא בוואטסאפ) */
   const [tips, setTips] = useState([]);
   const [coupleFills, setCoupleFills] = useState([]);
@@ -183,6 +186,9 @@ export function LiveTab({
     return () => {
       alive = false;
     };
+    // שחזור חד־פעמי בטעינה בלבד: db/A נקראים כצילום של רגע הטעינה. הגעת db
+    // מאוחרת מטופלת באפקט הניקוי הייעודי למטה — הוספתם לכאן תשחזר שוב ושוב.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // שמירה אוטומטית בכל שינוי
@@ -220,10 +226,14 @@ export function LiveTab({
     if (!hydrated || !startedAt || players.length === 0) return;
     if (!liveAlreadySaved({ startedAt }, db?.sessions)) return;
     store.set(LIVE_KEY, "");
+    // ניקוי מצב כשה־db מגלה שהערב כבר שמור — סנכרון מול מקור חיצוני (המסד),
+    // לא נגזרת של הרינדור; אין דרך לבצעו בשלב הרינדור בלי לכתוב לחנות באמצעו.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlayers([]);
     setEntriesCount("");
     setStartedAt(null);
     setSavings5(true); // הערב הבא מתחיל שוב עם 5% אוטומטי
+    setLiveAnnounced([]);
     setTips([]);
     setCoupleFills([]);
     setActionLog([]);
@@ -241,6 +251,9 @@ export function LiveTab({
       announced: liveAnnounced,
     });
     if (!fresh.length) return;
+    // סימון "הוכרז" הוא ספר־החשבונות של אפקט ההכרזה החיצוני (שליחה לקבוצה) —
+    // חייב להישמר יחד עם השליחה, באותו אפקט.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLiveAnnounced((prev) => [...new Set([...prev, ...fresh.map((r) => r.key)])]);
     const text = liveRecordAnnouncement(fresh);
     if (text) {
@@ -250,10 +263,8 @@ export function LiveTab({
     }
   }, [players, cfg.botOn, hydrated, db, liveAnnounced]);
 
-  // ערב חדש מתחיל מרשימת שחקנים ריקה — מאפסים את הדדופ של ההכרזות
-  useEffect(() => {
-    if (players.length === 0 && liveAnnounced.length) setLiveAnnounced([]);
-  }, [players.length, liveAnnounced]);
+  // ערב חדש מתחיל מרשימת שחקנים ריקה — הדדופ של ההכרזות מתאפס בכל נתיב
+  // שרוקן את השחקנים (ביטול משחק, ניקוי ערב שמור, סיום שמירה), לא באפקט נפרד.
 
   // ההצעה נעלמת לבד אחרי 15 שניות כדי לא להפריע
   useEffect(() => {
@@ -481,7 +492,7 @@ export function LiveTab({
       });
     }
     /* תאריך הערב = תחילת המשחק בשעון ישראל (לא חצות אחרי סגירה מאוחרת). */
-    const endedAt = Date.now();
+    const endedAt = nowMs();
     const { d, mo, y, iso } = nightDateParts(startedAt, endedAt);
     /* צילום נוכחות: אישורי הגעה מול מי שבאמת ישב. שמות הצופים ממופים
        לשמות שחקנים; מי שלא זוהה נשאר עם שם ההתחברות ופשוט לא נספר. */
@@ -498,7 +509,7 @@ export function LiveTab({
       : undefined;
     const potFinal = effectivePot(savingsPot, potDraft);
     const rec = {
-      id: "live_" + Date.now(),
+      id: "live_" + nowMs(),
       iso,
       d,
       mo,
@@ -813,6 +824,7 @@ export function LiveTab({
                 setActionLog([]);
                 setHandOfNight("");
                 setPotDraft("");
+                setLiveAnnounced([]);
                 setPlanSnap(null);
                 setMenuIdx(null);
                 setTipPickerIdx(null);

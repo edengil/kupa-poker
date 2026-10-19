@@ -1,6 +1,6 @@
 "use client";
 /* באנר קצר כשנשבר שיא בסוף ערב — באפליקציה, לא רק בוואטסאפ. */
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { C } from "../../lib/poker/colors";
 import { normalizeRecordAlertLines } from "../../lib/poker/recordsAlert.js";
 
@@ -10,13 +10,13 @@ const AUTO_DISMISS_MS = 12_000;
  * @param {{ lines: string[] | null, onDismiss?: () => void }} props
  */
 export function RecordsAlert({ lines, onDismiss }) {
-  const cleaned = normalizeRecordAlertLines(lines);
+  const cleaned = useMemo(() => normalizeRecordAlertLines(lines), [lines]);
 
   useEffect(() => {
     if (!cleaned?.length || typeof onDismiss !== "function") return undefined;
     const id = setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => clearTimeout(id);
-  }, [lines, onDismiss]);
+  }, [cleaned, onDismiss]);
 
   if (!cleaned?.length) return null;
 

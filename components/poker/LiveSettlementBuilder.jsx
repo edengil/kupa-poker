@@ -74,6 +74,8 @@ export function LiveSettlementBuilder({
   const [updateSending, setUpdateSending] = useState(false);
   const [updateSent, setUpdateSent] = useState(false);
   const [copied, setCopied] = useState(false);
+  /* חותמת הפתיחה של הבונה — לטקסט החלוקה כשאין endedAt (במקום Date.now בתוך useMemo). */
+  const [openedAt] = useState(() => Date.now());
   const preferKey = prefer.slice().sort().join("\0");
   const lastPreferKey = React.useRef(preferKey);
 
@@ -111,9 +113,9 @@ export function LiveSettlementBuilder({
       buildManualSettlementText({
         manualPayments,
         remaining,
-        now: endedAt || Date.now(),
+        now: endedAt || openedAt,
       }),
-    [manualPayments, remaining, endedAt]
+    [manualPayments, remaining, endedAt, openedAt]
   );
 
   const inviteUrl = resolveBrowserInviteUrl(inviteSlug, sessionId);

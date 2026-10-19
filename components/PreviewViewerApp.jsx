@@ -49,7 +49,6 @@ export function buildViewerFixture({ shareHistory = true, withLive = false } = {
  * /preview/viewer?history=0|1&live=1
  */
 export default function PreviewViewerApp({ shareHistory = true, withLive = false }) {
-  const [ready, setReady] = useState(false);
   const snap = useMemo(
     () => buildViewerFixture({ shareHistory, withLive }),
     [shareHistory, withLive]
@@ -59,10 +58,13 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
   const cps = viewerCps(viewerSnap, live);
   const pot = (live?.players || []).reduce((s, p) => s + (+p.buyin || 0), 0);
 
-  useEffect(() => {
+  const [ready] = useState(() => {
+    if (typeof window === "undefined") return false;
     configureStore(makeReadOnlyStore(viewerSnap));
-    setReady(true);
-  }, [viewerSnap]);
+    return true;
+  });
+  /* הזמן החולף ברגע הטעינה — PokerTable מתקתק ממנו הלאה בעצמו. */
+  const [elapsed0] = useState(() => (live?.startedAt ? Date.now() - live.startedAt : 0));
 
   return (
     <>
@@ -85,7 +87,7 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
             potChips={pot * cps}
             onSeat={() => {}}
             startedAt={live.startedAt}
-            elapsed={live.startedAt ? Date.now() - live.startedAt : 0}
+            elapsed={elapsed0}
           />
         </div>
       )}

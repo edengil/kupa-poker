@@ -10,6 +10,66 @@ import { computeMonthHeroes, computeRollingHeroes, currentCalendarMonth } from "
  * גיבור החודש / ירידת החודש במסך הבית.
  * לחיצה פותחת פרופיל אם onPlayer קיים.
  */
+/* תא גיבור/נופל — חולץ לגוף המודול (היה מוגדר בתוך הרכיב). */
+function HeroCell({ kind, row, onPlayer }) {
+  if (!row) return null;
+  const isHero = kind === "hero";
+  const clickable = typeof onPlayer === "function";
+  const Tag = clickable ? "button" : "div";
+  return (
+    <Tag
+      type={clickable ? "button" : undefined}
+      onClick={clickable ? () => onPlayer(row.name) : undefined}
+      style={{
+        flex: 1,
+        minWidth: 0,
+        textAlign: "right",
+        cursor: clickable ? "pointer" : "default",
+        border: `1px solid ${isHero ? C.brass + "66" : C.line}`,
+        background: C.feltDeep,
+        borderRadius: 12,
+        padding: "10px 12px",
+        color: "inherit",
+        fontFamily: "inherit",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: isHero ? C.brass : C.dim,
+          marginBottom: 4,
+        }}
+      >
+        {isHero ? "גיבור החודש" : "ירידת החודש"}
+      </div>
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 800,
+          color: C.cream,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {row.name}
+      </div>
+      <b
+        style={{
+          display: "block",
+          marginTop: 2,
+          fontSize: 15,
+          color: isHero ? C.win : C.loss,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {fmt(row.amount)}
+      </b>
+    </Tag>
+  );
+}
+
 export function MonthHeroesCard({ db, onPlayer, y, mo }) {
   const cal = useMemo(() => {
     if (y != null && mo != null) return { y, mo };
@@ -24,65 +84,6 @@ export function MonthHeroesCard({ db, onPlayer, y, mo }) {
 
   if (!data || (!data.hero && !data.flop)) return null;
 
-  const Cell = ({ kind, row }) => {
-    if (!row) return null;
-    const isHero = kind === "hero";
-    const clickable = typeof onPlayer === "function";
-    const Tag = clickable ? "button" : "div";
-    return (
-      <Tag
-        type={clickable ? "button" : undefined}
-        onClick={clickable ? () => onPlayer(row.name) : undefined}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          textAlign: "right",
-          cursor: clickable ? "pointer" : "default",
-          border: `1px solid ${isHero ? C.brass + "66" : C.line}`,
-          background: C.feltDeep,
-          borderRadius: 12,
-          padding: "10px 12px",
-          color: "inherit",
-          fontFamily: "inherit",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: isHero ? C.brass : C.dim,
-            marginBottom: 4,
-          }}
-        >
-          {isHero ? "גיבור החודש" : "ירידת החודש"}
-        </div>
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 800,
-            color: C.cream,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {row.name}
-        </div>
-        <b
-          style={{
-            display: "block",
-            marginTop: 2,
-            fontSize: 15,
-            color: isHero ? C.win : C.loss,
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {fmt(row.amount)}
-        </b>
-      </Tag>
-    );
-  };
-
   return (
     <section
       style={{
@@ -96,8 +97,8 @@ export function MonthHeroesCard({ db, onPlayer, y, mo }) {
         {data.label}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <Cell kind="hero" row={data.hero} />
-        <Cell kind="flop" row={data.flop} />
+        <HeroCell kind="hero" row={data.hero} onPlayer={onPlayer} />
+        <HeroCell kind="flop" row={data.flop} onPlayer={onPlayer} />
       </div>
       {rolling?.hero && (
         <div style={{ fontSize: 12.5, color: C.dim, marginTop: 9, lineHeight: 1.55 }}>

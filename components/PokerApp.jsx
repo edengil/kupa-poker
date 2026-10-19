@@ -184,12 +184,15 @@ function App({
     return () => {
       alive = false;
     };
-  }, []);
-  const commit = (n) => {
-    if (readOnly) return;
-    setDb(n);
-    store.set(DB_KEY, JSON.stringify(n));
-  }; // כתיבה רק בפעולת משתמש
+  }, [readOnly]);
+  const commit = useCallback(
+    (n) => {
+      if (readOnly) return;
+      setDb(n);
+      store.set(DB_KEY, JSON.stringify(n));
+    },
+    [readOnly]
+  ); // כתיבה רק בפעולת משתמש
 
   const years = useMemo(() => {
     if (!db) return [];
@@ -239,9 +242,13 @@ function App({
   /* באדג' בסגנון פייסבוק: סופר רק התראות שטרם נצפו. פתיחת המגירה מסמנת
      את כל ה־id-ים הנוכחיים כנצפו; התראה חדשה (id חדש) תדליק שוב את הבאדג'. */
   const [seenIds, setSeenIds] = useState([]);
-  useEffect(() => {
+  /* טעינת ה־id-ים שנצפו מהאחסון כשהצופה מתחלף — התאמת state בשלב הרינדור
+     (הדפוס המתועד של React), במקום אפקט שמסנכרן state אחרי הרינדור. */
+  const [seenFor, setSeenFor] = useState(null);
+  if (seenFor !== viewerName) {
+    setSeenFor(viewerName);
     setSeenIds(loadSeenIds(safeStorage(), viewerName));
-  }, [viewerName]);
+  }
   const unseenCount = useMemo(
     () => unseenNotices(notices, seenIds).length,
     [notices, seenIds]
@@ -275,7 +282,7 @@ function App({
       await flushStore();
     }
     if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
-  }, [db, onMarkPayment, readOnly, viewerName]);
+  }, [db, onMarkPayment, readOnly, viewerName, commit]);
   const confirmOwnTransfers = useCallback(async () => {
     if (!transferPrompt || !db) return;
     let next = transferPrompt.session;
@@ -295,7 +302,7 @@ function App({
     }
     if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setTransferPromptDismissed(true);
-  }, [transferPrompt, db, onMarkPayment, readOnly, viewerName]);
+  }, [transferPrompt, db, onMarkPayment, readOnly, viewerName, commit]);
   const confirmOwnReceipts = useCallback(async () => {
     if (!receiptPrompt || !db) return;
     let next = receiptPrompt.session;
@@ -315,7 +322,7 @@ function App({
     }
     if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setReceiptPromptDismissed(true);
-  }, [receiptPrompt, db, onMarkPayment, readOnly, viewerName]);
+  }, [receiptPrompt, db, onMarkPayment, readOnly, viewerName, commit]);
 
   const dismissRecordAlert = useCallback(() => setRecordAlert(null), []);
   const handleRecords = useCallback(
@@ -337,7 +344,7 @@ function App({
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
-          fontFamily: "'Rubik',system-ui,sans-serif",
+          fontFamily: "var(--font-rubik),system-ui,sans-serif",
         }}
       >
         <Style />
@@ -360,7 +367,7 @@ function App({
         background: C.feltDeep,
         color: C.cream,
         minHeight: "100vh",
-        fontFamily: "'Rubik',system-ui,sans-serif",
+        fontFamily: "var(--font-rubik),system-ui,sans-serif",
       }}
     >
       <Style />

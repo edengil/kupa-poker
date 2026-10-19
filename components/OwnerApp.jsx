@@ -54,10 +54,12 @@ export default function OwnerApp() {
   const lastLiveFpRef = useRef(undefined); // טביעה בלי ts
   const pendingRemountRef = useRef(null); // null | "live" | "soft" — נדחה עד חזרה לדף
   const tabRef = useRef("table"); // הטאב הפתוח — נשמר בין רענונים
+  const [tabSnapshot, setTabSnapshot] = useState("table"); // צילום הטאב ברגע ה־remount — מועבר כ־initialTab בלי קריאת ref ברינדור
   const checkingLiveRef = useRef(false); // מונע checkLive חופפים שמרעננים פעמיים
 
   const remountApp = useCallback(() => {
     pendingRemountRef.current = null;
+    setTabSnapshot(tabRef.current);
     setGeneration((g) => g + 1);
   }, []);
 
@@ -187,6 +189,7 @@ export default function OwnerApp() {
   /* -------------------- איתור או יצירה של הקבוצה --------------------
      שורת הקבוצה נשמרת ב-localStorage: בביקור חוזר האפליקציה עולה מיידית
      מהמטמון, והרשת רק מאמתת ברקע. */
+  const signedOut = phase === "signedOut";
   useEffect(() => {
     let alive = true;
 
@@ -310,7 +313,7 @@ export default function OwnerApp() {
     return () => {
       alive = false;
     };
-  }, [supabase, phase === "signedOut", checkLive]);
+  }, [supabase, signedOut, checkLive, requestRemount]);
 
   // ניקוי הערוץ ביציאה
   useEffect(
@@ -509,7 +512,7 @@ export default function OwnerApp() {
       <PokerApp
         key={generation}
         viewerAuth={viewerAuth}
-        initialTab={tabRef.current}
+        initialTab={tabSnapshot}
         onTabChange={(t) => {
           tabRef.current = t;
           if (t === "live") checkLive();
@@ -562,13 +565,15 @@ function SignIn({ onSignIn }) {
 /* ========================= רצועת השיתוף למעלה ========================= */
 function ShareBar({ slug, groupId, supabase, onSignOut, onSlugChange }) {
   const [copied, setCopied] = useState(false);
-  const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [shareHistory, setShareHistory] = useState(() => getConfig().shareHistory !== false);
 
-  useEffect(() => {
-    const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-    setUrl(`${base}/g/${slug}`);
+  /* כתובת השיתוף נגזרת מה־slug — בלי state ואפקט סנכרון. */
+  const url = useMemo(() => {
+    const base =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    return base ? `${base}/g/${slug}` : "";
   }, [slug]);
 
   useEffect(() => onConfig((c) => setShareHistory(c.shareHistory !== false)), []);

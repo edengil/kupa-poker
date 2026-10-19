@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { C } from "../lib/poker/colors";
 import { brassCta } from "../lib/poker/festive";
 import { matchViewerToPlayer } from "../lib/poker/personalHighlights";
@@ -10,6 +10,25 @@ import { PUSH_PROMPT_KEY, nextPushPrompt } from "../lib/pushPrompt";
 const visitId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let decidedThisLoad = false;
 let decidedView = null;
+const viewListeners = new Set();
+function setDecidedView(next) {
+  decidedView = next;
+  viewListeners.forEach((fn) => fn());
+}
+function subscribeDecidedView(fn) {
+  viewListeners.add(fn);
+  return () => viewListeners.delete(fn);
+}
+function snapshotDecidedView() {
+  if (!decidedThisLoad) {
+    const support = getPushSupport();
+    const permission = typeof Notification === "undefined" ? "default" : Notification.permission;
+    decidedView = nextPushPrompt(readPrompt(), { permission, support, visitId });
+    writePrompt(decidedView);
+    decidedThisLoad = true;
+  }
+  return decidedView;
+}
 
 function readPrompt() {
   try {
@@ -31,18 +50,9 @@ function writePrompt(state) {
  * מהאייקון, או בדפדפן שתומך, הלחיצה פותחת את חלון ההרשאה.
  */
 export function PushPrompt({ supabase, groupId, db, viewerAuth }) {
-  const [view, setView] = useState(null);
-
-  useEffect(() => {
-    if (!decidedThisLoad) {
-      const support = getPushSupport();
-      const permission = typeof Notification === "undefined" ? "default" : Notification.permission;
-      decidedView = nextPushPrompt(readPrompt(), { permission, support, visitId });
-      writePrompt(decidedView);
-      decidedThisLoad = true;
-    }
-    setView(decidedView);
-  }, []);
+  /* ההחלטה מתקבלת פעם אחת בטעינת הדף (משתני מודול) — נקראת כ־external store:
+     בשרת null, בלקוח הערך שהוחלט. בלי אפקט שמסנכרן state. */
+  const view = useSyncExternalStore(subscribeDecidedView, snapshotDecidedView, () => null);
 
   useEffect(() => {
     if (!groupId || typeof Notification === "undefined" || Notification.permission !== "granted") return;
@@ -71,7 +81,7 @@ export function PushPrompt({ supabase, groupId, db, viewerAuth }) {
     const choice = result === "subscribed" ? "granted" : result === "denied" ? "denied" : view.choice;
     const next = { ...view, show: false, choice, asked: true };
     writePrompt(next);
-    setView(next);
+    setDecidedView(next);
   };
 
   const install = view.mode === "install";

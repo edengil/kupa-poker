@@ -32,12 +32,14 @@ const isIOS = () =>
 export default function InstallButton() {
   const [deferred, setDeferred] = useState(null);
   // idle: אין עדיין תמיכה ידועה · ready: אפשר להתקין · ios: הסבר לאייפון · hidden: מותקן/הותקן
-  const [state, setState] = useState("idle");
+  // המצב ההתחלתי נגזר מהסביבה באתחול (לא באפקט): מותקן → hidden; אייפון → ios.
+  const [state, setState] = useState(() =>
+    isStandalone() ? "hidden" : isIOS() ? "ios" : "idle"
+  );
   const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     if (isStandalone()) {
-      setState("hidden");
       return;
     }
 
@@ -54,9 +56,6 @@ export default function InstallButton() {
 
     window.addEventListener("beforeinstallprompt", onPrompt);
     window.addEventListener("appinstalled", onInstalled);
-
-    // ספארי באייפון לא יורה beforeinstallprompt — נציג הסבר ידני
-    if (isIOS()) setState("ios");
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);

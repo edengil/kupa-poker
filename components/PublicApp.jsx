@@ -49,6 +49,11 @@ export default function PublicApp({ slug, nightId = null }) {
   const loggedRef = useRef(false);
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
   const tabRef = useRef("table"); // רענון נתונים לא מחזיר את הצופה לטבלה
+  const [tabSnapshot, setTabSnapshot] = useState("table"); // צילום הטאב ברענון — initialTab בלי קריאת ref ברינדור
+  const bumpGeneration = () => {
+    setTabSnapshot(tabRef.current);
+    setGeneration((g) => g + 1);
+  };
 
   const load = useCallback(async () => {
     const cacheKey = `poker:cache:pub:${slug}`;
@@ -91,7 +96,7 @@ export default function PublicApp({ slug, nightId = null }) {
     const serialized = JSON.stringify([snap.data, snap.config]);
     if (serialized !== dataRef.current) {
       apply(snap);
-      setGeneration((g) => g + 1);
+      bumpGeneration();
       setFresh(true);
       setTimeout(() => setFresh(false), 2500);
     }
@@ -122,7 +127,7 @@ export default function PublicApp({ slug, nightId = null }) {
       };
       bootViewerStore(snap);
       dataRef.current = JSON.stringify([data, pubConfig]);
-      setGeneration((g) => g + 1);
+      bumpGeneration();
       setFresh(true);
       setTimeout(() => setFresh(false), 2500);
       try {
@@ -159,7 +164,7 @@ export default function PublicApp({ slug, nightId = null }) {
       };
       bootViewerStore(snap);
       dataRef.current = JSON.stringify([data, pubConfig]);
-      setGeneration((g) => g + 1);
+      bumpGeneration();
       setFresh(true);
       setTimeout(() => setFresh(false), 2500);
       try {
@@ -248,7 +253,7 @@ export default function PublicApp({ slug, nightId = null }) {
     if (serialized !== dataRef.current) {
       dataRef.current = serialized;
       bootViewerStore(next);
-      setGeneration((g) => g + 1);
+      bumpGeneration();
       setFresh(true);
       setTimeout(() => setFresh(false), 2500);
     }
@@ -347,7 +352,7 @@ export default function PublicApp({ slug, nightId = null }) {
         key={generation}
         readOnly
         viewerAuth={viewerAuth}
-        initialTab={tabRef.current}
+        initialTab={tabSnapshot}
         onMarkPayment={markPayment}
         onVotePlayer={votePlayer}
         focusSessionId={nightId}

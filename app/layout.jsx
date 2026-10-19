@@ -1,4 +1,21 @@
 import AnalyticsInit from "@/components/AnalyticsInit";
+import { Rubik, Outfit } from "next/font/google";
+
+/* פונטים דרך next/font (מאוחסנים עצמית) במקום <link> ל־Google Fonts —
+   גם מהיר יותר וגם סוגר את @next/next/no-page-custom-font. השמות נחשפים
+   כמשתני CSS, וכל ה־font-family באפליקציה מפנים אליהם. */
+const rubik = Rubik({
+  subsets: ["hebrew", "latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-rubik",
+  display: "swap",
+});
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-outfit",
+  display: "swap",
+});
 
 export const metadata = {
   title: "קופה — פוקר",
@@ -28,14 +45,8 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" className={`${rubik.variable} ${outfit.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap"
-          rel="stylesheet"
-        />
         {/* dangerouslySetInnerHTML ולא children: כשה-CSS מגיע כטקסט-ילד, React
             מקודד מחדש את המרכאות ('Rubik' → &#x27;) בצד השרת אך לא בלקוח, וזה
             יצר שגיאת hydration שהחזירה את כל הדף לרינדור-לקוח. הזרקה ישירה
@@ -46,7 +57,7 @@ export default function RootLayout({ children }) {
           html,body{margin:0;padding:0;background:#0A2B21;-webkit-text-size-adjust:100%;}
           /* באייפון (PWA) התוכן נמתח עד מתחת לשעון — הריווח מחזיר אותו למקום */
           body{padding-top:env(safe-area-inset-top);}
-          body{font-family:'Rubik',system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;}
+          body{font-family:var(--font-rubik),system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;}
           *{-webkit-tap-highlight-color:transparent;}
         `,
           }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import PokerApp from "./PokerApp";
 import { configureStore } from "../lib/store";
 import { buildSeedDb } from "../lib/poker/seed";
@@ -12,8 +12,9 @@ const PREFIX = "poker:preview:";
  * ?failFlush=1 — set מצליח מקומית אבל flush נכשל (סימולציית ניתוק מהשרת).
  */
 export default function PreviewApp({ failFlush = false, viewerName = "" }) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
+  // הגדרת החנות פעם אחת באתחול ה־state (אפקט+setReady היה דפוס סנכרון מיותר).
+  const [ready] = useState(() => {
+    if (typeof window === "undefined") return false;
     const defaults = {
       "poker:db": JSON.stringify(buildSeedDb()),
       "poker:config": JSON.stringify({ chipsPerShekel: 2, defaultBuyin: 50, botOn: false }),
@@ -36,8 +37,8 @@ export default function PreviewApp({ failFlush = false, viewerName = "" }) {
       },
       hasPending: () => pending,
     });
-    setReady(true);
-  }, [failFlush]);
+    return true;
+  });
 
   return (
     <>

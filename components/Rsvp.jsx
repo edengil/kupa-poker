@@ -43,21 +43,34 @@ export function planPlace(plan) {
 function useRsvps(supabase, groupId, planIso) {
   const [rows, setRows] = useState([]);
 
-  const refresh = useCallback(async () => {
-    if (!groupId || !planIso) return;
+  const fetchRows = useCallback(async () => {
+    if (!groupId || !planIso) return null;
     const { data, error } = await supabase
       .from("game_rsvps")
       .select("user_id, name, email, status, updated_at")
       .eq("group_id", groupId)
       .eq("plan_iso", planIso);
-    if (!error && data) setRows(data);
+    return !error && data ? data : null;
   }, [supabase, groupId, planIso]);
 
+  const refresh = useCallback(async () => {
+    const data = await fetchRows();
+    if (data) setRows(data);
+  }, [fetchRows]);
+
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 30000);
-    return () => clearInterval(id);
-  }, [refresh]);
+    let cancelled = false;
+    const load = async () => {
+      const data = await fetchRows();
+      if (!cancelled && data) setRows(data);
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [fetchRows]);
 
   return [rows, refresh];
 }
