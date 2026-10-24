@@ -35,13 +35,19 @@ function tabIsVisible() {
 const SESSION_TIMEOUT_MS = 4000;
 
 /** getSession עם מבוי־זמן: בספארי/PWA הקריאה נתקעת לפעמים עד שנוגעים במסך
-    (מתועד גם בהערת המסלול המהיר למטה). אחרי 4 שניות מוותרים ומתייחסים
-    כאילו אין סשן — העלייה ממשיכה למסך ההתחברות במקום להיתקע על מסך הפתיחה. */
+    (מתועד גם בהערת המסלול המהיר למטה). אחרי 4 שניות מוותרים על ההמתנה —
+    אבל ניסוי H: timeout הוא לא "אין סשן". התוצאה מסומנת ב־timedOut, והקורא
+    נשאר במצב המתנה; הסשן האמיתי מגיע דרך onAuthStateChange. (הגרסה הקודמת,
+    ניסוי D, החזירה סשן־null מזויף — והיפוך הפאזה ל־signedOut הריץ את כל
+    אפקט ה־boot מחדש כשהסשן האמיתי נחת, מגבר remount־ים בפתיחה.) */
 function getSessionWithTimeout(supabase) {
   return Promise.race([
-    supabase.auth.getSession().catch(() => ({ data: { session: null } })),
+    supabase.auth
+      .getSession()
+      .then(({ data }) => ({ data, timedOut: false }))
+      .catch(() => ({ data: { session: null }, timedOut: false })),
     new Promise((resolve) =>
-      setTimeout(() => resolve({ data: { session: null } }), SESSION_TIMEOUT_MS)
+      setTimeout(() => resolve({ data: { session: null }, timedOut: true }), SESSION_TIMEOUT_MS)
     ),
   ]);
 }
@@ -104,9 +110,13 @@ export default function OwnerApp() {
   /* ------------------------------ סשן ------------------------------ */
   useEffect(() => {
     let alive = true;
-    getSessionWithTimeout(supabase).then(({ data }) => {
+    getSessionWithTimeout(supabase).then(({ data, timedOut }) => {
       if (!alive) return;
       if (!data.session) {
+        /* ניסוי H: ב־timeout לא הופכים פאזה — נשארים בהמתנה והסשן האמיתי
+           יגיע דרך onAuthStateChange למטה (משתמש מחובר יאומת שם; מנותק
+           באמת יקבל שם session=null ויעבור למסך ההתחברות). */
+        if (timedOut) return;
         setPhase("signedOut");
         return;
       }

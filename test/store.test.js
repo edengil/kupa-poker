@@ -146,6 +146,56 @@ describe("store durability and ordering", () => {
     expect(api.update).toHaveBeenCalled();
   });
 
+  it("adopts server data silently on the boot load of the DB key (experiment H: no onStale)", async () => {
+    const api = client();
+    api.read.mockResolvedValue({ data: { data: { version: 2 } }, error: null });
+    localStorage.setItem("poker:cache:test:data", '{"version":1}');
+    const onStale = vi.fn();
+    const store = makeSupabaseStore(api, "test", { onStale });
+    expect(await store.get(DB_KEY)).toBe('{"version":1}');
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(onStale).not.toHaveBeenCalled();
+    // adopted silently: memory cache and localStorage now hold the server value
+    expect(await store.get(DB_KEY)).toBe('{"version":2}');
+    expect(localStorage.getItem("poker:cache:test:data")).toBe('{"version":2}');
+  });
+
+  it("still reports onStale for the DB key on a post-boot revalidation (after forget)", async () => {
+    const api = client();
+    api.read.mockResolvedValue({ data: { data: { version: 1 } }, error: null });
+    localStorage.setItem("poker:cache:test:data", '{"version":1}');
+    const onStale = vi.fn();
+    const store = makeSupabaseStore(api, "test", { onStale });
+    expect(await store.get(DB_KEY)).toBe('{"version":1}');
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(onStale).not.toHaveBeenCalled();
+
+    api.read.mockResolvedValue({ data: { data: { version: 2 } }, error: null });
+    store.forget(DB_KEY);
+    expect(await store.get(DB_KEY)).toBe('{"version":1}');
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(onStale).toHaveBeenCalledTimes(1);
+    expect(onStale).toHaveBeenCalledWith(DB_KEY);
+  });
+
+  it("delays the boot flush of rehydrated pending writes to 30s, not 400ms (experiment H)", async () => {
+    const api = client();
+    api.update.mockResolvedValueOnce({ error: { message: "offline" } });
+    const first = makeSupabaseStore(api, "boot-flush");
+    await first.set(DB_KEY, '{"version":1}');
+    expect(await first.flush()).toBe(false);
+    expect(first.hasPending()).toBe(true);
+
+    const second = makeSupabaseStore(api, "boot-flush");
+    expect(second.hasPending()).toBe(true);
+    const callsAfterBoot = api.update.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(400);
+    expect(api.update.mock.calls.length).toBe(callsAfterBoot);
+    await vi.advanceTimersByTimeAsync(29600);
+    expect(api.update.mock.calls.length).toBe(callsAfterBoot + 1);
+    expect(second.hasPending()).toBe(false);
+  });
+
   it("keeps an in-flight write recoverable on disk until acknowledgment", async () => {
     const api = client();
     let finish;
