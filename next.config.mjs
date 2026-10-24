@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // מעברי מסך חלקים בין טאבים (React ViewTransition) — נוסף 2026-10-16
-  experimental: { viewTransition: true },
+  // ניסוי F — דגל מעברי המסך (experimental.viewTransition) כובה זמנית
+  // לאבחון קריסת עמוד הבעלים באייפון (החזרה של d6983d5).
 };
 export default nextConfig;
