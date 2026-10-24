@@ -32,6 +32,20 @@ function tabIsVisible() {
   return typeof document !== "undefined" && document.visibilityState === "visible";
 }
 
+const SESSION_TIMEOUT_MS = 4000;
+
+/** getSession עם מבוי־זמן: בספארי/PWA הקריאה נתקעת לפעמים עד שנוגעים במסך
+    (מתועד גם בהערת המסלול המהיר למטה). אחרי 4 שניות מוותרים ומתייחסים
+    כאילו אין סשן — העלייה ממשיכה למסך ההתחברות במקום להיתקע על מסך הפתיחה. */
+function getSessionWithTimeout(supabase) {
+  return Promise.race([
+    supabase.auth.getSession().catch(() => ({ data: { session: null } })),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ data: { session: null } }), SESSION_TIMEOUT_MS)
+    ),
+  ]);
+}
+
 /** מזהה קצר, קריא ולא ניתן לניחוש, שמופיע בלינק לשיתוף. */
 function newSlug() {
   const bytes = new Uint8Array(8);
@@ -56,9 +70,16 @@ export default function OwnerApp() {
   const tabRef = useRef("table"); // הטאב הפתוח — נשמר בין רענונים
   const [tabSnapshot, setTabSnapshot] = useState("table"); // צילום הטאב ברגע ה־remount — מועבר כ־initialTab בלי קריאת ref ברינדור
   const checkingLiveRef = useRef(false); // מונע checkLive חופפים שמרעננים פעמיים
+  const lastRemountAtRef = useRef(0); // מגן לולאת remount: חותמת הכפוי האחרון
 
+  /* מגן: לא יותר מ־remount כפוי אחד ב־10 שניות. פינגים חוזרים מ־checkLive או
+     מהערוץ יכולים אחרת לשרשר remount-ים שמרעידים את הדף (ובטלפון חלש —
+     הורגים את תהליך הרינדור). remount שנחסם פשוט מדולג; הבא אחרי החלון יעבור. */
   const remountApp = useCallback(() => {
     pendingRemountRef.current = null;
+    const now = Date.now();
+    if (now - lastRemountAtRef.current < 10000) return;
+    lastRemountAtRef.current = now;
     setTabSnapshot(tabRef.current);
     setGeneration((g) => g + 1);
   }, []);
@@ -83,7 +104,7 @@ export default function OwnerApp() {
   /* ------------------------------ סשן ------------------------------ */
   useEffect(() => {
     let alive = true;
-    supabase.auth.getSession().then(({ data }) => {
+    getSessionWithTimeout(supabase).then(({ data }) => {
       if (!alive) return;
       if (!data.session) {
         setPhase("signedOut");
@@ -261,7 +282,7 @@ export default function OwnerApp() {
     }
 
     (async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await getSessionWithTimeout(supabase);
       const user = sessionData.session?.user;
       if (!user) return;
 
