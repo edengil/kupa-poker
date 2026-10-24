@@ -610,7 +610,9 @@ function SignIn({ onSignIn }) {
 }
 
 /* ========================= רצועת השיתוף למעלה ========================= */
-function ShareBar({ slug, groupId, supabase, onSignOut, onSlugChange }) {
+/* מיוצא גם כ־named export בשביל בדיקת הרינדור (test/ownerAppRender.test.js) —
+   זה הרכיב שבו ישב באג ה־useMemo של 24.10, והוא מתרנדר רק בנתיב הבעלים המחובר. */
+export function ShareBar({ slug, groupId, supabase, onSignOut, onSlugChange }) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [shareHistory, setShareHistory] = useState(() => getConfig().shareHistory !== false);

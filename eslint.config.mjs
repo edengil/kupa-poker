@@ -11,4 +11,22 @@ export default defineConfig([
       "react-hooks/exhaustive-deps": "warn",
     },
   },
+  {
+    // אירוע 24.10: הקונפיג של Next לא מפעיל no-undef (הוא סומך על TypeScript,
+    // וה־JSX כאן לא עובר בדיקת טיפוסים) — וכך useMemo בלי ייבוא ב־OwnerApp
+    // עבר lint נקי והפיל את עמוד הבעלים בכל רינדור מחובר (ReferenceError).
+    // הפעלה מפורשת סוגרת את החור: ריצה ראשונה מצאה אפס ממצאים אמיתיים בקוד.
+    rules: {
+      "no-undef": "error",
+    },
+  },
+  {
+    // ה־service worker רץ בסביבת worker — הגלובל clients לגיטימי שם
+    files: ["public/sw.js"],
+    languageOptions: {
+      globals: {
+        clients: "readonly",
+      },
+    },
+  },
 ]);
