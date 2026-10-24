@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import AppErrorBoundary from "./AppErrorBoundary";
+import { reportBeacon } from "../lib/diagReport";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY, DB_KEY } from "../lib/store";
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
@@ -85,8 +86,12 @@ export default function OwnerApp() {
   const remountApp = useCallback(() => {
     pendingRemountRef.current = null;
     const now = Date.now();
-    if (now - lastRemountAtRef.current < 10000) return;
+    if (now - lastRemountAtRef.current < 10000) {
+      reportBeacon("remount-blocked", `guard 10s, last ${now - lastRemountAtRef.current}ms ago`);
+      return;
+    }
     lastRemountAtRef.current = now;
+    reportBeacon("remount", "forced remount executed");
     setTabSnapshot(tabRef.current);
     setGeneration((g) => g + 1);
   }, []);
@@ -98,8 +103,10 @@ export default function OwnerApp() {
   const requestRemount = useCallback(
     (opts = {}) => {
       const { forgetLive = false, force = false } = opts;
+      reportBeacon("remount-request", `force=${force} forgetLive=${forgetLive}`);
       if (!force && !forgetLive && tabIsVisible()) {
         pendingRemountRef.current = "soft";
+        reportBeacon("remount-deferred", "soft remount deferred until visible");
         return;
       }
       if (forgetLive) forgetStoreKey(LIVE_KEY);
@@ -107,6 +114,12 @@ export default function OwnerApp() {
     },
     [remountApp]
   );
+
+  /* משואת אבחון (fix/diag-capture): כל שינוי פאזה/קבוצה בעליית הבעלים */
+  const groupSlug = group?.slug ?? null;
+  useEffect(() => {
+    reportBeacon("owner-phase", groupSlug ? `${phase} group=${groupSlug}` : phase);
+  }, [phase, groupSlug]);
 
   /* ------------------------------ סשן ------------------------------ */
   useEffect(() => {

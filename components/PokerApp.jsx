@@ -8,6 +8,7 @@
    ============================================================================ */
 import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback } from "react";
 import { store } from "../lib/store";
+import { reportBeacon } from "../lib/diagReport";
 import { C } from "../lib/poker/colors";
 import { Header, TabBar, Style, TABBAR_H } from "./poker/chrome";
 import { Banner } from "./poker/Banner";
@@ -112,6 +113,11 @@ function App({
   groupId = null,
 }) {
   const [db, setDb] = useState(null);
+  /* משואת אבחון (fix/diag-capture): mount/unmount של האפליקציה — מונה סופת remount-ים */
+  useEffect(() => {
+    reportBeacon("pokerapp-mount", readOnly ? "readOnly" : "owner");
+    return () => reportBeacon("pokerapp-unmount", readOnly ? "readOnly" : "owner");
+  }, [readOnly]);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [recordAlert, setRecordAlert] = useState(null);
