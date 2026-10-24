@@ -1,4 +1,5 @@
 import AnalyticsInit from "@/components/AnalyticsInit";
+import DiagCapture from "@/components/DiagCapture";
 import { Rubik, Outfit } from "next/font/google";
 
 /* פונטים דרך next/font (מאוחסנים עצמית) במקום <link> ל־Google Fonts —
@@ -64,6 +65,7 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
+        <DiagCapture />
         <AnalyticsInit />
         {children}
       </body>

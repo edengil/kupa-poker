@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
+import AppErrorBoundary from "./AppErrorBoundary";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY, DB_KEY } from "../lib/store";
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
@@ -515,6 +516,7 @@ export default function OwnerApp() {
         <PushPrompt supabase={supabase} groupId={group?.id} db={group?.data} viewerAuth={viewerAuth} />
         <Viewers supabase={supabase} online={online} groupId={group.id} />
       </div>
+      <AppErrorBoundary>
       <PokerApp
         key={generation}
         viewerAuth={viewerAuth}
@@ -533,6 +535,7 @@ export default function OwnerApp() {
           <RsvpList supabase={supabase} groupId={group.id} planIso={planIso} onRows={onRows} />
         )}
       />
+      </AppErrorBoundary>
     </>
   );
 }

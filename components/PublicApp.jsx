@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
+import AppErrorBoundary from "./AppErrorBoundary";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
@@ -348,6 +349,7 @@ export default function PublicApp({ slug, nightId = null }) {
         </div>
       )}
 
+      <AppErrorBoundary>
       <PokerApp
         key={generation}
         readOnly
@@ -362,6 +364,7 @@ export default function PublicApp({ slug, nightId = null }) {
           visitRef.current?.onTab?.(tab);
         }}
       />
+      </AppErrorBoundary>
     </>
   );
 }
