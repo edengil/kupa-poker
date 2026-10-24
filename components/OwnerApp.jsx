@@ -5,7 +5,7 @@ import PokerApp from "./PokerApp";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY, DB_KEY } from "../lib/store";
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
-import { createBroadcaster, watchPresence } from "../lib/realtime";
+import { watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import InstallButton from "./InstallButton";
@@ -259,12 +259,12 @@ export default function OwnerApp() {
     // כל כתיבה שנחתה משדרת ping לצופים, בלי לשלוח את הנתונים עצמם.
     // ובכיוון ההפוך: פינג מבחוץ (וואטסאפ / סימון שולם של צופה) מרענן.
     const mkBroadcaster = (slug) => {
-      const b = createBroadcaster(supabase, slug, () => {
-        checkLive();
-        /* סימוני תשלום מעדכנים data ולא live — חובה לרענן גם את ההיסטוריה */
-        forgetStoreKey(DB_KEY);
-        requestRemount({ forgetLive: false, force: true });
-      });
+      /* ניסוי E — ניתוק זמני לאבחון: לא נרשמים לערוץ ה־realtime בכלל.
+         מחזירים אובייקט דמה עם אותו ממשק (ping/dispose) כדי ששאר נתיב
+         ה־boot (מטמון + אימות מול המסד) יישאר זהה. אם האפליקציה עולה
+         ויציבה ככה — הסופה היא בערוץ/באתחולים שהוא מפעיל. */
+      void slug;
+      const b = { ping() {}, dispose() {} };
       broadcasterRef.current = b;
       return b;
     };
@@ -351,39 +351,13 @@ export default function OwnerApp() {
      החור — בדיוק כמו אצל הצופים.
      Remount בזמן שהדף גלוי נדחה; בחזרה מהרקע מריצים remount ממתינים. */
   useEffect(() => {
+    /* ניסוי E — ניתוק זמני לאבחון: הסקר המחזורי (setInterval של 12 שניות)
+       ורענוני החזרה־לדף מנוטרלים לגמרי, כדי שלא ירוצו remount-ים כפויים
+       כלל. גוף האפקט המקורי הוסר זמנית; ה־boot עדיין קורא checkLive
+       פעם אחת לקביעת נקודת ייחוס, ומעבר לטאב הלייב בודק ידנית. */
     if (phase !== "ready") return;
-    let timer = null;
-    const stop = () => timer && clearInterval(timer);
-    const start = () => {
-      stop();
-      timer = setInterval(checkLive, 12000);
-    };
-    const onVis = () => {
-      if (document.visibilityState === "visible") {
-        if (pendingRemountRef.current) {
-          if (pendingRemountRef.current === "live") forgetStoreKey(LIVE_KEY);
-          remountApp();
-        }
-        checkLive();
-        start();
-      } else stop();
-    };
-    const onFocus = () => {
-      if (pendingRemountRef.current) {
-        if (pendingRemountRef.current === "live") forgetStoreKey(LIVE_KEY);
-        remountApp();
-      }
-      checkLive();
-    };
-    onVis();
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      stop();
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [phase, checkLive, remountApp]);
+    return undefined;
+  }, [phase]);
 
   /* נוכחות חיה — מנוי אחד לכל הדף. גם פאנל "מי צופה" וגם טאב "צפיות"
      מקבלים את אותה רשימה כ-prop. שני מנויים לאותו ערוץ היו מפילים את
@@ -516,7 +490,8 @@ export default function OwnerApp() {
             return row;
           });
           broadcasterRef.current?.dispose();
-          broadcasterRef.current = createBroadcaster(supabase, next, checkLive);
+          /* ניסוי E — ניתוק זמני לאבחון: גם בחילוף slug לא פותחים ערוץ. */
+          broadcasterRef.current = { ping() {}, dispose() {} };
         }}
       />
       {saveStatus !== "saved" && (
