@@ -59,6 +59,7 @@ export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
       summaryText={summaryText}
       initialPayments={saved.manualPayments}
       initialPreferCreditors={saved.preferCreditors}
+      initialShortfall={saved.shortfall}
       potAmount={potAmount}
       notice={notice.text}
       onSendUpdate={

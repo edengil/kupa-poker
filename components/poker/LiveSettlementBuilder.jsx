@@ -9,6 +9,7 @@ import { postToGroup } from "../../lib/postToGroup";
 import {
   openingBalances,
   openingBalancesWithPot,
+  editorBalancesWithPot,
   debtorsOf,
   creditorsOf,
   applyManualPayment,
@@ -47,6 +48,7 @@ export function LiveSettlementBuilder({
   sessionId,
   dateLabel,
   potAmount = 0,
+  initialShortfall = null,
 }) {
   // ערב קופה (מודל 25.10): יתרות הפתיחה כוללות את כיור הקופה, וחוסר
   // המימון (זכיות + קופה − חובות) הוא ה"חוסר" שהעורך מחלק בין המרוויחים.
@@ -69,12 +71,19 @@ export function LiveSettlementBuilder({
   const [prefer, setPrefer] = useState(() =>
     Array.isArray(initialPreferCreditors) ? [...initialPreferCreditors] : []
   );
+  // יתרות העבודה של העורך הן הזכאויות נטו (אחרי חלוקת החוסר): במסלול הקופה —
+  // אחרי מפת החוסר השמורה אם יש, אחרת אחרי החלוקה האוטומטית לפי ההעדפה.
+  // ככה תקרת ההעברה (maxPayable/ולידציית applyManualPayment) היא תמיד
+  // min(חוב נותר, זכאות נטו נותרת) — אי אפשר לרשום מעבר למה שמגיע למקבל.
   const opening = useMemo(
     () =>
       potAmount > 0
-        ? openingBalancesWithPot(players, cps, potAmount, POT_SINK_NAME)
+        ? editorBalancesWithPot(players, cps, potAmount, POT_SINK_NAME, {
+            preferCreditors: prefer,
+            shortfallMap: initialShortfall,
+          })
         : openingBalances(players, cps, { preferCreditors: prefer }),
-    [players, cps, prefer, potAmount]
+    [players, cps, prefer, potAmount, initialShortfall]
   );
 
   const [balances, setBalances] = useState(opening.balances);

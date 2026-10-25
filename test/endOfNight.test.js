@@ -94,12 +94,16 @@ describe("end of night — night link with the summary", () => {
     expect(isNightShareText(text)).toBe(true);
   });
 
-  it("the 08:00 reminder picks up the 26.9 night with its five open transfers", () => {
+  it("the 08:00 reminder picks up the 26.9 night with its six open transfers", () => {
+    // שימו לב (25.10): איחוד רשימת הזוגות הוסיף כיסוי זוגי נתנאל↔אופיר, ולכן
+    // התוכנית המחושבת של הערב הסגור שונה מהתוכנית השמורה (נתנאל→אופיר 95
+    // כזוג + נתנאל→קובי 105 + דור→קובי 45) — ה־fingerprint לא תואם וסימון
+    // ה"שולם" הישן מתאפס, כך שכל 6 ההעברות פתוחות. הסכומים האישיים זהים.
     const due = sessionsDueForPaymentReminder([NIGHT_26_9], "2026-09-27", {
       alreadySent: { live_1790201099969: "2026-09-25" },
     });
     expect(due).toHaveLength(1);
-    expect(due[0].check.unpaid).toHaveLength(5);
+    expect(due[0].check.unpaid).toHaveLength(6);
     const text = buildPaymentReminderText(NIGHT_26_9, due[0].check.unpaid, {
       siteUrl: "https://kupa.test",
       slug: "g1",

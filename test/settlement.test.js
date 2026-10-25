@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { settle, isCashOnly, transferVerb, COUPLES } from "../lib/settlement";
+import { FILL_COUPLES } from "../lib/poker/coupleFills.js";
 
 /* cps=2 → net = cashout/2 - buyin. */
 
@@ -39,10 +40,15 @@ describe("settle — basic balance", () => {
 
 describe("settle — couples cover each other first", () => {
   it("lists the expected fixed couples", () => {
+    // מקור האמת האחד = FILL_COUPLES (הכרעת עדן, 25.10 — כל החמישה)
     expect(COUPLES).toEqual([
       ["עדן גיל", "אורן גיל"],
       ["דור לירז", "עדן לירז"],
+      ["שגיא גיל", "דוד בני גיל"],
+      ["אופיר סנה", "נתנאל כהן"],
+      ["איציק תפילין", "ירדן תפילין"],
     ]);
+    expect(COUPLES).toEqual(FILL_COUPLES);
   });
 
   it("Eden pays Oren first when he lost and she won, before others", () => {

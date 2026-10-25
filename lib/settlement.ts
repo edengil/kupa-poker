@@ -13,6 +13,7 @@
 
 import { CPS } from "./report";
 import { FEMALE, canonName, isFemaleName } from "./gender.js";
+import { FILL_COUPLES } from "./poker/coupleFills.js";
 
 export { FEMALE, canonName, isFemaleName };
 
@@ -50,11 +51,13 @@ export const CASH_ONLY: string[] = ["עדן", "אורן", "עדן גיל", "או
 /* מי שלא אוהב להעביר בפייבוקס — יש להתאים אותו קודם למקבלי ביט */
 export const AVOID_CASH_PAY: string[] = ["נתנאל", "נתנאל כהן"];
 
-/* זוגות שמכסים אחד את השני ואחר כך יכולים לשלם יחד */
-export const COUPLES: [string, string][] = [
-  ["עדן גיל", "אורן גיל"],
-  ["דור לירז", "עדן לירז"],
-];
+/* זוגות שמכסים אחד את השני ואחר כך יכולים לשלם יחד.
+   מקור האמת האחד = FILL_COUPLES (הכרעת עדן, 25.10): כלל הכיסוי־קודם חל על
+   כל הזוגות ברשימה המלאה; ההפרדה הישנה בין רשימת המילוי הזוגי לרשימת
+   הכיסוי בחלוקה בוטלה. הוספת זוג = שורה אחת ב־lib/poker/coupleFills.js. */
+export const COUPLES: [string, string][] = FILL_COUPLES.map(
+  ([a, b]) => [a, b] as [string, string]
+);
 
 /** "מעביר" או "מעבירה" לפי השם */
 export const transferVerb = (name: string): string => {
