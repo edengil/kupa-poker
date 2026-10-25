@@ -7,8 +7,9 @@ import { potActualFor, potRecordedFor } from "../../lib/nightShare";
 
 /**
  * ניהול קופת החיסכון — אדמין בלבד.
- * היתרה הראשית היא ה"בפועל" (מזומן שנשמר באמת, מסכום שדות הערבים);
- * היתרה הרשומה (לפי ה־5%) מוצגת כשורה משנית. משיכה נבדקת מול ה"בפועל".
+ * היתרה הראשית היא ה"בפועל" (מזומן שנשמר באמת, מסכום שדות הערבים) —
+ * רק היא מוצגת; היתרה הרשומה הכוללת הוסרה מהתצוגה (הכרעת עדן, 25.10.2026).
+ * משיכה נבדקת מול ה"בפועל".
  * כל משיכה אפשר גם לבטל (מחיקה מההיסטוריה) — היתרה נגזרת מהנתונים
  * ומתעדכנת מעצמה (הכרעת עדן, 25.10.2026).
  */
@@ -31,7 +32,6 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
   const withdrawals = Array.isArray(db.savingsWithdrawals) ? db.savingsWithdrawals : [];
   const withdrawn = withdrawals.reduce((s, w) => s + (Number(w.amount) || 0), 0);
   const balance = r2(totalActual - withdrawn);
-  const balanceRecorded = r2(totalRecorded - withdrawn);
 
   const doWithdraw = () => {
     const amt = Number(amount);
@@ -91,7 +91,7 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
         {balance}₪
       </div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>
-        נצבר בפועל: {totalActual}₪ · נמשך: {withdrawn}₪ · יתרה רשומה: {balanceRecorded}₪
+        נצבר בפועל: {totalActual}₪ · נמשך: {withdrawn}₪
       </div>
 
       {!showForm ? (

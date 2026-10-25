@@ -202,7 +202,6 @@ export function PotDashboard({ db, commit, isAdmin }) {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {stat("יתרה בפועל", overview.balance, "המזומן שבקופה — היתרה הראשית", true)}
-        {stat("יתרה רשומה", overview.balanceRecorded, "לפי ה־5% הרשמי")}
         {stat("נמשך", overview.withdrawn)}
       </div>
 
