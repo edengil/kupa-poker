@@ -46,10 +46,13 @@ describe("העברות אמיתיות 10.10 — תשלום זוגי ידני", (
     expect(got["דן ינקלויץ"]).toBe(530);
     expect(got["קובי סעדה"]).toBe(210);
     expect(got["אופיר סנה"]).toBe(260); // 255 ידני + 5 אוטומטי (ממתין)
-    const pending = plan.transfers.filter((t) => !t.manual);
+    const pending = plan.transfers.filter((t) => !t.manual && !t.residual);
     expect(pending).toHaveLength(1);
     expect(pending[0].to).toBe("אופיר סנה");
     expect(pending[0].amount).toBe(5);
+    // מודל 25.10: העודף (75₪) לא מנותב דרך עדן — הוא רשום במפורש בכיור העודף
+    const residual = plan.transfers.filter((t) => t.residual);
+    expect(residual.reduce((s, t) => s + t.amount, 0)).toBe(75);
   });
 
   it("הוולידטור לא מתריע על החלוקה המלאה (ידני + יתרה)", () => {

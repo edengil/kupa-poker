@@ -8,6 +8,7 @@ import { brassCta, sectionEyebrow } from "../../lib/poker/festive";
 import { postToGroup } from "../../lib/postToGroup";
 import {
   openingBalances,
+  openingBalancesWithPot,
   debtorsOf,
   creditorsOf,
   applyManualPayment,
@@ -15,6 +16,7 @@ import {
   buildManualSettlementText,
   maxPayable,
 } from "../../lib/manualSettlement";
+import { POT_SINK_NAME, RESIDUAL_SINK_NAME } from "../../lib/nightShare";
 import {
   buildSettlementInviteText,
   resolveBrowserInviteUrl,
@@ -44,12 +46,21 @@ export function LiveSettlementBuilder({
   inviteSlug,
   sessionId,
   dateLabel,
+  potAmount = 0,
 }) {
-  const rawOpening = useMemo(() => openingBalances(players, cps), [players, cps]);
+  // ערב קופה (מודל 25.10): יתרות הפתיחה כוללות את כיור הקופה, וחוסר
+  // המימון (זכיות + קופה − חובות) הוא ה"חוסר" שהעורך מחלק בין המרוויחים.
+  const rawOpening = useMemo(
+    () =>
+      potAmount > 0
+        ? openingBalancesWithPot(players, cps, potAmount, POT_SINK_NAME)
+        : openingBalances(players, cps),
+    [players, cps, potAmount]
+  );
   const winnerNames = useMemo(
     () =>
       Object.entries(rawOpening.balances)
-        .filter(([, n]) => n > 0)
+        .filter(([name, n]) => n > 0 && name !== POT_SINK_NAME)
         .map(([name]) => name)
         .sort((a, b) => a.localeCompare(b, "he")),
     [rawOpening.balances]
@@ -59,8 +70,11 @@ export function LiveSettlementBuilder({
     Array.isArray(initialPreferCreditors) ? [...initialPreferCreditors] : []
   );
   const opening = useMemo(
-    () => openingBalances(players, cps, { preferCreditors: prefer }),
-    [players, cps, prefer]
+    () =>
+      potAmount > 0
+        ? openingBalancesWithPot(players, cps, potAmount, POT_SINK_NAME)
+        : openingBalances(players, cps, { preferCreditors: prefer }),
+    [players, cps, prefer, potAmount]
   );
 
   const [balances, setBalances] = useState(opening.balances);
@@ -107,15 +121,30 @@ export function LiveSettlementBuilder({
 
   const debtors = debtorsOf(balances);
   const creditors = creditorsOf(balances);
-  const remaining = useMemo(() => settleFromBalances(balances, cps), [balances, cps]);
+  const remaining = useMemo(
+    () =>
+      settleFromBalances(balances, cps, {
+        preferCreditors: potAmount > 0 ? [POT_SINK_NAME, ...prefer] : prefer,
+      }),
+    [balances, cps, prefer, potAmount]
+  );
   const settlementText = useMemo(
     () =>
       buildManualSettlementText({
         manualPayments,
-        remaining,
+        // הקופה פרטית למנהל — שורות הכיור לא יוצאות לטקסט החלוקה.
+        remaining:
+          potAmount > 0
+            ? {
+                ...remaining,
+                transfers: (remaining.transfers || []).filter(
+                  (t) => t.to !== POT_SINK_NAME && t.to !== RESIDUAL_SINK_NAME
+                ),
+              }
+            : remaining,
         now: endedAt || openedAt,
       }),
-    [manualPayments, remaining, endedAt, openedAt]
+    [manualPayments, remaining, endedAt, openedAt, potAmount]
   );
 
   const inviteUrl = resolveBrowserInviteUrl(inviteSlug, sessionId);

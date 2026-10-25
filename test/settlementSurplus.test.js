@@ -1,6 +1,7 @@
-/* כלל קבוע מעדן (2026-10-11): כסף תלוי באוויר (חייבים > מגיע) תמיד הולך לעדן גיל —
-   מפחית את חובו או מגדיל את זכייתו. לעולם לא נופל שרירותית על שחקן אחר
-   (ערב 10.10.2026: נפל על איציק) ולא נגרע מזוכה (אותו ערב: קובי 210→134). */
+/* כלל העודף — עודכן בהכרעת עדן 25.10.2026 (מחליף את כלל 2026-10-11):
+   העודף לא מנותב יותר דרך הנטו של עדן. כל חייב משלם את מלוא חובו הגולמי,
+   כל זוכה מקבל את מלוא זכייתו, והעודף נרשם במפורש בכיור "עודף ערב".
+   (הכלל הישן שרד רק כ־legacy לחלוקות ידניות ישנות — playersWithPot.) */
 import { describe, it, expect } from "vitest";
 import {
   paymentPlan,
@@ -59,13 +60,13 @@ function sums(transfers) {
   return { got, gave };
 }
 
-describe("כלל העודף → עדן גיל (ערב 10.10.2026)", () => {
+describe("כלל העודף — כיור מפורש, בלי ניתוב דרך עדן (ערב 10.10.2026)", () => {
   it("החלוקה תקינה — אין בעיות ולידציה", () => {
     const { problems } = paymentPlan(NIGHT_1010);
     expect(problems).toEqual([]);
   });
 
-  it("זוכים מקבלים מלא, חייבים משלמים מלא, עדן משלם פחות העודף", () => {
+  it("זוכים מקבלים מלא, חייבים משלמים מלא — כולל עדן; העודף לכיור", () => {
     const { transfers } = paymentPlan(NIGHT_1010);
     const { got, gave } = sums(transfers);
     expect(got["דן ינקלויץ"]).toBe(530);
@@ -74,14 +75,15 @@ describe("כלל העודף → עדן גיל (ערב 10.10.2026)", () => {
     expect(gave["איציק תפילין"]).toBe(175); // לא 100!
     expect(gave["נתנאל כהן"]).toBe(200);
     expect(gave["דור לירז"]).toBe(300);
-    expect((gave["אורן גיל"] || 0) + (gave["עדן גיל"] || 0)).toBe(325); // 120 + (280-75)
+    expect((gave["אורן גיל"] || 0) + (gave["עדן גיל"] || 0)).toBe(400); // 120 + 280 מלא
+    expect(got["עודף ערב"]).toBe(75); // העודף רשום במפורש, לא נופל על אף שחקן
     for (const t of transfers) {
       expect(Number.isInteger(t.amount) && t.amount > 0).toBe(true);
     }
     const totalIn = Object.values(got).reduce((s, v) => s + v, 0);
     const totalOut = Object.values(gave).reduce((s, v) => s + v, 0);
-    expect(totalIn).toBe(1000);
-    expect(totalOut).toBe(1000);
+    expect(totalIn).toBe(1075);
+    expect(totalOut).toBe(1075);
   });
 
   it("הנטו של עדן ב-playersWithPot מופחת בגובה העודף (הגולמי נשמר ב-entries)", () => {
@@ -99,7 +101,7 @@ describe("כלל העודף → עדן גיל (ערב 10.10.2026)", () => {
     expect(problems.some((p) => p.includes("איציק תפילין"))).toBe(true);
   });
 
-  it("עדן מרוויח — העודף מגדיל את זכייתו", () => {
+  it("עדן מרוויח — זכייתו הגולמית נשמרת והעודף הולך לכיור", () => {
     const session = {
       iso: "2026-10-10",
       entries: [
@@ -111,11 +113,12 @@ describe("כלל העודף → עדן גיל (ערב 10.10.2026)", () => {
     const { transfers, problems } = paymentPlan(session);
     expect(problems).toEqual([]);
     const { got } = sums(transfers);
-    expect(got["עדן גיל"]).toBe(150); // 100 + עודף 50
+    expect(got["עדן גיל"]).toBe(100); // הגולמי — העודף לא מגדיל את זכייתו (25.10)
     expect(got["דן ינקלויץ"]).toBe(50);
+    expect(got["עודף ערב"]).toBe(50);
   });
 
-  it("עדן לא בערב — הוולידטור מתריע במקום לשתוק", () => {
+  it("עדן לא בערב — העודף לכיור והוולידטור שקט (אין תשלום חסר סמוי)", () => {
     const session = {
       iso: "2026-10-10",
       entries: [
@@ -123,7 +126,11 @@ describe("כלל העודף → עדן גיל (ערב 10.10.2026)", () => {
         { name: "אורן גיל", amount: -150 },
       ],
     };
-    const { problems } = paymentPlan(session);
-    expect(problems.length).toBeGreaterThan(0);
+    const { transfers, problems } = paymentPlan(session);
+    expect(problems).toEqual([]);
+    const { got, gave } = sums(transfers);
+    expect(got["דן ינקלויץ"]).toBe(100);
+    expect(got["עודף ערב"]).toBe(50);
+    expect(gave["אורן גיל"]).toBe(150);
   });
 });

@@ -3,11 +3,21 @@
 import React, { useState } from "react";
 import { C } from "../../lib/poker/colors";
 import { r2 } from "../../lib/poker/helpers";
+import { potActualFor, potRecordedFor } from "../../lib/nightShare";
 
 /**
  * ניהול קופת החיסכון — אדמין בלבד.
- * מציג יתרה, היסטוריית משיכות, וטופס משיכה חדשה.
+ * היתרה הראשית היא ה"בפועל" (מזומן שנשמר באמת, מסכום שדות הערבים);
+ * היתרה הרשומה (לפי ה־5%) מוצגת כשורה משנית. משיכה נבדקת מול ה"בפועל".
+ * כל משיכה אפשר גם לבטל (מחיקה מההיסטוריה) — היתרה נגזרת מהנתונים
+ * ומתעדכנת מעצמה (הכרעת עדן, 25.10.2026).
  */
+
+/** מחזיר עותק של רשימת המשיכות בלי הרשומה שבאינדקס המקורי (בלי לשנות את המקור). */
+export function withoutWithdrawal(withdrawals, originalIndex) {
+  const list = Array.isArray(withdrawals) ? withdrawals : [];
+  return list.filter((_, idx) => idx !== originalIndex);
+}
 export function SavingsPotCard({ db, commit, isAdmin }) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -15,10 +25,13 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
 
   if (!isAdmin) return null;
 
-  const total = Number(db.savingsPot) || 0;
+  const sessions = Array.isArray(db.sessions) ? db.sessions : [];
+  const totalActual = r2(sessions.reduce((s, x) => s + potActualFor(x), 0));
+  const totalRecorded = r2(sessions.reduce((s, x) => s + potRecordedFor(x), 0));
   const withdrawals = Array.isArray(db.savingsWithdrawals) ? db.savingsWithdrawals : [];
   const withdrawn = withdrawals.reduce((s, w) => s + (Number(w.amount) || 0), 0);
-  const balance = r2(total - withdrawn);
+  const balance = r2(totalActual - withdrawn);
+  const balanceRecorded = r2(totalRecorded - withdrawn);
 
   const doWithdraw = () => {
     const amt = Number(amount);
@@ -48,7 +61,18 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
     setShowForm(false);
   };
 
-  if (total <= 0 && withdrawals.length === 0) return null;
+  const deleteWithdrawal = (originalIndex, w) => {
+    const ok = confirm(
+      `לבטל את המשיכה של ${w.amount}₪ (${w.reason})? היא תימחק מההיסטוריה והיתרה תתעדכן.`
+    );
+    if (!ok) return;
+    commit({
+      ...db,
+      savingsWithdrawals: withoutWithdrawal(withdrawals, originalIndex),
+    });
+  };
+
+  if (totalActual <= 0 && totalRecorded <= 0 && withdrawals.length === 0) return null;
 
   return (
     <div
@@ -67,7 +91,7 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
         {balance}₪
       </div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 12 }}>
-        נצבר: {total}₪ · נמשך: {withdrawn}₪
+        נצבר בפועל: {totalActual}₪ · נמשך: {withdrawn}₪ · יתרה רשומה: {balanceRecorded}₪
       </div>
 
       {!showForm ? (
@@ -159,23 +183,39 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
             היסטוריית משיכות:
           </div>
           {withdrawals
-            .slice()
+            .map((w, idx) => ({ w, idx }))
             .reverse()
             .slice(0, 10)
-            .map((w, i) => (
+            .map(({ w, idx }) => (
               <div
-                key={i}
+                key={idx}
                 style={{
                   fontSize: 12,
                   color: C.dim,
                   padding: "4px 0",
                   borderBottom: `1px solid ${C.line}`,
                   display: "flex",
-                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
                 }}
               >
-                <span>{w.reason}</span>
+                <span style={{ flex: 1 }}>{w.reason}</span>
                 <span style={{ color: C.cream }}>-{w.amount}₪</span>
+                <button
+                  type="button"
+                  onClick={() => deleteWithdrawal(idx, w)}
+                  style={{
+                    fontSize: 11,
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    border: `1px solid ${C.line}`,
+                    background: "transparent",
+                    color: C.dim,
+                  }}
+                >
+                  מחק
+                </button>
               </div>
             ))}
         </div>

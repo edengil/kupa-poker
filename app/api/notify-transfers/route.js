@@ -86,7 +86,10 @@ export async function POST(request) {
   try {
     if (action === "settlement") {
       const plan = paymentPlan(session);
-      const open = plan.transfers.filter((t, i) => !plan.paid[i] && !plan.received[i]);
+      // העברות פנימיות לקופה/לעודף לא נחשפות לשחקנים — הקופה פרטית למנהל.
+      const open = plan.transfers.filter(
+        (t, i) => !t.pot && !t.residual && !plan.paid[i] && !plan.received[i]
+      );
       if (!open.length) return NextResponse.json({ ok: true, sent: 0, skipped: "all paid" });
 
       // מקבץ לפי שחקן: למי הוא צריך להעביר / מי צריך להעביר אליו

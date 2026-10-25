@@ -29,8 +29,8 @@ const NIGHT_2 = {
 };
 
 describe("דשבורד קופה", () => {
-  it("computedPot מחזיר את העודף בשקלים שלמים", () => {
-    expect(computedPot(NIGHT_1010)).toBe(75);
+  it("computedPot מחזיר את הקופה הרשומה מהשדה (מודל 25.10)", () => {
+    expect(computedPot(NIGHT_1010)).toBe(76.25);
     expect(computedPot(NIGHT_2)).toBe(0); // מאוזן — אין קופה
     expect(computedPot({ entries: [] })).toBe(0);
   });
@@ -44,21 +44,23 @@ describe("דשבורד קופה", () => {
     expect(o.evenings).toHaveLength(2);
     expect(o.evenings[0].id).toBe("live_1791669733765"); // חדש קודם
     const e = o.evenings[0];
-    expect(e.applied).toBe(75);
     expect(e.recorded).toBe(76.25);
+    expect(e.actual).toBe(76.25); // ברירת מחדל: בפועל = רשום
+    expect(e.gap).toBe(-75); // פער הערב — שורה נפרדת, לא חלק מהקופה
     expect(e.edenGross).toBe(-280);
-    expect(e.edenPaid).toBe(205);
+    expect(e.edenPaid).toBe(280); // מודל 25.10: עדן משלם מלא, העודף לא מנותב דרכו
     expect(e.edenWon).toBe(0);
-    expect(o.totalApplied).toBe(75);
     expect(o.totalRecorded).toBe(76.25);
+    expect(o.totalActual).toBe(76.25);
     expect(o.withdrawn).toBe(50);
-    expect(o.balance).toBe(26.25);
+    expect(o.balance).toBe(26.25); // היתרה הראשית = בפועל פחות משיכות
+    expect(o.balanceRecorded).toBe(26.25);
   });
 
   it("ערב מאוזן: קופה 0 ועדן משלם מלא", () => {
     const o = potOverview({ sessions: [NIGHT_2] });
     const e = o.evenings[0];
-    expect(e.applied).toBe(0);
+    expect(e.recorded).toBe(0);
     expect(e.edenPaid).toBe(100);
   });
 });

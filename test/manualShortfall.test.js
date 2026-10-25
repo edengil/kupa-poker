@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { paymentPlan, saveManualPayments } from "../lib/paymentTracking.js";
 import { savedSettlement } from "../lib/savedSettlement.js";
-import { playersWithPot } from "../lib/nightShare.js";
+import { settlementPlayersFor } from "../lib/nightShare.js";
 
 const NIGHT_1010 = {
   id: "live_1791669733765",
@@ -39,9 +39,12 @@ describe("חוסר ידני", () => {
     const withManual = saveManualPayments(NIGHT_1010, REAL);
     const ms = { ...withManual.manualSettlement, shortfall: SHORTFALL };
     const plan = paymentPlan(sessionWith(ms));
-    const pending = plan.transfers.filter((t) => !t.manual);
+    const pending = plan.transfers.filter((t) => !t.manual && !t.residual);
     expect(pending).toHaveLength(0);
     expect(plan.transfers.filter((t) => t.manual)).toHaveLength(6);
+    // העודף (70₪) רשום בכיור העודף — לא נופל על עדן ולא נעלם
+    const residual = plan.transfers.filter((t) => t.residual);
+    expect(residual.reduce((s, t) => s + t.amount, 0)).toBe(70);
   });
 
   it("הוולידטור לא מתריע", () => {
@@ -52,9 +55,9 @@ describe("חוסר ידני", () => {
   });
 
   it("shortfallTotal הוא 10 נטו", () => {
-    const players = playersWithPot(NIGHT_1010);
     const withManual = saveManualPayments(NIGHT_1010, REAL);
     const ms = { ...withManual.manualSettlement, shortfall: SHORTFALL };
+    const players = settlementPlayersFor(sessionWith(ms));
     const saved = savedSettlement(players, 1, ms);
     expect(saved.shortfallTotal).toBe(10);
   });

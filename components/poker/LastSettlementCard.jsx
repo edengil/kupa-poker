@@ -5,7 +5,7 @@ import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SendSettlementLink } from "./SendSettlementLink";
 import { C } from "../../lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
-import { settlementTextForSession } from "../../lib/nightShare";
+import { settlementTextForSession, potActualFor } from "../../lib/nightShare";
 import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
 import { r2 } from "../../lib/poker/helpers";
 import { settlementVersionLabel } from "../../lib/savedSettlement";
@@ -58,11 +58,16 @@ export function LastSettlementCard({
     }
     const sid = sessionId || session?.id;
     if (!sid || !commit) return;
+    // כמו בדשבורד הקופה: עריכת הרשום מעדכנת גם את היתרה המצטברת בהפרש,
+    // אחרת השדה והיתרה מתפצלים (סטיית מעקב שנמצאה בביקורת 25.10).
+    const old = Number(db.sessions.find((s) => s.id === sid)?.savingsPot) || 0;
+    const newTotal = r2((Number(db.savingsPot) || 0) + r2(v - old));
     commit({
       ...db,
       sessions: db.sessions.map((s) =>
         s.id === sid ? { ...s, savingsPot: v > 0 ? r2(v) : undefined } : s
       ),
+      savingsPot: newTotal > 0 ? newTotal : undefined,
     });
     setEditingPot(false);
     setPotValue("");
@@ -184,6 +189,7 @@ export function LastSettlementCard({
     const closed = !!statusRow?.closed;
     // קופת חיסכון בסוגריים — רק האדמין רואה (כולל העברות זוגיות)
     const pot = r2(Number(session.savingsPot) || 0);
+    const potActual = potActualFor(session);
     const showPot = isAdmin && pot > 0 && (String(transfer.from || "").includes("עדן גיל") || String(transfer.to || "").includes("עדן גיל"));
     // חלקו האישי של עדן בהעברה זוגית — רק האדמין רואה (שיראה שהקופה ירדה ממנו)
     let edenShare = null;
@@ -264,7 +270,7 @@ export function LastSettlementCard({
         )}
         {showPot && !editingPot && (
           <span style={{ color: C.brass, fontSize: 11 }}>
-            (קופת חיסכון: {pot}₪)
+            (קופת חיסכון: {pot}₪{potActual !== pot ? ` · בפועל ${potActual}₪` : ""})
             <button
               type="button"
               onClick={(e) => {

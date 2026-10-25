@@ -98,6 +98,19 @@ function avoidsCashPay(name: string): boolean {
   return AVOID_CASH_PAY.includes(n) || AVOID_CASH_PAY.includes(canonName(n));
 }
 
+/**
+ * נטו מעוגל לשקלים שלמים לכל שחקן, בלי שום חלוקת חוסר/עודף —
+ * הבסיס הגולמי שממנו נגזרות כל החלוקות (קופה, ידני, אוטומטי).
+ */
+export function roundedNets(
+  players: SettlePlayer[] = [],
+  cps: number = CPS
+): { name: string; net: number; raw: number }[] {
+  const exact = players.map((p) => (+p.cashout! || 0) / cps - (+p.buyin! || 0));
+  const nets = roundPreservingSum(exact);
+  return players.map((p, i) => ({ name: p.name, net: nets[i], raw: exact[i] }));
+}
+
 export function settle(players: SettlePlayer[] = [], cps: number = CPS, opts: SettleOpts = {}): SettleResult {
   const unfinished = players.filter((p) => p.cashout === "" || p.cashout == null).map((p) => p.name);
 

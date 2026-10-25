@@ -3,17 +3,23 @@
 import React, { useMemo, useState } from "react";
 import { C } from "../../lib/poker/colors";
 import { r2 } from "../../lib/poker/helpers";
+import { fmtGap } from "../../lib/poker/format";
 import { potOverview } from "../../lib/paymentTracking";
 import { flushStore } from "../../lib/store";
 
 /**
- * דשבורד קופת חיסכון — אדמין בלבד.
- * לכל ערב: הקופה שיושמה בפועל בחלוקה (מחושבת מהיתרות — זה מה שירד
- * מהתשלום של עדן) והקופה המתועדת (ניתנת לעריכה, למעקב מזומן).
+ * דשבורד קופת חיסכון — אדמין בלבד (מודל 25.10).
+ * לכל ערב שני מספרים נפרדים: "רשום" — ה־5% הרשמי (session.savingsPot),
+ * שנשמר תמיד במלואו וניתן לעריכה; ו"בפועל" — כמה מזומן באמת נשמר
+ * (session.savingsPotActual, ברירת מחדל = הרשום, ניתן לעריכה).
+ * היתרה הראשית היא ה"בפועל". פער הערב (חוסר/עודף במאזן) מוצג כשורה
+ * נפרדת ולעולם לא מתקזז מול הקופה.
  */
 export function PotDashboard({ db, commit, isAdmin }) {
   const [editingId, setEditingId] = useState(null);
   const [potValue, setPotValue] = useState("");
+  const [editingActualId, setEditingActualId] = useState(null);
+  const [actualValue, setActualValue] = useState("");
 
   const overview = useMemo(() => potOverview(db), [db]);
   if (!isAdmin) return null;
@@ -41,6 +47,25 @@ export function PotDashboard({ db, commit, isAdmin }) {
     setPotValue("");
   };
 
+  /* עריכת "בפועל" — נוגעת רק בשדה של הערב, לא ביתרה הרשומה המצטברת. */
+  const savePotActual = (sessionId) => {
+    const v = Number(actualValue);
+    if (!Number.isFinite(v) || v < 0) {
+      alert("סכום לא תקין");
+      return;
+    }
+    if (!commit) return;
+    commit({
+      ...db,
+      sessions: db.sessions.map((s) =>
+        s.id === sessionId ? { ...s, savingsPotActual: v > 0 ? r2(v) : undefined } : s
+      ),
+    });
+    void flushStore().catch(() => {});
+    setEditingActualId(null);
+    setActualValue("");
+  };
+
   const stat = (label, value, sub, accent = false) => (
     <div
       style={{
@@ -60,6 +85,66 @@ export function PotDashboard({ db, commit, isAdmin }) {
     </div>
   );
 
+  const editBtnStyle = {
+    background: "transparent",
+    color: C.brass,
+    border: `1px solid ${C.line}`,
+    borderRadius: 8,
+    padding: "2px 8px",
+    fontSize: 11.5,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    marginRight: 4,
+  };
+  const inputStyle = {
+    width: 80,
+    background: C.feltDeep,
+    color: C.cream,
+    border: `1px solid ${C.brass}`,
+    borderRadius: 8,
+    padding: "4px 8px",
+    fontFamily: "inherit",
+    fontSize: 13,
+  };
+  const saveBtnStyle = {
+    background: C.brass,
+    color: C.feltDeep,
+    border: "none",
+    borderRadius: 8,
+    padding: "4px 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  };
+  const cancelBtnStyle = {
+    background: "transparent",
+    color: C.dim,
+    border: `1px solid ${C.line}`,
+    borderRadius: 8,
+    padding: "4px 10px",
+    fontSize: 12,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  };
+
+  const amountEditor = ({ value, onChange, onSave, onCancel }) => (
+    <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <input
+        type="number"
+        value={value}
+        onChange={(ev) => onChange(ev.target.value)}
+        style={inputStyle}
+      />
+      <button type="button" onClick={onSave} style={saveBtnStyle}>
+        שמור
+      </button>
+      <button type="button" onClick={onCancel} style={cancelBtnStyle}>
+        ביטול
+      </button>
+    </span>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: C.brass }}>
@@ -67,14 +152,16 @@ export function PotDashboard({ db, commit, isAdmin }) {
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {stat("יתרה מתועדת", overview.balance, "מתועד פחות נמשך", true)}
-        {stat("יושם בחלוקות", overview.totalApplied, "ירד מהתשלום שלך")}
+        {stat("יתרה בפועל", overview.balance, "המזומן שבקופה — היתרה הראשית", true)}
+        {stat("יתרה רשומה", overview.balanceRecorded, "לפי ה־5% הרשמי")}
         {stat("נמשך", overview.withdrawn)}
       </div>
 
       <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6 }}>
-        הסכום שיורד מהתשלום שלך מחושב אוטומטית מהיתרות כדי שהחלוקה תתאזן.
-        הסכום המתועד הוא למעקב המזומן שלך — ניתן לעריכה בכל ערב.
+        הקופה היא ה־5% מהקניות של כל ערב (הסכום ה&quot;רשום&quot;) — היא נשמרת תמיד
+        במלואה. &quot;בפועל&quot; הוא כמה מזומן באמת נשמר; אם נשמר סכום אחר, עורכים
+        אותו כאן. פער של ערב (חוסר או עודף במאזן) מוצג בנפרד ולעולם לא יורד
+        מהקופה — חוסר מתחלק בין המרוויחים בחלוקת ההעברות.
       </div>
 
       {overview.evenings.length === 0 ? (
@@ -114,96 +201,72 @@ export function PotDashboard({ db, commit, isAdmin }) {
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ color: C.win }}>
-                  יושם: <b style={{ fontVariantNumeric: "tabular-nums" }}>{e.applied}₪</b>
-                </span>
                 {editingId === e.id ? (
                   <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <span style={{ color: C.dim }}>מתועד:</span>
-                    <input
-                      type="number"
-                      value={potValue}
-                      onChange={(ev) => setPotValue(ev.target.value)}
-                      style={{
-                        width: 80,
-                        background: C.feltDeep,
-                        color: C.cream,
-                        border: `1px solid ${C.brass}`,
-                        borderRadius: 8,
-                        padding: "4px 8px",
-                        fontFamily: "inherit",
-                        fontSize: 13,
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => savePot(e.id)}
-                      style={{
-                        background: C.brass,
-                        color: C.feltDeep,
-                        border: "none",
-                        borderRadius: 8,
-                        padding: "4px 10px",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      שמור
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
+                    <span style={{ color: C.dim }}>רשום:</span>
+                    {amountEditor({
+                      value: potValue,
+                      onChange: setPotValue,
+                      onSave: () => savePot(e.id),
+                      onCancel: () => {
                         setEditingId(null);
                         setPotValue("");
-                      }}
-                      style={{
-                        background: "transparent",
-                        color: C.dim,
-                        border: `1px solid ${C.line}`,
-                        borderRadius: 8,
-                        padding: "4px 10px",
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      ביטול
-                    </button>
+                      },
+                    })}
                   </span>
                 ) : (
                   <span style={{ color: C.cream }}>
-                    מתועד:{" "}
-                    <b style={{ fontVariantNumeric: "tabular-nums" }}>
-                      {e.recorded != null ? `${e.recorded}₪` : "—"}
-                    </b>{" "}
+                    רשום:{" "}
+                    <b style={{ fontVariantNumeric: "tabular-nums" }}>{e.recorded}₪</b>{" "}
                     <button
                       type="button"
                       onClick={() => {
                         setEditingId(e.id);
-                        setPotValue(e.recorded != null ? String(e.recorded) : String(e.applied));
+                        setPotValue(String(e.recorded));
                       }}
-                      style={{
-                        background: "transparent",
-                        color: C.brass,
-                        border: `1px solid ${C.line}`,
-                        borderRadius: 8,
-                        padding: "2px 8px",
-                        fontSize: 11.5,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        marginRight: 4,
-                      }}
+                      style={editBtnStyle}
                     >
                       ערוך
                     </button>
                   </span>
                 )}
+                {editingActualId === e.id ? (
+                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ color: C.dim }}>בפועל:</span>
+                    {amountEditor({
+                      value: actualValue,
+                      onChange: setActualValue,
+                      onSave: () => savePotActual(e.id),
+                      onCancel: () => {
+                        setEditingActualId(null);
+                        setActualValue("");
+                      },
+                    })}
+                  </span>
+                ) : (
+                  <span style={{ color: C.cream }}>
+                    בפועל:{" "}
+                    <b style={{ fontVariantNumeric: "tabular-nums" }}>{e.actual}₪</b>{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingActualId(e.id);
+                        setActualValue(String(e.actual));
+                      }}
+                      style={editBtnStyle}
+                    >
+                      ערוך
+                    </button>
+                  </span>
+                )}
+                <span style={{ color: C.dim }}>
+                  פער הערב: {fmtGap(e.gap)}₪
+                </span>
               </div>
-              {e.recorded != null && Math.abs(e.recorded - e.applied) > 2 && (
-                <div style={{ fontSize: 11.5, color: C.brass, marginTop: 4 }}>
-                  שים לב: המתועד שונה מהמיושם ב־{r2(Math.abs(e.recorded - e.applied))}₪ (הפרש עיגול/תיעוד)
+              {e.actual !== e.recorded && (
+                <div style={{ fontSize: 11.5, color: C.dim, marginTop: 4 }}>
+                  נשמרו בפועל {e.actual}₪ מתוך {e.recorded}₪ רשומים — היתרה
+                  הראשית עוקבת אחרי ה&quot;בפועל&quot;.
                 </div>
               )}
             </div>

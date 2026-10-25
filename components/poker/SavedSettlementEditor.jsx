@@ -1,7 +1,15 @@
 "use client";
 
 import { LiveSettlementBuilder } from "./LiveSettlementBuilder";
-import { sessionHasBuyinChips, nightSummaryText, playersWithPot } from "../../lib/nightShare";
+import {
+  sessionHasBuyinChips,
+  nightSummaryText,
+  settlementPlayersFor,
+  isLegacySettlement,
+  edenNameIn,
+  potRecordedFor,
+  POT_SINK_NAME,
+} from "../../lib/nightShare";
 import { savedSettlement } from "../../lib/savedSettlement";
 import { saveManualPayments } from "../../lib/paymentTracking";
 import { settlementEditNotice } from "../../lib/settlementEditNotice";
@@ -21,9 +29,15 @@ import { AL } from "../../lib/poker/helpers";
 export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
   const session = db.sessions.find((s) => s.id === sessionId);
   if (!session) return null;
-  const players = playersWithPot(session);
+  const players = settlementPlayersFor(session);
   const cps = sessionHasBuyinChips(session) ? session.cps || 2 : 1;
-  const saved = savedSettlement(players, cps, session.manualSettlement);
+  const legacy = isLegacySettlement(session);
+  const potAmount = legacy ? 0 : potRecordedFor(session);
+  const saved = savedSettlement(players, cps, session.manualSettlement, {
+    potAmount,
+    potSinkName: POT_SINK_NAME,
+    edenName: edenNameIn(session),
+  });
   const notice = settlementEditNotice(session);
   const summaryText = nightSummaryText(session, AL(db));
   const settlementVersion = Number(session.manualSettlement?.settlementVersion) || 0;
@@ -45,6 +59,7 @@ export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
       summaryText={summaryText}
       initialPayments={saved.manualPayments}
       initialPreferCreditors={saved.preferCreditors}
+      potAmount={potAmount}
       notice={notice.text}
       onSendUpdate={
         settlementVersion > 1
