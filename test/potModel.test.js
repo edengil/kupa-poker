@@ -63,7 +63,9 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
   it("אוטומטי: חוסר 58 מתחלק יחסית בין הזוכים; הקופה מלאה; עדן משלם 530 מהם 93 לקופה", () => {
     const plan = paymentPlan(NIGHT_2410);
     expect(plan.problems).toEqual([]);
-    const { got, gave } = sums(plan.transfers);
+    // החשבונאות המלאה (כולל כיורים) היא של ה־resolver; paymentPlan מחזיק רק העברות שחקנים
+    const allTransfers = resolveSettlement(NIGHT_2410).transfers;
+    const { got, gave } = sums(allTransfers);
     // חלוקה יחסית של 58: אופיר 29, אורן 18, דור 6, דן 5
     expect(got["אופיר סנה"]).toBe(486);
     expect(got["אורן גיל"]).toBe(302);
@@ -74,7 +76,7 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     expect(gave["קובי סעדה"]).toBe(400);
     expect(gave["נתנאל כהן"]).toBe(150);
     // חובת ההפקדה של עדן: שורת קופה אחת של 93 ממנו
-    const potFromEden = plan.transfers.filter((t) => t.to === POT_SINK_NAME);
+    const potFromEden = allTransfers.filter((t) => t.to === POT_SINK_NAME);
     expect(potFromEden).toHaveLength(1);
     expect(potFromEden[0].from).toBe("עדן גיל");
     expect(potFromEden[0].amount).toBe(93);
@@ -95,19 +97,21 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     };
     const plan = paymentPlan(session);
     expect(plan.problems).toEqual([]);
-    const { got, gave } = sums(plan.transfers);
+    const allTransfers = resolveSettlement(session).transfers;
+    const { got, gave } = sums(allTransfers);
     expect(got["אופיר סנה"]).toBe(480);
     expect(got["אורן גיל"]).toBe(307);
     expect(got["דור לירז"]).toBe(100);
     expect(got["דן ינקלויץ"]).toBe(100);
-    expect(got[POT_SINK_NAME]).toBe(93);
-    expect(gave["עדן גיל"]).toBe(530); // 437 לזוכים + 93 לקופה
+    // R3: עם savingsPotActual=70 — ההעברה לקופה בתוכנית היא הבפועל, לא הרשום
+    expect(got[POT_SINK_NAME]).toBe(70);
+    expect(gave["עדן גיל"]).toBe(530); // מלוא החוב הגולמי: 437 לזוכים + 70 לקופה + 23 עודף פנימי
     expect(gave["קובי סעדה"]).toBe(400);
     expect(gave["נתנאל כהן"]).toBe(150);
-    const edenToPot = plan.transfers
+    const edenToPot = allTransfers
       .filter((t) => t.from === "עדן גיל" && t.to === POT_SINK_NAME)
       .reduce((s, t) => s + t.amount, 0);
-    expect(edenToPot).toBe(93);
+    expect(edenToPot).toBe(70);
     // הטקסט הציבורי לקבוצה לא חושף את הקופה
     const text = settlementTextForSession(session);
     expect(text).not.toContain("קופת חיסכון");
@@ -127,7 +131,7 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     };
     const plan = paymentPlan(session);
     expect(plan.problems).toEqual([]);
-    const { got, gave } = sums(plan.transfers);
+    const { got, gave } = sums(resolveSettlement(session).transfers);
     expect(got["דן ינקלויץ"]).toBe(250);
     expect(got[POT_SINK_NAME]).toBe(93);
     expect(got[RESIDUAL_SINK_NAME]).toBe(57); // 150 עודף − 93 קופה

@@ -5,6 +5,14 @@ import { C } from "../../lib/poker/colors";
 import { r2 } from "../../lib/poker/helpers";
 import { fmtGap } from "../../lib/poker/format";
 import { potOverview } from "../../lib/paymentTracking";
+import {
+  autoShortfallMapForPot,
+  potRecordedFor,
+  sessionHasBuyinChips,
+  sessionHasPot,
+  settlementPlayersFor,
+} from "../../lib/nightShare";
+import { settlementBasis } from "../../lib/savedSettlement";
 import { flushStore } from "../../lib/store";
 
 /**
@@ -47,7 +55,47 @@ export function PotDashboard({ db, commit, isAdmin }) {
     setPotValue("");
   };
 
-  /* עריכת "בפועל" — נוגעת רק בשדה של הערב, לא ביתרה הרשומה המצטברת. */
+  /* עריכת "בפועל" — נוגעת רק בשדה של הערב, לא ביתרה הרשומה המצטברת.
+     היא משנה את סכום ההעברה לקופה בתוכנית (R3) — ורק אותו: סכומי השחקנים
+     נשארים כפי שהיו תחת הרשום (כמו ב־24.10, שם המפה נכתבה מול 93 והבפועל
+     70 שינה רק את שורת הקופה; ההפרש הוא עודף פנימי). צופה מחשב עם הרשום
+     בלבד (הבפועל פרטי למנהל), ולכן לערב בלי חלוקה שמורה "מקפיאים" את
+     חלוקת החוסר האוטומטית של הרשום כמפה ידנית (frozenActual) — כך מנהל
+     וצופה מקבלים אותם סכומי שחקנים בדיוק. מפה שעדן ערך בעצמו לא נוגעים
+     בה; מחיקת הבפועל משחררת מפה קפואה וחוזרת לחישוב האוטומטי. */
+  const withActual = (s, v) => {
+    const next = { ...s, savingsPotActual: v > 0 ? r2(v) : undefined };
+    const ms = s.manualSettlement;
+    const nowIso = new Date().toISOString();
+    if (ms?.frozenActual != null) {
+      if (v <= 0) {
+        const { manualSettlement, ...rest } = next;
+        return rest;
+      }
+      return { ...next, manualSettlement: { ...ms, frozenActual: r2(v) } };
+    }
+    if (!ms && v > 0 && sessionHasPot(next)) {
+      const map = autoShortfallMapForPot(next, potRecordedFor(next));
+      if (Object.keys(map).length) {
+        const players = settlementPlayersFor(next);
+        const cps = sessionHasBuyinChips(next) ? next.cps || 2 : 1;
+        return {
+          ...next,
+          manualSettlement: {
+            basis: settlementBasis(players, cps),
+            manualPayments: [],
+            preferCreditors: [],
+            shortfall: map,
+            frozenActual: r2(v),
+            settlementVersion: 2,
+            settlementUpdatedAt: nowIso,
+          },
+        };
+      }
+    }
+    return next;
+  };
+
   const savePotActual = (sessionId) => {
     const v = Number(actualValue);
     if (!Number.isFinite(v) || v < 0) {
@@ -57,9 +105,7 @@ export function PotDashboard({ db, commit, isAdmin }) {
     if (!commit) return;
     commit({
       ...db,
-      sessions: db.sessions.map((s) =>
-        s.id === sessionId ? { ...s, savingsPotActual: v > 0 ? r2(v) : undefined } : s
-      ),
+      sessions: db.sessions.map((s) => (s.id === sessionId ? withActual(s, v) : s)),
     });
     void flushStore().catch(() => {});
     setEditingActualId(null);

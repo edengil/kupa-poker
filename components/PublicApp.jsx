@@ -8,7 +8,7 @@ import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
 import { PushPrompt } from "./PushPrompt";
-import { paymentPlan, markPaymentViaRpc } from "../lib/paymentTracking";
+import { markPaymentViaRpc, rpcMarkTarget } from "../lib/paymentTracking";
 import { votePlayerViaRpc } from "../lib/poker/playerOfNight";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
@@ -106,12 +106,18 @@ export default function PublicApp({ slug, nightId = null }) {
 
   const markPayment = useCallback(
     async (session, index, paid, field = "paid", by = null) => {
-      const { fingerprint } = paymentPlan(session);
+      /* השרת מקבל רק את ה־fingerprint השמור במסד; כשהחלוקה השתנתה מאז,
+         rpcMarkTarget מתרגם את ההעברה לאינדקס שלה בתוכנית השמורה. */
+      const target = rpcMarkTarget(session, index);
+      if (!target) {
+        alert("החלוקה של הערב עודכנה, וההעברה הזו לא הייתה בתוכנית הקודמת — המנהל צריך לפתוח את האפליקציה פעם אחת כדי לאמץ את החלוקה החדשה, ואז הסימון יישמר.");
+        return;
+      }
       const data = await markPaymentViaRpc(supabase, {
         slug,
         sessionId: session.id,
-        fingerprint,
-        index,
+        fingerprint: target.fingerprint,
+        index: target.index,
         paid,
         field,
         by,

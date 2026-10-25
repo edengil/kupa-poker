@@ -131,7 +131,7 @@ describe("ניתוב הקופה דרך עדן — העברת זוג מוגנת",
 });
 
 describe("ערב 24.10 (manualSettlement שמור) — זוגות נסגרים קודם במסלול הידני", () => {
-  it("עדן→אורן 307 במלואה וראשונה; נתנאל→אופיר 150 כזוג; עדן 437 לזוכים + 93 לקופה", () => {
+  it("עדן→אורן 307 במלואה וראשונה; נתנאל→אופיר 150 כזוג; עדן 437 לזוכים + 70 לקופה (בפועל — R3)", () => {
     const session = night2410WithManualMap();
     const plan = paymentPlan(session);
     expect(plan.problems).toEqual([]);
@@ -147,18 +147,36 @@ describe("ערב 24.10 (manualSettlement שמור) — זוגות נסגרים �
     expect(netanelOut).toEqual([
       expect.objectContaining({ from: "נתנאל כהן", to: "אופיר סנה", amount: 150, pair: true }),
     ]);
-    // הסכומים האישיים בדיוק כמו בהכרעת עדן
+    // הסכומים האישיים בדיוק כמו בהכרעת עדן; הקופה אינה ברשימת ההעברות
+    // הקנונית — היא חוזרת כ־potTransfer, ובפועל (70) כי savingsPotActual נערך
     const { got, gave } = sums(t);
     expect(got["אופיר סנה"]).toBe(480);
     expect(got["אורן גיל"]).toBe(307);
     expect(got["דור לירז"]).toBe(100);
     expect(got["דן ינקלויץ"]).toBe(100);
-    expect(got[POT_SINK_NAME]).toBe(93);
-    expect(gave["עדן גיל"]).toBe(530);
-    const edenToPlayers = t
-      .filter((x) => x.from === "עדן גיל" && x.to !== POT_SINK_NAME)
-      .reduce((s, x) => s + x.amount, 0);
-    expect(edenToPlayers).toBe(437);
+    expect(got[POT_SINK_NAME]).toBeUndefined();
+    expect(plan.potTransfer).toEqual(
+      expect.objectContaining({ from: "עדן גיל", to: POT_SINK_NAME, amount: 70, pot: true })
+    );
+    expect(gave["עדן גיל"]).toBe(437);
+    // הפרש הרשום־בפועל (23) נשאר כעודף פנימי ב־resolver — לא העברה לשחקן
+    const residual = resolveSettlement(session).transfers.filter((x) => x.residual);
+    expect(residual.reduce((s, x) => s + x.amount, 0)).toBe(23);
+  });
+
+  it("עקביות צופה (R1+R3+R4): בלי שדות הקופה מתקבלת אותה תוכנית שחקנים ואותו fingerprint", () => {
+    const admin = night2410WithManualMap();
+    // כך הערב נראה בנתוני הציבור: ה־SQL מסיר savingsPot, והצופה לא מקבל
+    // את savingsPotActual (R4). נשאר savings5 — הרשום מחושב מ־5% מהקניות.
+    const viewer = { ...admin, savingsPot: undefined, savingsPotActual: undefined };
+    const adminPlan = paymentPlan(admin);
+    const viewerPlan = paymentPlan(viewer);
+    expect(viewerPlan.transfers).toEqual(adminPlan.transfers);
+    expect(viewerPlan.fingerprint).toBe(adminPlan.fingerprint);
+    // רק המנהל רואה את העברת הקופה, ובסכום הבפועל; אצל הצופה היא כלל לא
+    // חלק מהתוכנית הקנונית (transfers), ולכן גם לא מהספירה ומהסימונים.
+    expect(adminPlan.potTransfer?.amount).toBe(70);
+    expect(viewerPlan.transfers.some((t) => t.pot)).toBe(false);
   });
 
   it("גם במסלול האוטומטי (בלי manualSettlement) נתנאל→אופיר היא העברת זוג", () => {

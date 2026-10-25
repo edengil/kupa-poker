@@ -6,7 +6,7 @@ import { SendSettlementLink } from "./SendSettlementLink";
 import { C } from "../../lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
 import { settlementTextForSession, potActualFor } from "../../lib/nightShare";
-import { paymentPlan, markTransfer } from "../../lib/paymentTracking";
+import { paymentPlan, markTransfer, markPotPaid } from "../../lib/paymentTracking";
 import { r2 } from "../../lib/poker/helpers";
 import { settlementVersionLabel } from "../../lib/savedSettlement";
 import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "../../lib/nightConfirmations";
@@ -32,6 +32,116 @@ import { StatusChip } from "./ui";
  * onMarkPayment(session, index, paid) — לצופים (RPC); אחרת commit מקומי.
  * collapsible — כותרת שפותחת וסוגרת את הכרטיס (ערבים קודמים מתחילים סגורים).
  */
+/* שורת ההפקדה לקופת החיסכון — מנהל בלבד, שורה אחת בלבד (R2): שדה עריכת
+   הקופה ("רשום") קשור רק אליה, לא לכל שורה של עדן. הסכום בשורה הוא סכום
+   התוכנית (ה"בפועל" אם נערך — R3); הכיתוב מראה רשום/בפועל. */
+function PotRow({ session, potTransfer, potPaid, busy, markPot, editingPot, setEditingPot, potValue, setPotValue, savePot }) {
+  if (!potTransfer) return null;
+  const pot = r2(Number(session.savingsPot) || 0);
+  const potActual = potActualFor(session);
+  return (
+    <label
+      style={{
+        display: "flex",
+        gap: 10,
+        alignItems: "center",
+        padding: "9px 8px",
+        borderTop: `1px dashed ${C.brass}55`,
+        background: `${C.brass}14`,
+        borderRadius: 8,
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={!!potPaid}
+        disabled={busy != null}
+        onChange={(e) => markPot(e.target.checked)}
+        aria-label={`הפקדה לקופת חיסכון, ${potTransfer.amount} שקלים`}
+        style={{ width: 20, height: 20, accentColor: C.win }}
+      />
+      <span style={{ flex: 1 }}>
+        אתה מעביר ל־<b>קופת חיסכון</b>
+        <span style={{ color: C.brass, fontSize: 11, marginInlineStart: 6 }}>
+          (רשום: {pot}₪{potActual !== pot ? ` · בפועל ${potActual}₪` : ""})
+        </span>
+        {!editingPot && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              setPotValue(String(pot));
+              setEditingPot(true);
+            }}
+            style={{
+              marginInlineStart: 4,
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 6,
+              cursor: "pointer",
+              border: `1px solid ${C.line}`,
+              background: "transparent",
+              color: C.dim,
+            }}
+          >
+            ערוך רשום
+          </button>
+        )}
+        {editingPot && (
+          <span style={{ display: "inline-flex", gap: 4, alignItems: "center", marginInlineStart: 6 }}>
+            <input
+              type="number"
+              value={potValue}
+              onChange={(e) => setPotValue(e.target.value)}
+              style={{
+                width: 70,
+                padding: "2px 6px",
+                borderRadius: 6,
+                border: `1px solid ${C.line}`,
+                background: C.felt,
+                color: C.cream,
+                fontSize: 12,
+              }}
+            />
+            <button
+              type="button"
+              onClick={savePot}
+              style={{
+                fontSize: 11,
+                padding: "2px 8px",
+                borderRadius: 6,
+                cursor: "pointer",
+                border: "none",
+                background: C.brass,
+                color: C.feltDeep,
+                fontWeight: 700,
+              }}
+            >
+              שמור
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingPot(false)}
+              style={{
+                fontSize: 11,
+                padding: "2px 8px",
+                borderRadius: 6,
+                cursor: "pointer",
+                border: `1px solid ${C.line}`,
+                background: "transparent",
+                color: C.dim,
+              }}
+            >
+              ביטול
+            </button>
+          </span>
+        )}
+      </span>
+      <b>{potTransfer.amount}₪</b>
+      <StatusChip closed={!!potPaid}>{potPaid ? "נסגר" : "ממתין"}</StatusChip>
+    </label>
+  );
+}
+
 export function LastSettlementCard({
   db,
   commit,
@@ -97,7 +207,7 @@ export function LastSettlementCard({
 
   if (!card) return null;
 
-  const { session, isLatest, text, transfers, problems } = card;
+  const { session, isLatest, text, transfers, potTransfer, potPaid, problems } = card;
   const dateLabel = `${session.d}.${session.mo}.${session.y}`;
   const heading = isLatest ? `חלוקה · ערב אחרון · ${dateLabel}` : `חלוקה · ערב ${dateLabel}`;
   const expanded = !collapsible || open;
@@ -183,14 +293,27 @@ export function LastSettlementCard({
     }
   };
 
+  const markPot = async (value) => {
+    if (!isAdmin || !commit || busy != null) return;
+    setBusy("pot");
+    try {
+      const next = markPotPaid(session, value, viewerName);
+      if (next !== session) {
+        commit({
+          ...db,
+          sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
+        });
+        await flushStore();
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const Row = ({ transfer, index }) => {
     const mineRow = isMine(transfer);
     const statusRow = confirmations?.rows[index];
     const closed = !!statusRow?.closed;
-    // קופת חיסכון בסוגריים — רק האדמין רואה (כולל העברות זוגיות)
-    const pot = r2(Number(session.savingsPot) || 0);
-    const potActual = potActualFor(session);
-    const showPot = isAdmin && pot > 0 && (String(transfer.from || "").includes("עדן גיל") || String(transfer.to || "").includes("עדן גיל"));
     // חלקו האישי של עדן בהעברה זוגית — רק האדמין רואה (שיראה שהקופה ירדה ממנו)
     let edenShare = null;
     if (isAdmin && transfer.fromSplit && typeof transfer.fromSplit === "object") {
@@ -267,80 +390,6 @@ export function LastSettlementCard({
         )}
         {edenShare != null && (
           <span style={{ color: C.brass, fontSize: 11 }}>(חלקך: {edenShare}₪)</span>
-        )}
-        {showPot && !editingPot && (
-          <span style={{ color: C.brass, fontSize: 11 }}>
-            (קופת חיסכון: {pot}₪{potActual !== pot ? ` · בפועל ${potActual}₪` : ""})
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setPotValue(String(pot));
-                setEditingPot(true);
-              }}
-              style={{
-                marginRight: 4,
-                fontSize: 10,
-                padding: "2px 6px",
-                borderRadius: 6,
-                cursor: "pointer",
-                border: `1px solid ${C.line}`,
-                background: "transparent",
-                color: C.dim,
-              }}
-            >
-              ערוך
-            </button>
-          </span>
-        )}
-        {showPot && editingPot && (
-          <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <input
-              type="number"
-              value={potValue}
-              onChange={(e) => setPotValue(e.target.value)}
-              style={{
-                width: 70,
-                padding: "2px 6px",
-                borderRadius: 6,
-                border: `1px solid ${C.line}`,
-                background: C.felt,
-                color: C.cream,
-                fontSize: 12,
-              }}
-            />
-            <button
-              type="button"
-              onClick={savePot}
-              style={{
-                fontSize: 11,
-                padding: "2px 8px",
-                borderRadius: 6,
-                cursor: "pointer",
-                border: "none",
-                background: C.brass,
-                color: C.feltDeep,
-                fontWeight: 700,
-              }}
-            >
-              שמור
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditingPot(false)}
-              style={{
-                fontSize: 11,
-                padding: "2px 8px",
-                borderRadius: 6,
-                cursor: "pointer",
-                border: `1px solid ${C.line}`,
-                background: "transparent",
-                color: C.dim,
-              }}
-            >
-              ביטול
-            </button>
-          </span>
         )}
         <StatusChip closed={closed}>{confirmationStatusText(statusRow)}</StatusChip>
       </label>
@@ -511,6 +560,20 @@ export function LastSettlementCard({
                 </>
               )}
             </>
+          )}
+          {isAdmin && !readOnly && commit && potTransfer && (
+          <PotRow
+            session={session}
+            potTransfer={potTransfer}
+            potPaid={potPaid}
+            busy={busy}
+            markPot={markPot}
+            editingPot={editingPot}
+            setEditingPot={setEditingPot}
+            potValue={potValue}
+            setPotValue={setPotValue}
+            savePot={savePot}
+          />
           )}
           {text.trim() && (
             <details style={{ marginTop: 8 }}>

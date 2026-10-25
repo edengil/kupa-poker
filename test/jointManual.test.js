@@ -1,6 +1,7 @@
 /* תשלום זוגי ידני — ההעברות האמיתיות של ערב 10.10.2026 כפי שדיווח עדן. */
 import { describe, it, expect } from "vitest";
 import { paymentPlan, validateTransfers, saveManualPayments } from "../lib/paymentTracking.js";
+import { resolveSettlement } from "../lib/nightShare.js";
 
 const NIGHT_1010 = {
   id: "live_1791669733765",
@@ -51,7 +52,8 @@ describe("העברות אמיתיות 10.10 — תשלום זוגי ידני", (
     expect(pending[0].to).toBe("אופיר סנה");
     expect(pending[0].amount).toBe(5);
     // מודל 25.10: העודף (75₪) לא מנותב דרך עדן — הוא רשום במפורש בכיור העודף
-    const residual = plan.transfers.filter((t) => t.residual);
+    // (שורות העודף הן פנימיות ל־resolver ואינן חלק מתוכנית התשלומים הקנונית)
+    const residual = resolveSettlement(withManual).transfers.filter((t) => t.residual);
     expect(residual.reduce((s, t) => s + t.amount, 0)).toBe(75);
   });
 

@@ -7,7 +7,7 @@ import {
   paymentPlan,
   validateTransfers,
 } from "../lib/paymentTracking.js";
-import { playersWithPot } from "../lib/nightShare.js";
+import { playersWithPot, resolveSettlement } from "../lib/nightShare.js";
 
 const NIGHT_1010 = {
   id: "live_1791669733765",
@@ -67,7 +67,8 @@ describe("כלל העודף — כיור מפורש, בלי ניתוב דרך ע
   });
 
   it("זוכים מקבלים מלא, חייבים משלמים מלא — כולל עדן; העודף לכיור", () => {
-    const { transfers } = paymentPlan(NIGHT_1010);
+    // הרשימה המלאה כולל כיור העודף היא של ה־resolver; paymentPlan מחזיק העברות שחקנים בלבד
+    const { transfers } = resolveSettlement(NIGHT_1010);
     const { got, gave } = sums(transfers);
     expect(got["דן ינקלויץ"]).toBe(530);
     expect(got["אופיר סנה"]).toBe(260);
@@ -110,8 +111,9 @@ describe("כלל העודף — כיור מפורש, בלי ניתוב דרך ע
         { name: "אורן גיל", amount: -200 },
       ],
     };
-    const { transfers, problems } = paymentPlan(session);
+    const { problems } = paymentPlan(session);
     expect(problems).toEqual([]);
+    const { transfers } = resolveSettlement(session);
     const { got } = sums(transfers);
     expect(got["עדן גיל"]).toBe(100); // הגולמי — העודף לא מגדיל את זכייתו (25.10)
     expect(got["דן ינקלויץ"]).toBe(50);
@@ -126,8 +128,9 @@ describe("כלל העודף — כיור מפורש, בלי ניתוב דרך ע
         { name: "אורן גיל", amount: -150 },
       ],
     };
-    const { transfers, problems } = paymentPlan(session);
+    const { problems } = paymentPlan(session);
     expect(problems).toEqual([]);
+    const { transfers } = resolveSettlement(session);
     const { got, gave } = sums(transfers);
     expect(got["דן ינקלויץ"]).toBe(100);
     expect(got["עודף ערב"]).toBe(50);

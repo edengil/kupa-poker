@@ -6,7 +6,7 @@ import {
   paymentPlan,
   saveManualPayments,
 } from "../lib/paymentTracking.js";
-import { computedPot, nightGap } from "../lib/nightShare.js";
+import { computedPot, nightGap, resolveSettlement } from "../lib/nightShare.js";
 
 function sums(transfers) {
   const got = Object.create(null);
@@ -39,7 +39,9 @@ describe("1. עדן מרוויח + יש עודף — הזכייה גולמית, 
   it("העודף (30₪) הולך לכיור העודף — זכיית עדן נשארת 100", () => {
     expect(computedPot(night)).toBe(0); // אין קופה רשומה בפיקסטורה
     expect(nightGap(night)).toBe(-30);
-    const { transfers, problems } = paymentPlan(night);
+    // כיור העודף הוא שורת resolver פנימית — לא חלק מהתוכנית הקנונית של paymentPlan
+    const { problems } = paymentPlan(night);
+    const { transfers } = resolveSettlement(night);
     expect(problems).toEqual([]);
     const { got, gave } = sums(transfers);
     expect(got["עדן גיל"]).toBe(100); // הגולמי בלבד (מודל 25.10)
@@ -63,7 +65,8 @@ describe("2. עדן לא משתתף + יש עודף — העודף לכיור ו
   it("כל חייב משלם מלא והעודף רשום במפורש — אין תשלום חסר סמוי", () => {
     expect(computedPot(night)).toBe(0);
     expect(nightGap(night)).toBe(-30);
-    const { transfers, problems } = paymentPlan(night);
+    const { problems } = paymentPlan(night);
+    const { transfers } = resolveSettlement(night);
     expect(problems).toEqual([]);
     expect(allWhole(transfers)).toBe(true);
     const { got, gave } = sums(transfers);
@@ -133,7 +136,8 @@ describe("5. עיגול אגורות — כל ההעברות בשקלים שלמ
   it("עודף 10₪ + אגורות — עדן משלם מלא (100 אחרי עיגול), העודף לכיור, הכל שלם", () => {
     expect(computedPot(night)).toBe(0);
     expect(nightGap(night)).toBe(-10);
-    const { transfers, problems } = paymentPlan(night);
+    const { problems } = paymentPlan(night);
+    const { transfers } = resolveSettlement(night);
     expect(allWhole(transfers)).toBe(true);
     expect(problems).toEqual([]);
     const { got, gave } = sums(transfers);
@@ -159,7 +163,8 @@ describe("6. חלוקה ידנית — עובדת עם לוגיקת הקופה �
     const withManual = saveManualPayments(night, [
       { from: "עדן גיל", to: "דן ינקלויץ", amount: 100 },
     ]);
-    const { transfers, problems } = paymentPlan(withManual);
+    const { problems } = paymentPlan(withManual);
+    const { transfers } = resolveSettlement(withManual);
     const manual = transfers.filter((t) => t.manual);
     expect(manual).toHaveLength(1);
     expect(manual[0]).toMatchObject({ from: "עדן גיל", to: "דן ינקלויץ", amount: 100 });
@@ -208,7 +213,8 @@ describe("8. זוג (עדן+אורן) עם עודף — שניהם משלמים 
   it("העודף (50₪) הולך לכיור; הזוג משלם את מלוא החוב המשותף", () => {
     expect(computedPot(night)).toBe(0);
     expect(nightGap(night)).toBe(-50);
-    const { transfers, problems } = paymentPlan(night);
+    const { problems } = paymentPlan(night);
+    const { transfers } = resolveSettlement(night);
     expect(problems).toEqual([]);
     const joint = transfers.find((t) => t.joint);
     expect(joint).toBeTruthy();

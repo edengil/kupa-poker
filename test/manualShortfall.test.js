@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { paymentPlan, saveManualPayments } from "../lib/paymentTracking.js";
 import { savedSettlement } from "../lib/savedSettlement.js";
-import { settlementPlayersFor } from "../lib/nightShare.js";
+import { resolveSettlement, settlementPlayersFor } from "../lib/nightShare.js";
 
 const NIGHT_1010 = {
   id: "live_1791669733765",
@@ -39,12 +39,14 @@ describe("חוסר ידני", () => {
     const withManual = saveManualPayments(NIGHT_1010, REAL);
     const ms = { ...withManual.manualSettlement, shortfall: SHORTFALL };
     const plan = paymentPlan(sessionWith(ms));
-    const pending = plan.transfers.filter((t) => !t.manual && !t.residual);
+    const pending = plan.transfers.filter((t) => !t.manual);
     expect(pending).toHaveLength(0);
     expect(plan.transfers.filter((t) => t.manual)).toHaveLength(6);
-    // העודף (70₪) רשום בכיור העודף — לא נופל על עדן ולא נעלם
-    const residual = plan.transfers.filter((t) => t.residual);
+    // העודף (70₪) רשום בכיור העודף — לא נופל על עדן ולא נעלם. העודף הוא
+    // שורת resolver פנימית; בתוכנית הקנונית (paymentPlan) הוא לא מופיע.
+    const residual = resolveSettlement(sessionWith(ms)).transfers.filter((t) => t.residual);
     expect(residual.reduce((s, t) => s + t.amount, 0)).toBe(70);
+    expect(plan.transfers.some((t) => t.residual)).toBe(false);
   });
 
   it("הוולידטור לא מתריע", () => {

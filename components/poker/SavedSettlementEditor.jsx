@@ -7,7 +7,7 @@ import {
   settlementPlayersFor,
   isLegacySettlement,
   edenNameIn,
-  potRecordedFor,
+  potPlanFor,
   POT_SINK_NAME,
 } from "../../lib/nightShare";
 import { savedSettlement } from "../../lib/savedSettlement";
@@ -32,7 +32,7 @@ export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
   const players = settlementPlayersFor(session);
   const cps = sessionHasBuyinChips(session) ? session.cps || 2 : 1;
   const legacy = isLegacySettlement(session);
-  const potAmount = legacy ? 0 : potRecordedFor(session);
+  const potAmount = legacy ? 0 : potPlanFor(session);
   const saved = savedSettlement(players, cps, session.manualSettlement, {
     potAmount,
     potSinkName: POT_SINK_NAME,

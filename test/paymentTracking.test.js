@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markReceipt, markTransfer, paymentPlan } from "../lib/paymentTracking.js";
+import { markReceipt, markTransfer, paymentPlan, rpcMarkTarget } from "../lib/paymentTracking.js";
 import { settlementTextForSession } from "../lib/nightShare.js";
 
 const session = { iso: "2026-07-26", entries: [{ name: "א", amount: 25 }, { name: "ב", amount: -25 }] };
@@ -35,6 +35,117 @@ describe("payment tracking", () => {
     expect(plan.received[0]).toBe(true);
     expect(paymentPlan(markTransfer(both, 0, false)).received[0]).toBe(true);
     expect(paymentPlan(markReceipt(both, 0, false)).paid[0]).toBe(true);
+  });
+  it("carries marks on identical transfers when the plan around them changes", () => {
+    const before = {
+      iso: "2026-07-26",
+      entries: [{ name: "א", amount: -100 }, { name: "ב", amount: 60 }, { name: "ג", amount: 40 }],
+    };
+    const marked = markReceipt(markTransfer(before, 0, true, "א"), 0, true, "ב");
+    const after = {
+      ...marked,
+      entries: [{ name: "א", amount: -120 }, { name: "ב", amount: 60 }, { name: "ג", amount: 60 }],
+    };
+    const plan = paymentPlan(after);
+    // א→ב 60 זהה בשתי התוכניות — הסימונים והאישורים עוברים; א→ג השתנתה (40→60) — בלי וי
+    expect(plan.transfers).toEqual([
+      { from: "א", to: "ב", amount: 60 },
+      { from: "א", to: "ג", amount: 60 },
+    ]);
+    expect(plan.paid).toEqual({ 0: true });
+    expect(plan.received).toEqual({ 0: true });
+    expect(plan.confirmations).toHaveLength(2);
+    expect(plan.confirmations.every((e) => e.index === 0)).toBe(true);
+  });
+  it("remaps marks and confirmations when an identical transfer moves index", () => {
+    const before = {
+      iso: "2026-07-26",
+      entries: [{ name: "א", amount: -100 }, { name: "ב", amount: 60 }, { name: "ג", amount: 40 }],
+    };
+    const marked = markTransfer(before, 1, true, "א"); // א→ג 40 באינדקס 1
+    const after = { ...marked, entries: [{ name: "א", amount: -40 }, { name: "ג", amount: 40 }] };
+    const plan = paymentPlan(after);
+    expect(plan.transfers).toEqual([{ from: "א", to: "ג", amount: 40 }]);
+    expect(plan.paid).toEqual({ 0: true });
+    expect(plan.confirmations[0]).toMatchObject({ index: 0, action: "paid", by: "א" });
+  });
+  it("marking after a plan change does not wipe carried marks", () => {
+    const before = {
+      iso: "2026-07-26",
+      entries: [{ name: "א", amount: -100 }, { name: "ב", amount: 60 }, { name: "ג", amount: 40 }],
+    };
+    const marked = markTransfer(before, 0, true, "א");
+    const after = {
+      ...marked,
+      entries: [{ name: "א", amount: -120 }, { name: "ב", amount: 60 }, { name: "ג", amount: 60 }],
+    };
+    const plan = paymentPlan(markTransfer(after, 1, true, "א"));
+    expect(plan.paid).toEqual({ 0: true, 1: true });
+  });
+  it("24.10 reconstruction: marks stored on the old plan survive onto the identical נתנאל→אופיר 150", () => {
+    const oldPlan = JSON.stringify([
+      { from: "עדן גיל", to: "אורן גיל", amount: 285 },
+      { from: "נתנאל כהן", to: "אופיר סנה", amount: 150 },
+      { from: "קובי סעדה", to: "אופיר סנה", amount: 365 },
+      { from: "קובי סעדה", to: "אורן גיל", amount: 35 },
+    ]);
+    const current = {
+      iso: "2026-10-24",
+      entries: [
+        { name: "נתנאל כהן", amount: -150 },
+        { name: "אופיר סנה", amount: 150 },
+        { name: "קובי סעדה", amount: -70 },
+        { name: "דן ינקלויץ", amount: 70 },
+      ],
+      payments: {
+        plan: oldPlan,
+        paid: { 0: true, 1: true, 2: true },
+        received: { 0: true, 1: true, 2: true },
+        confirmations: [{ index: 1, action: "paid", by: "נתנאל כהן", at: "2026-10-25T00:00:00.000Z" }],
+      },
+    };
+    const plan = paymentPlan(current);
+    const idx = plan.transfers.findIndex((t) => t.from === "נתנאל כהן" && t.to === "אופיר סנה" && t.amount === 150);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(plan.paid[idx]).toBe(true);
+    expect(plan.received[idx]).toBe(true);
+    expect(plan.confirmations).toEqual([
+      { index: idx, action: "paid", by: "נתנאל כהן", at: "2026-10-25T00:00:00.000Z" },
+    ]);
+    // קובי→אופיר 365 וקובי→אורן 35 לא קיימות בתוכנית החדשה — הסימונים שלהן לא נדבקים להעברה אחרת
+    const kobiIdx = plan.transfers.findIndex((t) => t.from === "קובי סעדה");
+    expect(plan.paid[kobiIdx]).toBeUndefined();
+  });
+  it("rpcMarkTarget translates a click to the stored plan when the plan changed", () => {
+    const oldPlan = JSON.stringify([
+      { from: "עדן גיל", to: "אורן גיל", amount: 285 },
+      { from: "נתנאל כהן", to: "אופיר סנה", amount: 150 },
+    ]);
+    const current = {
+      iso: "2026-10-24",
+      entries: [
+        { name: "נתנאל כהן", amount: -150 },
+        { name: "אופיר סנה", amount: 150 },
+        { name: "קובי סעדה", amount: -70 },
+        { name: "דן ינקלויץ", amount: 70 },
+      ],
+      payments: { plan: oldPlan, paid: {}, received: {}, confirmations: [] },
+    };
+    const plan = paymentPlan(current);
+    const identicalIdx = plan.transfers.findIndex((t) => t.from === "נתנאל כהן");
+    expect(rpcMarkTarget(current, identicalIdx)).toEqual({ fingerprint: oldPlan, index: 1 });
+    // העברה שלא הייתה בתוכנית השמורה — אין יעד שרת חוקי
+    const newOnlyIdx = plan.transfers.findIndex((t) => t.from === "קובי סעדה");
+    expect(rpcMarkTarget(current, newOnlyIdx)).toBeNull();
+    // בלי תוכנית שמורה — שולחים את המחושבת כרגיל
+    const { payments, ...noStored } = current;
+    expect(rpcMarkTarget(noStored, identicalIdx)).toEqual({ fingerprint: plan.fingerprint, index: identicalIdx });
+    // תוכנית שמורה זהה למחושבת — בלי תרגום
+    const adopted = markTransfer(noStored, identicalIdx, true);
+    expect(rpcMarkTarget(adopted, identicalIdx)).toEqual({
+      fingerprint: paymentPlan(adopted).fingerprint,
+      index: identicalIdx,
+    });
   });
   it("uses the saved chip ratio and original date", () => {
     const custom = { ...session, cps: 4, entries: [{ name: "א", amount: 25, buyin: 50, chips: 300 }, { name: "ב", amount: -25, buyin: 50, chips: 100 }] };
