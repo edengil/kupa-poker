@@ -307,9 +307,18 @@ declare
   sessions jsonb;
   sess jsonb;
   i integer;
+  j integer;
   sid text;
   payments jsonb;
-  paid_map jsonb;
+  stored_plan text;
+  plan_arr jsonb;
+  projected jsonb;
+  incoming jsonb;
+  elem jsonb;
+  proj_pos integer;
+  mark_index integer;
+  plan_to_store text;
+  side_map jsonb;
   conf jsonb;
   out_sessions jsonb := '[]'::jsonb;
   session_found boolean := false;
@@ -319,6 +328,9 @@ begin
   end if;
   if p_index < 0 then
     raise exception 'invalid index';
+  end if;
+  if p_field is distinct from 'paid' and p_field is distinct from 'received' then
+    raise exception 'invalid field';
   end if;
 
   select * into g from public.groups where slug = p_slug for update;
@@ -334,34 +346,63 @@ begin
     if sid = p_session_id then
       session_found := true;
       payments := coalesce(sess->'payments', '{}'::jsonb);
-      if payments ? 'plan' and payments->>'plan' is distinct from p_fingerprint then
-        raise exception 'fingerprint mismatch';
+      stored_plan := payments->>'plan';
+      mark_index := p_index;
+      plan_to_store := p_fingerprint;
+      if stored_plan is not null and stored_plan is distinct from p_fingerprint then
+        -- The public client holds the projection of the stored plan (admin
+        -- rows stripped) and sends it as the fingerprint. If it matches the
+        -- stored plan's projection semantically, translate the index into
+        -- raw-plan coordinates and keep the raw string stored.
+        begin
+          plan_arr := stored_plan::jsonb;
+          incoming := p_fingerprint::jsonb;
+        exception when others then
+          raise exception 'fingerprint mismatch';
+        end;
+        if jsonb_typeof(plan_arr) is distinct from 'array' then
+          raise exception 'fingerprint mismatch';
+        end if;
+        projected := '[]'::jsonb;
+        proj_pos := -1;
+        mark_index := null;
+        for j in 0 .. jsonb_array_length(plan_arr) - 1 loop
+          elem := plan_arr->j;
+          if coalesce(elem->>'pot', 'false') = 'true'
+             or coalesce(elem->>'residual', 'false') = 'true' then
+            continue;
+          end if;
+          proj_pos := proj_pos + 1;
+          projected := projected || jsonb_build_array(elem);
+          if proj_pos = p_index then
+            mark_index := j;
+          end if;
+        end loop;
+        if incoming is distinct from projected then
+          raise exception 'fingerprint mismatch';
+        end if;
+        if mark_index is null then
+          raise exception 'invalid index';
+        end if;
+        plan_to_store := stored_plan;
       end if;
-      if p_field is distinct from 'paid' and p_field is distinct from 'received' then
-        raise exception 'invalid field';
-      end if;
-      paid_map := coalesce(payments->p_field, '{}'::jsonb);
-      paid_map := jsonb_set(paid_map, array[p_index::text], to_jsonb(p_paid), true);
+      side_map := coalesce(payments->p_field, '{}'::jsonb);
+      side_map := jsonb_set(side_map, array[mark_index::text], to_jsonb(p_paid), true);
       conf := coalesce(payments->'confirmations', '[]'::jsonb);
       if p_paid is true and coalesce(btrim(p_by), '') <> '' then
         conf := conf || jsonb_build_array(jsonb_build_object(
-          'index', p_index,
+          'index', mark_index,
           'action', p_field,
           'by', btrim(p_by),
           'at', to_char(clock_timestamp() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
         ));
       end if;
-      sess := jsonb_set(
-        sess,
-        '{payments}',
-        jsonb_build_object(
-          'plan', p_fingerprint,
-          'paid', case when p_field = 'paid' then paid_map else coalesce(payments->'paid', '{}'::jsonb) end,
-          'received', case when p_field = 'received' then paid_map else coalesce(payments->'received', '{}'::jsonb) end,
-          'confirmations', conf
-        ),
-        true
-      );
+      -- Conservative merge: update only the three marking keys inside the
+      -- stored payments object — potPaid and any future keys survive.
+      payments := jsonb_set(payments, '{plan}', to_jsonb(plan_to_store), true);
+      payments := jsonb_set(payments, array[p_field], side_map, true);
+      payments := jsonb_set(payments, '{confirmations}', conf, true);
+      sess := jsonb_set(sess, '{payments}', payments, true);
     end if;
     out_sessions := out_sessions || jsonb_build_array(sess);
   end loop;

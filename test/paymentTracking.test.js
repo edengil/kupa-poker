@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { markReceipt, markTransfer, paymentPlan, rpcMarkTarget } from "../lib/paymentTracking.js";
 import { settlementTextForSession } from "../lib/nightShare.js";
+import { snapshotForViewer } from "../lib/publicShare.js";
+import { NIGHT_24_10, CURRENT_PAYMENTS_24_10 } from "./fixtures/night-2026-10-24.js";
 
 const session = { iso: "2026-07-26", entries: [{ name: "א", amount: 25 }, { name: "ב", amount: -25 }] };
 describe("payment tracking", () => {
@@ -152,5 +154,72 @@ describe("payment tracking", () => {
     expect(paymentPlan(custom).transfers[0].amount).toBe(25);
     expect(settlementTextForSession(custom)).toContain("26/07/2026");
     expect(settlementTextForSession(custom)).toContain("25");
+  });
+});
+
+/* שחזור נאמן־ייצור של 24.10 (סבב תיקון 2 — פסילת בודק B): התוכנית השמורה
+   היא של סוף הלילה, עם דגלי manual:true על שלוש ההעברות הראשונות ושורת
+   קופה 60, וב־manualSettlement מפת חוסר. הפיקסצ'ר של סבב 1 החסיר את
+   דגלי ה־manual ולכן עבר בטעות: זהות ההעברה כללה את הדגל, וההעברה
+   נתנאל→אופיר 150 (manual שם, pair בחישוב) לא זוהתה. */
+describe("24.10 faithful production reconstruction (round 2)", () => {
+  const EXPECTED_TRANSFERS = [
+    { from: "עדן גיל", to: "אורן גיל", amount: 307, pair: true },
+    { from: "נתנאל כהן", to: "אופיר סנה", amount: 150, pair: true },
+    { from: "קובי סעדה", to: "אופיר סנה", amount: 330 },
+    { from: "עדן גיל", to: "דן ינקלויץ", amount: 30 },
+    { from: "עדן גיל", to: "דור לירז", amount: 100 },
+    { from: "קובי סעדה", to: "דן ינקלויץ", amount: 70 },
+  ];
+
+  it("F1: paid/received על נתנאל→אופיר 150 שורדים בתצוגה למרות דגל manual שונה", () => {
+    const plan = paymentPlan(NIGHT_24_10);
+    expect(plan.transfers).toEqual(EXPECTED_TRANSFERS);
+    expect(plan.potTransfer).toEqual(
+      expect.objectContaining({ from: "עדן גיל", to: "קופת חיסכון", amount: 70, pot: true })
+    );
+    expect(plan.problems).toEqual([]);
+    // בשמורה סומנו אינדקסים 0–2; רק נתנאל→אופיר 150 קיימת זהה בתוכנית החדשה (אינדקס 1).
+    // קובי→אופיר 365 וקובי→אורן 35 אינן קיימות עוד — הסימונים לא נדבקים לאחרות.
+    expect(plan.paid).toEqual({ 1: true });
+    expect(plan.received).toEqual({ 1: true });
+  });
+
+  it("F1: rpcMarkTarget מחזיר יעד תקין (לא null) להעברה הזהה — מנהל וצופה", () => {
+    const storedPlan = NIGHT_24_10.payments.plan;
+    expect(rpcMarkTarget(NIGHT_24_10, 1)).toEqual({ fingerprint: storedPlan, index: 0 });
+    // העברה חדשה שלא הייתה בשמורה (קובי→דן 70) — עדיין אין יעד חוקי
+    expect(rpcMarkTarget(NIGHT_24_10, 5)).toBeNull();
+
+    const snap = { id: "g1", data: { sessions: [NIGHT_24_10] }, config: { shareHistory: true } };
+    const viewerSession = snapshotForViewer(snap).data.sessions[0];
+    const viewerPlan = paymentPlan(viewerSession);
+    expect(viewerPlan.transfers).toEqual(EXPECTED_TRANSFERS);
+    const target = rpcMarkTarget(viewerSession, 1);
+    // הצופה מחזיק את ההקרנה (בלי שורת הקופה) — היעד הוא ההקרנה, אינדקס 0
+    expect(target).not.toBeNull();
+    expect(target.index).toBe(0);
+    expect(target.fingerprint).toBe(viewerSession.payments.plan);
+    expect(target.fingerprint).not.toContain("קופת חיסכון");
+  });
+
+  it("F1: סימון חדש אחרי ה־carry לא מוחק את הסימונים ששרדו", () => {
+    const marked = markTransfer(NIGHT_24_10, 5, true, "קובי סעדה");
+    const plan = paymentPlan(marked);
+    expect(plan.paid).toEqual({ 1: true, 5: true });
+    expect(plan.received).toEqual({ 1: true });
+  });
+
+  it("A(a): אישור תשלום הקופה (אינדקס רגיל בתוכנית השמורה) שורד כ־pot ב־carry-over", () => {
+    const session = { ...NIGHT_24_10, payments: CURRENT_PAYMENTS_24_10 };
+    const plan = paymentPlan(session);
+    expect(plan.potPaid).toBe(true);
+    // כל 7 האישורים של המנהל שורדים; של הקופה מומר לצורה הקנונית
+    expect(plan.confirmations).toHaveLength(7);
+    const potEvent = plan.confirmations.find((e) => e.pot);
+    expect(potEvent).toMatchObject({ index: -1, action: "paid", by: "עדן גיל", at: "2026-10-25T08:25:59.112Z" });
+    // ושאר האירועים ממופים לאינדקסים של התוכנית הנוכחית (קובי→דן: 6→5)
+    const kobiDan = plan.confirmations.find((e) => e.at === "2026-10-25T08:22:15.119Z");
+    expect(kobiDan.index).toBe(5);
   });
 });

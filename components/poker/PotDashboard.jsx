@@ -23,6 +23,42 @@ import { flushStore } from "../../lib/store";
  * היתרה הראשית היא ה"בפועל". פער הערב (חוסר/עודף במאזן) מוצג כשורה
  * נפרדת ולעולם לא מתקזז מול הקופה.
  */
+/* עריכת "בפועל" של ערב אחד — ראו את התיעוד המלא מעל savePotActual.
+   חולץ לרמת המודול כדי שבדיקות יוכלו לשמור על מסלול מחיקת
+   ה־manualSettlement הקפוא (A(b)). */
+export function withActual(s, v) {
+  const next = { ...s, savingsPotActual: v > 0 ? r2(v) : undefined };
+  const ms = s.manualSettlement;
+  const nowIso = new Date().toISOString();
+  if (ms?.frozenActual != null) {
+    if (v <= 0) {
+      const { manualSettlement, ...rest } = next;
+      return rest;
+    }
+    return { ...next, manualSettlement: { ...ms, frozenActual: r2(v) } };
+  }
+  if (!ms && v > 0 && sessionHasPot(next)) {
+    const map = autoShortfallMapForPot(next, potRecordedFor(next));
+    if (Object.keys(map).length) {
+      const players = settlementPlayersFor(next);
+      const cps = sessionHasBuyinChips(next) ? next.cps || 2 : 1;
+      return {
+        ...next,
+        manualSettlement: {
+          basis: settlementBasis(players, cps),
+          manualPayments: [],
+          preferCreditors: [],
+          shortfall: map,
+          frozenActual: r2(v),
+          settlementVersion: 2,
+          settlementUpdatedAt: nowIso,
+        },
+      };
+    }
+  }
+  return next;
+}
+
 export function PotDashboard({ db, commit, isAdmin }) {
   const [editingId, setEditingId] = useState(null);
   const [potValue, setPotValue] = useState("");
@@ -63,39 +99,6 @@ export function PotDashboard({ db, commit, isAdmin }) {
      חלוקת החוסר האוטומטית של הרשום כמפה ידנית (frozenActual) — כך מנהל
      וצופה מקבלים אותם סכומי שחקנים בדיוק. מפה שעדן ערך בעצמו לא נוגעים
      בה; מחיקת הבפועל משחררת מפה קפואה וחוזרת לחישוב האוטומטי. */
-  const withActual = (s, v) => {
-    const next = { ...s, savingsPotActual: v > 0 ? r2(v) : undefined };
-    const ms = s.manualSettlement;
-    const nowIso = new Date().toISOString();
-    if (ms?.frozenActual != null) {
-      if (v <= 0) {
-        const { manualSettlement, ...rest } = next;
-        return rest;
-      }
-      return { ...next, manualSettlement: { ...ms, frozenActual: r2(v) } };
-    }
-    if (!ms && v > 0 && sessionHasPot(next)) {
-      const map = autoShortfallMapForPot(next, potRecordedFor(next));
-      if (Object.keys(map).length) {
-        const players = settlementPlayersFor(next);
-        const cps = sessionHasBuyinChips(next) ? next.cps || 2 : 1;
-        return {
-          ...next,
-          manualSettlement: {
-            basis: settlementBasis(players, cps),
-            manualPayments: [],
-            preferCreditors: [],
-            shortfall: map,
-            frozenActual: r2(v),
-            settlementVersion: 2,
-            settlementUpdatedAt: nowIso,
-          },
-        };
-      }
-    }
-    return next;
-  };
-
   const savePotActual = (sessionId) => {
     const v = Number(actualValue);
     if (!Number.isFinite(v) || v < 0) {
