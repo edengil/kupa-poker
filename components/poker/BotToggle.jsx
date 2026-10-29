@@ -2,9 +2,15 @@
 
 import React from "react";
 import { C } from "../../lib/poker/colors";
+import { botHealthView, formatAgoHe } from "../../lib/wa/health.js";
 
-/* מתג בוט וואטסאפ — חולץ מ-PokerApp.jsx. */
-export function BotToggle({ on, onChange }) {
+/* מתג בוט וואטסאפ — חולץ מ-PokerApp.jsx.
+   שורת הסטטוס התחתונה היא אינדיקטור בריאות הערוץ (config.botHealth,
+   נכתב מהשרת על כל שליחה דרך lib/wa/healthServer): אם הערוץ נפל —
+   רואים כאן מתי נרשם הכשל האחרון ומה הייתה השגיאה, במקום לגלות
+   בדיעבד שהבוט שתק. */
+export function BotToggle({ on, onChange, health = null }) {
+  const view = health ? botHealthView(health) : null;
   return (
     <div
       style={{
@@ -36,6 +42,17 @@ export function BotToggle({ on, onChange }) {
         <div style={{ fontSize: 11.5, color: C.dim }}>
           {on ? "מגיב לפקודות בקבוצה. נכבה לבד בסוף הערב." : "נדלק לבד כשנפתח משחק, או ידנית כאן."}
         </div>
+        {view?.state === "down" && (
+          <div style={{ fontSize: 11.5, color: C.loss, marginTop: 3 }}>
+            ⚠️ הערוץ נפל — כשל שליחה אחרון {formatAgoHe(view.lastFailAt)}
+            {view.lastFailHint ? ` · ${view.lastFailHint}` : ""}
+          </div>
+        )}
+        {view?.state === "up" && (
+          <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>
+            הערוץ חי · שליחה אחרונה {formatAgoHe(view.lastOkAt)}
+          </div>
+        )}
       </div>
       <button
         onClick={() => onChange(!on)}

@@ -96,7 +96,11 @@ describe("wa-reminders route", () => {
     h.maybeRemindPending.mockReturnValue({ live: nextLive, ownerDm: "יש ממתינים", reply: null });
     const res = await GET(makeReq(true));
     expect(res.body).toMatchObject({ ok: true, reminded: "pending" });
-    expect(h.writes).toEqual([{ live: nextLive }]);
+    /* כתיבה ראשונה = מצב הלייב; אחריה כתיבת config של ניטור הערוץ
+       (botHealth — השליחה הצליחה, lib/wa/healthServer). */
+    expect(h.writes[0]).toEqual({ live: nextLive });
+    expect(h.writes[1]?.config?.botHealth).toMatchObject({ fails: 0 });
+    expect(h.writes[1]?.config?.botHealth?.lastOkAt).toEqual(expect.any(Number));
     expect(h.sendToGroup).toHaveBeenCalledTimes(1);
     expect(h.sendToGroup).toHaveBeenCalledWith("יש ממתינים", { token: "tok", groupId: "972500000000" });
   });

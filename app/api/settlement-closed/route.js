@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { sendToGroup } from "@/lib/whatsapp";
+import { recordWaSend } from "@/lib/wa/healthServer";
 import { reportError } from "@/lib/monitor";
 import { allTransfersPaid, buildSettlementClosedText } from "@/lib/settlementClosed";
 import { siteUrlFromEnv } from "@/lib/paymentReminder";
@@ -59,6 +60,13 @@ export async function POST(request) {
   const groupId = process.env.WHAPI_GROUP_ID;
   const token = process.env.WHAPI_TOKEN;
   if (!groupId || !token) {
+    await recordWaSend({
+      supabase,
+      groupId: row.id,
+      ok: false,
+      error: new Error("WHAPI missing"),
+      where: "settlement-closed",
+    });
     await reportError(new Error("WHAPI missing"), "settlement-closed");
     return NextResponse.json({ error: "whatsapp" }, { status: 500 });
   }
@@ -69,7 +77,9 @@ export async function POST(request) {
   });
   try {
     await sendToGroup(text, { token, groupId });
+    await recordWaSend({ supabase, groupId: row.id, ok: true, where: "settlement-closed" });
   } catch (e) {
+    await recordWaSend({ supabase, groupId: row.id, ok: false, error: e, where: "settlement-closed" });
     await reportError(e, `settlement-closed/${sessionId}`);
     return NextResponse.json({ error: "send failed" }, { status: 502 });
   }

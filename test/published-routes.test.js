@@ -150,8 +150,12 @@ describe("published whatsapp webhook", () => {
     expect(reply).toContain("אופיר");
     expect(reply).toContain("נוספו 5 כניסות");
 
-    expect(h.writes).toHaveLength(1);
-    const live = h.writes[0].live;
+    // The one inbound message produces exactly ONE live write. A separate
+    // small config write records the bot-channel health touch (botHealth).
+    const liveWrites = h.writes.filter((w) => w.live);
+    expect(liveWrites).toHaveLength(1);
+    expect(h.writes.some((w) => typeof w.config?.botHealth?.lastOkAt === "number")).toBe(true);
+    const live = liveWrites[0].live;
     expect(live.players.find((p) => p.name === "קובי סעדה").buyin).toBe(150);
     expect(live.players.find((p) => p.name === "אופיר סנה").tipsGiven).toBe(5);
     expect(String(live.entriesCount)).toBe("15");

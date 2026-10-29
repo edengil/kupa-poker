@@ -9,6 +9,8 @@ import {
   maybeRemindPending, maybeRemindBitIdle,
 } from "@/lib/whatsapp";
 import { knownPlayerNames } from "@/lib/poker/personalHighlights";
+import { appendAction } from "@/lib/liveActionLog";
+import { trackWaSend } from "@/lib/wa/healthServer";
 import { AL, canon } from "@/lib/poker/helpers";
 import { normalize } from "@/lib/poker/db";
 import { latestSession } from "@/lib/lastSession";
@@ -32,6 +34,28 @@ import {
 export const dynamic = "force-dynamic";
 
 const ok = (extra = {}) => NextResponse.json({ ok: true, ...extra });
+
+/* נפילה מסודרת: שליחת התשובה לקבוצה נכשלה — הכשל נרשם ביומן הפעולות של
+   הלייב כפעולה גלויה למנהל (בנוסף לתיעוד ב־diag_events דרך trackWaSend),
+   כדי שהודעה שלא הגיעה לא תיבלע בשקט. best-effort: לא זורק לעולם. */
+async function appendWaFailToLive(supabase, rowId, nextLive, prevLive, error) {
+  try {
+    const fromNext = Array.isArray(nextLive?.actionLog) ? nextLive.actionLog : [];
+    const fromPrev = Array.isArray(prevLive?.actionLog) ? prevLive.actionLog : [];
+    const baseLog = fromNext.length >= fromPrev.length ? fromNext : fromPrev;
+    const actionLog = appendAction(baseLog, {
+      t: "waFail",
+      where: "reply",
+      error: String(error?.message || error || "").slice(0, 120),
+    });
+    await supabase
+      .from("groups")
+      .update({ live: { ...(nextLive || prevLive || {}), actionLog } })
+      .eq("id", rowId);
+  } catch {
+    /* היומן הוא בונוס נראות — הכשל כבר תועד ב־diag_events וב־botHealth */
+  }
+}
 
 function guard(request) {
   const secret = envValue("WHATSAPP_WEBHOOK_SECRET");
@@ -148,7 +172,10 @@ export async function POST(request) {
         : `${BOT_MARK} הבוט כבוי. "בוט הדלק" יחזיר אותי.`;
     }
     try {
-      await sendToGroup(reply, { token: envValue("WHAPI_TOKEN"), groupId: msg.chatId });
+      await trackWaSend(
+        { supabase, groupId: row.id, where: "whatsapp/bot-control" },
+        () => sendToGroup(reply, { token: envValue("WHAPI_TOKEN"), groupId: msg.chatId })
+      );
     } catch (e) {
       console.error(e.message);
     }
@@ -181,17 +208,25 @@ export async function POST(request) {
     }
     try {
       if (reminded.ownerDm && ownerPhone) {
-        await sendToGroup(reminded.ownerDm, {
-          token: envValue("WHAPI_TOKEN"),
-          groupId: ownerPhone,
-        });
+        await trackWaSend(
+          { supabase, groupId: row.id, where: `whatsapp/${kind}-remind` },
+          () =>
+            sendToGroup(reminded.ownerDm, {
+              token: envValue("WHAPI_TOKEN"),
+              groupId: ownerPhone,
+            })
+        );
       }
       /* נדנוד קצר לקבוצה — רק כשהפונקציה החזירה reply (ביט שקט). */
       if (reminded.reply && groupId) {
-        await sendToGroup(reminded.reply, {
-          token: envValue("WHAPI_TOKEN"),
-          groupId,
-        });
+        await trackWaSend(
+          { supabase, groupId: row.id, where: `whatsapp/${kind}-remind` },
+          () =>
+            sendToGroup(reminded.reply, {
+              token: envValue("WHAPI_TOKEN"),
+              groupId,
+            })
+        );
       }
     } catch (e) {
       console.warn(`${kind} remind failed:`, e.message);
@@ -262,28 +297,43 @@ export async function POST(request) {
     }
   }
 
-  try {
-    const token = envValue("WHAPI_TOKEN");
-    if (ownerDm && ownerPhone) {
+  const token = envValue("WHAPI_TOKEN");
+  if (ownerDm && ownerPhone) {
+    try {
+      await trackWaSend(
+        { supabase, groupId: row.id, where: "whatsapp/owner-dm" },
+        () => sendToGroup(ownerDm, { token, groupId: ownerPhone })
+      );
+    } catch (e) {
+      console.warn("owner dm failed:", e.message);
+    }
+  }
+  let sent = null;
+  if (reply) {
+    try {
+      sent = await trackWaSend(
+        { supabase, groupId: row.id, where: "whatsapp/reply" },
+        () => sendToGroup(reply, { token, groupId: msg.chatId })
+      );
+    } catch (e) {
+      console.error(e.message); // הנתונים כבר נשמרו — התשובה היא בונוס
+      /* נפילה מסודרת: מסמנים את הכשל ביומן הפעולות של הלייב, גלוי למנהל */
+      await appendWaFailToLive(supabase, row.id, nextLive, live, e);
+    }
+    /* אישור מצ'אט פרטי — מעדכנים גם את הקבוצה */
+    if (sent && isOwnerDm && groupId && groupId !== msg.chatId) {
       try {
-        await sendToGroup(ownerDm, { token, groupId: ownerPhone });
+        await trackWaSend(
+          { supabase, groupId: row.id, where: "whatsapp/group-echo" },
+          () => sendToGroup(reply, { token, groupId })
+        );
       } catch (e) {
-        console.warn("owner dm failed:", e.message);
+        console.warn("group echo of approval failed:", e.message);
       }
     }
-    let sent = null;
-    if (reply) {
-      sent = await sendToGroup(reply, { token, groupId: msg.chatId });
-      /* אישור מצ'אט פרטי — מעדכנים גם את הקבוצה */
-      if (isOwnerDm && groupId && groupId !== msg.chatId) {
-        try {
-          await sendToGroup(reply, { token, groupId });
-        } catch (e) {
-          console.warn("group echo of approval failed:", e.message);
-        }
-      }
-    }
-    if (sent && isNightShareText(reply)) {
+  }
+  if (sent && isNightShareText(reply)) {
+    try {
       const iso = nextLive?.startedAt
         ? jerusalemIso(new Date(nextLive.startedAt))
         : nightIsoFromText(reply);
@@ -303,9 +353,9 @@ export async function POST(request) {
             .eq("id", row.id);
         },
       });
+    } catch (e) {
+      console.error(e.message); // הנעיצה היא בונוס — ההודעה כבר נשלחה
     }
-  } catch (e) {
-    console.error(e.message); // הנתונים כבר נשמרו — התשובה היא בונוס
   }
 
   return ok({ handled: cmds.length });
