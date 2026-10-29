@@ -4,6 +4,7 @@ import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { reportError } from "@/lib/monitor";
 import { envValue } from "@/lib/env";
 import { sendToGroup, maybeRemindPending, maybeRemindBitIdle } from "@/lib/whatsapp";
+import { trackWaSend } from "@/lib/wa/healthServer";
 
 /* ============================================================================
    תזכורות בוט תלויות־זמן — ממתינים לאישור (8 דק׳) וביט שקט (שעתיים).
@@ -59,10 +60,16 @@ export async function GET(request) {
     const groupId = envValue("WHAPI_GROUP_ID");
     try {
       if (reminded.ownerDm && ownerPhone) {
-        await sendToGroup(reminded.ownerDm, { token, groupId: ownerPhone });
+        await trackWaSend(
+          { supabase, groupId: row.id, where: `wa-reminders/${kind}` },
+          () => sendToGroup(reminded.ownerDm, { token, groupId: ownerPhone })
+        );
       }
       if (reminded.reply && groupId) {
-        await sendToGroup(reminded.reply, { token, groupId });
+        await trackWaSend(
+          { supabase, groupId: row.id, where: `wa-reminders/${kind}` },
+          () => sendToGroup(reminded.reply, { token, groupId })
+        );
       }
     } catch (e) {
       console.warn(`${kind} remind failed:`, e.message);

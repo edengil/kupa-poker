@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { envValue, hasEnv } from "@/lib/env";
+import { botHealthView } from "@/lib/wa/health.js";
 
 /* ============================================================================
    עמוד מצב מרוכז — מבט אחד על בריאות הבוט וההגדרות.
@@ -87,6 +88,10 @@ async function groupState() {
     return {
       found: true,
       botOn: Boolean(data.config?.botOn),
+      /* סטטוס ערוץ מהאירועים שנרשמו בפועל (config.botHealth) — משלים את
+         בדיקת ה־Whapi החיה למעלה: גם אם הבדיקה החיה עברה, כאן רואים מתי
+         נרשם כשל השליחה האחרון ומה הייתה השגיאה. */
+      botHealth: botHealthView(data.config?.botHealth),
       gameActive: (data.live?.players?.length || 0) > 0,
       sessions,
       lastReports: data.config?.sentReports || {},

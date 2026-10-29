@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabaseServer";
 import { sendToGroup } from "@/lib/whatsapp";
+import { recordWaSend } from "@/lib/wa/healthServer";
 import { reportError } from "@/lib/monitor";
 import { classifyWhapiSendFailure } from "@/lib/whapiErrors";
 import {
@@ -128,6 +129,12 @@ export async function POST(request) {
   const token = process.env.WHAPI_TOKEN;
   const groupId = process.env.WHAPI_GROUP_ID;
   if (!token || !groupId) {
+    await recordWaSend({
+      groupId: group.id,
+      ok: false,
+      error: new Error("WHAPI env missing (token/groupId)"),
+      where: "send/manual",
+    });
     return NextResponse.json(
       {
         error: "שליחה לוואטסאפ לא מוגדרת בשרת (חסר טוקן או מזהה קבוצה)",
@@ -140,6 +147,7 @@ export async function POST(request) {
   try {
     const body = text.trim();
     const sent = await sendToGroup(body, { token, groupId });
+    await recordWaSend({ groupId: group.id, ok: true, where: "send/manual" });
     if (isNightShareText(body)) {
       try {
         await pinAfterSend(
@@ -164,6 +172,7 @@ export async function POST(request) {
     }
     return NextResponse.json({ ok: true });
   } catch (e) {
+    await recordWaSend({ groupId: group.id, ok: false, error: e, where: "send/manual" });
     await reportError(e, "send");
     const raw = e instanceof Error ? e.message : String(e);
     const { code, hint } = classifyWhapiSendFailure(raw);
