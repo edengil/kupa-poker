@@ -212,10 +212,12 @@ function stampIdOf(entry: UndoEntry): string | undefined {
 }
 
 /** היפוך מדויק של חותמת על שחקן קיים: מסיר את האירוע שהחותמת הוסיפה
- * ומחסיר את ה־pot שלו מ־savingsPot. זיהוי האירוע: קודם לפי מזהה החותמת
- * (חד־משמעי, לא תלוי שם/סכום/זמן); בנפילה לאחור לפי צילום האירוע שנרשם
- * בפעולה (amount+at+total), ולרשומות ישנות בלי צילום — לפי האירוע האחרון
- * עם אותו סכום. */
+ * ומחסיר את ה־pot שלו מ־savingsPot. זיהוי האירוע: לפי מזהה החותמת
+ * (חד־משמעי, לא תלוי שם/סכום/זמן). לרשומה עם מזהה אין נפילה לצילום —
+ * אם האירוע עם המזהה לא על השחקן, החותמת איננה וההסרה היא no-op;
+ * נפילה לצילום הייתה צורכת אירוע זהה־מראה ומעבירה כסף לאדם הלא־נכון.
+ * הנפילה לצילום (amount+at+total), ולרשומות ישנות בלי צילום — לאירוע
+ * האחרון עם אותו סכום, נשארת רק לרשומות ישנות בלי מזהה. */
 function unstampEvent(
   state: WaLiveState,
   player: WaPlayer,
@@ -228,8 +230,8 @@ function unstampEvent(
   let idx = -1;
   if (sid) {
     idx = events.findIndex((cand) => cand.sid === sid);
-  }
-  if (idx === -1) {
+    if (idx === -1) return events;
+  } else {
     const matches = (cand: WaBuyinEvent): boolean =>
       snap ? matchesEventSnapshot(cand, snap) : cand.amount === amount;
     for (let k = events.length - 1; k >= 0; k--) {
@@ -238,16 +240,16 @@ function unstampEvent(
         break;
       }
     }
-  }
-  if (idx === -1 && snap) {
-    for (let k = events.length - 1; k >= 0; k--) {
-      if (events[k].amount === amount) {
-        idx = k;
-        break;
+    if (idx === -1 && snap) {
+      for (let k = events.length - 1; k >= 0; k--) {
+        if (events[k].amount === amount) {
+          idx = k;
+          break;
+        }
       }
     }
+    if (idx === -1) return events;
   }
-  if (idx === -1) return events;
   const [removed] = events.splice(idx, 1);
   if (removed.pot) state.savingsPot = r2((Number(state.savingsPot) || 0) - removed.pot);
   return events;
@@ -257,9 +259,12 @@ function unstampEvent(
  * ששמו תוקן בין ההחלה למסירה החוזרת כבר לא נמצא לפי השם שברשומה, והביטול
  * מדולג והפקודה חותמת שוב. לכן מאתרים קודם לפי מזהה החותמת: אירוע שייך
  * לשחקן אחד בדיוק, והמזהה חד־משמעי גם כששני אירועים חולקים צילום זהה.
- * בנפילה לאחור (רשומות בלי מזהה): צילום האירוע — שחקן בשם המדויק שמחזיק
- * את האירוע קודם; אחרת השחקן היחיד שמחזיק אותו. בלי צילום או בצילום לא
- * חד־משמעי לא מנחשים שחקן אחר, ונשארים עם ההתאמה לפי שם. */
+ * לרשומה עם מזהה שאין לו מחזיק חי (השחקן הוסר מאז) — החותמת איננה
+ * והביטול הוא no-op: אסור ליפול לצילום, כי אירוע זהה־מראה של שחקן אחר
+ * (אותו סכום/at/total) ייצרך והכסף ינחת על האדם הלא־נכון.
+ * בנפילה לאחור (רק רשומות בלי מזהה): צילום האירוע — שחקן בשם המדויק
+ * שמחזיק את האירוע קודם; אחרת השחקן היחיד שמחזיק אותו. בלי צילום או
+ * בצילום לא חד־משמעי לא מנחשים שחקן אחר, ונשארים עם ההתאמה לפי שם. */
 function findStampPlayerIndex(state: WaLiveState, entry: UndoEntry): number {
   const exact = state.players.findIndex((p) => p.name === entry.name);
   const sid = stampIdOf(entry);
@@ -269,6 +274,7 @@ function findStampPlayerIndex(state: WaLiveState, entry: UndoEntry): number {
       .filter((i) => i !== -1);
     if (byId.length === 1) return byId[0];
     if (byId.length > 1) return exact; // כפילות שחיתותית — לא מנחשים
+    return -1; // אין מחזיק חי למזהה — החותמת איננה, הביטול no-op
   }
   if (!entry.ev) return exact;
   if (
@@ -397,6 +403,15 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
       }
       continue;
     }
+    /* רשומות שינוי־שם לא תלויות בשער השחקן שלמטה: אין להן שדה name
+       (יש from/to), ולכן findIndex לפי e.name החזיר תמיד ‎-1 והענף שלהן
+       בשרשרת שלמטה היה בלתי־ניתן־להשגה — הודעת rename ערוכה אבדה בשקט,
+       כי הביטול לא הפך את השם וההחלה־מחדש לא מצאה את שם המקור (ממצא 4).
+       מטפלים בהן כאן, לפני השער, כמו ברשומות הממתין. */
+    if (e.t === "rename") {
+      renameEverywhere(state, e.to as string, e.from as string);
+      continue;
+    }
     let i = state.players.findIndex((p) => p.name === e.name);
     /* רשומות קנייה מאותבות לפי מזהה/צילום האירוע, לא רק לפי שם — שם ששונה
        מאז ההחלה לא שובר את הביטול. שאר סוגי הרשומות: לפי שם, כמקודם. */
@@ -460,9 +475,9 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
       state.approvedNames = (state.approvedNames || []).filter(
         (n) => n !== e.name && n !== currentName,
       );
-    } else if (e.t === "rename") {
-      renameEverywhere(state, e.to as string, e.from as string);
     }
+    /* ענף rename לא מופיע כאן — רשומות שינוי־שם מטופלות לפני שער השחקן
+       שבראש הלולאה (אין להן שדה name לעבור אותו). */
   }
   // הסרה מוחזרת בסוף, אחרי שכל השאר חזר למקומו
   for (const e of [...entries].reverse()) {

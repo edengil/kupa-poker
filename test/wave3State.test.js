@@ -292,3 +292,62 @@ describe("גל 3א — כתיבת האפליקציה שומרת את מטא־ה�
     expect("ts" in meta).toBe(false);
   });
 });
+
+describe("גל 3א — סבב תיקון: חותמת בלי מחזיק חי וביטול שינוי־שם (פסילת בודק A)", () => {
+  it("מסירת יצירה של שחקן שהוסר: הביטול לא צורך אירוע זהה־מראה של שחקן אחר", () => {
+    let live = apply(null, [{ kind: "add", name: "קובי", amount: 100 }], "f1-k1");
+    live = apply(live, [{ kind: "add", name: "דוד", amount: 100 }], "f1-d1");
+    live = apply(live, [{ kind: "add", name: "דוד", amount: 50 }], "f1-d2");
+    // שני אירועי ה־100 חולקים צילום זהה לגמרי (amount+at+total, אותו now) —
+    // רק מזהה החותמת מבחין ביניהם.
+    const kobiEv = live.players.find((p) => p.name === "קובי סעדה").buyinEvents[0];
+    const davidEv = live.players.find((p) => p.name === "דוד").buyinEvents[0];
+    expect(kobiEv).toMatchObject({ amount: 100, at: T0, total: 100 });
+    expect(davidEv).toMatchObject({ amount: 100, at: T0, total: 100 });
+    expect(kobiEv.sid).toBe("f1-k1:0");
+    expect(davidEv.sid).toBe("f1-d1:0");
+    expect(live.savingsPot).toBe(12.5);
+
+    live = apply(live, [{ kind: "remove", name: "קובי" }], "f1-r1");
+    expect(live.players).toHaveLength(1);
+    expect(live.savingsPot).toBe(7.5);
+
+    // מסירה חוזרת של הודעת היצירה של קובי. לחותמת שלו אין מחזיק חי (הוא
+    // הוסר) — הביטול חייב להיות no-op. לפני התיקון האיתור נפל לצילום,
+    // צרך את אירוע ה־100 של דוד, וההחלה נחתה על דוד כריביי: קובי לא חזר
+    // ו־100₪ של חוב נעלמו מהשולחן.
+    live = apply(live, [{ kind: "add", name: "קובי", amount: 100 }], "f1-k1");
+    expect(live.players).toHaveLength(2);
+    const david = live.players.find((p) => p.name === "דוד");
+    expect(david.buyin).toBe(150);
+    expect(david.buyinEvents.map((e) => e.sid)).toEqual(["f1-d1:0", "f1-d2:0"]);
+    expect(david.buyinEvents.map((e) => e.amount)).toEqual([100, 50]);
+    const kobi = live.players.find((p) => p.name === "קובי סעדה");
+    expect(kobi.buyin).toBe(100);
+    expect(kobi.buyinEvents).toHaveLength(1);
+    expect(kobi.buyinEvents[0].sid).toBe("f1-k1:0");
+    expect(live.savingsPot).toBe(12.5);
+    expectPotInvariant(live);
+  });
+
+  it("עריכת הודעת שינוי־שם: הביטול הופך את השם הקודם והגרסה החדשה נכנסת לתוקף", () => {
+    let live = apply(null, [{ kind: "add", name: "קובי", amount: 50 }], "f2-a1");
+    live = apply(live, [{ kind: "rename", from: "קובי", to: "קובי אחר" }], "f2-rn");
+    expect(live.players[0].name).toBe("קובי אחר");
+
+    // עריכת אותה הודעה ליעד אחר. לפני התיקון רשומת ה־rename ישבה מאחורי
+    // שער השחקן ב־undo (אין לה שדה name) ודולגה תמיד — הביטול לא הפך את
+    // השם, ההחלה לא מצאה את המקור, והעריכה אבדה בשקט: השם נשאר "קובי אחר".
+    live = apply(live, [{ kind: "rename", from: "קובי", to: "קובי שני" }], "f2-rn");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].name).toBe("קובי שני");
+    expect(live.players[0].buyin).toBe(50);
+
+    // מסירה חוזרת לא־ערוכה של הגרסה החדשה — אידמפוטנטית.
+    live = apply(live, [{ kind: "rename", from: "קובי", to: "קובי שני" }], "f2-rn");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].name).toBe("קובי שני");
+    expect(live.players[0].buyin).toBe(50);
+    expectPotInvariant(live);
+  });
+});
