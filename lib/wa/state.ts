@@ -9,6 +9,12 @@ export interface WaBuyinEvent {
   at?: number;
   total?: number;
   pot?: number;
+  /* זהות יציבה של החותמת: מזהה הודעת הוואטסאפ + אינדקס הפקודה בתוכה.
+     הצילום (amount+at+total) אינו זהות — שתי קניות של 50 באותה אלפית־שנייה
+     נראות זהות, ושם השחקן הוא תווית משתנה. ה־sid הוא מה שמאפשר לביטול
+     למצוא בדיוק את החותמת הזו גם אחרי שינוי שם, ולהחלה־מחדש לנחות על
+     אותו שחקן. שדה פנימי של הבוט — מוסר בהקרנת הצופה (publicShare/SQL). */
+  sid?: string;
 }
 
 export interface WaPlayer {
@@ -157,6 +163,7 @@ export function stampBuyin(
   player: WaPlayer,
   delta: number,
   at: number = Date.now(),
+  sid?: string,
 ): WaPlayer {
   const prev = +player.buyin || 0;
   const buyin = Math.max(0, r2(prev + delta));
@@ -164,10 +171,9 @@ export function stampBuyin(
   if (!(applied > 0)) return { ...player, buyin };
   const toPot = state.savings5 ? r2(applied * 0.05) : 0;
   if (toPot > 0) state.savingsPot = r2((Number(state.savingsPot) || 0) + toPot);
-  const events = [
-    ...(player.buyinEvents || []),
-    { amount: applied, at, total: buyin, pot: toPot || undefined },
-  ];
+  const ev: WaBuyinEvent = { amount: applied, at, total: buyin, pot: toPot || undefined };
+  if (sid) ev.sid = sid;
+  const events = [...(player.buyinEvents || []), ev];
   return { ...player, buyin, buyinEvents: events };
 }
 
@@ -184,10 +190,16 @@ function matchesEventSnapshot(cand: WaBuyinEvent, snap?: WaBuyinEvent): boolean 
   return !!snap && cand.amount === snap.amount && cand.at === snap.at && cand.total === snap.total;
 }
 
+/** מזהה החותמת של רשומת ביטול — נשמר על האירוע החתום עצמו (entry.ev). */
+function stampIdOf(entry: UndoEntry): string | undefined {
+  return entry.ev?.sid || undefined;
+}
+
 /** היפוך מדויק של חותמת על שחקן קיים: מסיר את האירוע שהחותמת הוסיפה
- * ומחסיר את ה־pot שלו מ־savingsPot. זיהוי האירוע: קודם לפי צילום האירוע
- * שנרשם בפעולה (amount+at+total), ובנפילה לאחור — לרשומות ישנות בלי
- * צילום — לפי האירוע האחרון עם אותו סכום. */
+ * ומחסיר את ה־pot שלו מ־savingsPot. זיהוי האירוע: קודם לפי מזהה החותמת
+ * (חד־משמעי, לא תלוי שם/סכום/זמן); בנפילה לאחור לפי צילום האירוע שנרשם
+ * בפעולה (amount+at+total), ולרשומות ישנות בלי צילום — לפי האירוע האחרון
+ * עם אותו סכום. */
 function unstampEvent(
   state: WaLiveState,
   player: WaPlayer,
@@ -195,14 +207,20 @@ function unstampEvent(
   amount: number,
 ): WaBuyinEvent[] {
   const events = [...(player.buyinEvents || [])];
+  const sid = stampIdOf(entry);
   const snap = entry.ev;
-  const matches = (cand: WaBuyinEvent): boolean =>
-    snap ? matchesEventSnapshot(cand, snap) : cand.amount === amount;
   let idx = -1;
-  for (let k = events.length - 1; k >= 0; k--) {
-    if (matches(events[k])) {
-      idx = k;
-      break;
+  if (sid) {
+    idx = events.findIndex((cand) => cand.sid === sid);
+  }
+  if (idx === -1) {
+    const matches = (cand: WaBuyinEvent): boolean =>
+      snap ? matchesEventSnapshot(cand, snap) : cand.amount === amount;
+    for (let k = events.length - 1; k >= 0; k--) {
+      if (matches(events[k])) {
+        idx = k;
+        break;
+      }
     }
   }
   if (idx === -1 && snap) {
@@ -221,12 +239,21 @@ function unstampEvent(
 
 /** איתור השחקן לרשומת ביטול של חותמת קנייה. שם הוא תווית משתנה — שחקן
  * ששמו תוקן בין ההחלה למסירה החוזרת כבר לא נמצא לפי השם שברשומה, והביטול
- * מדולג והפקודה חותמת שוב. צילום האירוע הוא זהות החותמת עצמה ואינו תלוי
- * בשם, לכן: שחקן בשם המדויק שמחזיק את האירוע קודם; אחרת — השחקן היחיד
- * שמחזיק אותו. בלי צילום (רשומות ישנות) או בצילום לא חד־משמעי לא מנחשים
- * שחקן אחר, ונשארים עם ההתאמה לפי שם. */
+ * מדולג והפקודה חותמת שוב. לכן מאתרים קודם לפי מזהה החותמת: אירוע שייך
+ * לשחקן אחד בדיוק, והמזהה חד־משמעי גם כששני אירועים חולקים צילום זהה.
+ * בנפילה לאחור (רשומות בלי מזהה): צילום האירוע — שחקן בשם המדויק שמחזיק
+ * את האירוע קודם; אחרת השחקן היחיד שמחזיק אותו. בלי צילום או בצילום לא
+ * חד־משמעי לא מנחשים שחקן אחר, ונשארים עם ההתאמה לפי שם. */
 function findStampPlayerIndex(state: WaLiveState, entry: UndoEntry): number {
   const exact = state.players.findIndex((p) => p.name === entry.name);
+  const sid = stampIdOf(entry);
+  if (sid) {
+    const byId = state.players
+      .map((p, i) => ((p.buyinEvents || []).some((ev) => ev.sid === sid) ? i : -1))
+      .filter((i) => i !== -1);
+    if (byId.length === 1) return byId[0];
+    if (byId.length > 1) return exact; // כפילות שחיתותית — לא מנחשים
+  }
   if (!entry.ev) return exact;
   if (
     exact !== -1 &&
@@ -309,14 +336,23 @@ export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
 export const openPlayers = (state: WaLiveState): WaPlayer[] =>
   state.players.filter((p) => p.cashout === "" || p.cashout == null);
 
-/** מבטל את מה שהודעה קודמת עם אותו מזהה כבר עשתה. */
-export function undo(state: WaLiveState, entries: UndoEntry[]): void {
+/** מבטל את מה שהודעה קודמת עם אותו מזהה כבר עשתה.
+ * מחזיר מפת נחיתה להחלה־מחדש: מזהה חותמת → השם הנוכחי של השחקן שהביטול
+ * נגע בו. ההחלה שאחרי הביטול חייבת לנחות על אותו שחקן באותו שם — פתרון
+ * השם הגולמי מההודעה מחדש דרך טבלת הכינויים עלול להושיב אדם אחר לגמרי
+ * (למשל "דני" → "דני גוטניק" כשהיושב בפועל תוקן ל"דני לוי"). */
+export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, string> {
+  const retarget = new Map<string, string>();
   for (const e of [...entries].reverse()) {
     let i = state.players.findIndex((p) => p.name === e.name);
-    /* רשומות קנייה מאותבות לפי צילום האירוע, לא רק לפי שם — שם ששונה
+    /* רשומות קנייה מאותבות לפי מזהה/צילום האירוע, לא רק לפי שם — שם ששונה
        מאז ההחלה לא שובר את הביטול. שאר סוגי הרשומות: לפי שם, כמקודם. */
     if (e.t === "add" || e.t === "approve") i = findStampPlayerIndex(state, e);
     if (i === -1) continue;
+    if (e.t === "add" || e.t === "approve") {
+      const sid = stampIdOf(e);
+      if (sid) retarget.set(sid, state.players[i].name);
+    }
     if (e.t === "add") {
       if (e.created) {
         undoCreatedStamp(state, i, e, e.delta ?? 0);
@@ -378,6 +414,7 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): void {
     if (e.t === "remove") state.players.splice(e.at as number, 0, e.player as WaPlayer);
     if (e.t === "entries") state.entriesCount = e.before as string;
   }
+  return retarget;
 }
 
 /** מחליף שם בכל מקומות הלייב של ערב פעיל (שולחן, ממתינים, טיפים…). */

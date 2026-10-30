@@ -129,8 +129,14 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     };
   }
 
+  /* מסירה חוזרת/עריכה: מבטלים את מה שההודעה עשתה ומחילים מחדש. ה־undo
+     מחזיר מפת נחיתה (מזהה חותמת → שם נוכחי של השחקן) — ההחלה־מחדש של
+     פקודת קנייה נוחתת על השחקן שהביטול נגע בו, בשמו הנוכחי, ולא פותרת
+     את השם הגולמי מההודעה מחדש (זהות החותמת: מזהה הודעה + אינדקס פקודה,
+     יציבה בין ההחלה למסירה החוזרת של אותה הודעה). */
+  let retarget = new Map<string, string>();
   if (msgId && state.applied[msgId]) {
-    undo(state, state.applied[msgId] as UndoEntry[]);
+    retarget = undo(state, state.applied[msgId] as UndoEntry[]);
     delete state.applied[msgId];
   }
 
@@ -138,7 +144,9 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   const acks = [];
   const problems = [];
 
-  for (let cmd of cmds) {
+  for (let ci = 0; ci < cmds.length; ci++) {
+    let cmd = cmds[ci];
+    const sid = msgId ? `${msgId}:${ci}` : undefined;
     if (READ_ONLY.has(cmd.kind)) continue;
 
     if (cmd.kind === "tipNoName") {
@@ -220,11 +228,20 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         );
         continue;
       }
-      const already = findInState(state, item.name, aliases);
+      /* החלה־מחדש של אישור: נוחתים על השחקן שהביטול נגע בו בשמו הנוכחי,
+         אם הוא עדיין בשולחן — לא על פתרון שם הממתין מחדש. */
+      const rtApproveName = sid ? retarget.get(sid) : undefined;
+      const rtApproveIdx = rtApproveName
+        ? state.players.findIndex((p) => p.name === rtApproveName)
+        : -1;
+      const already =
+        rtApproveIdx !== -1
+          ? { index: rtApproveIdx, resolved: rtApproveName as string }
+          : findInState(state, item.name, aliases);
       // הקנייה עוברת דרך החותמת המרכזית — אירוע אחד, pot ו־savingsPot כמו באפליקציה
       if (already.index !== -1) {
         const p = state.players[already.index];
-        const next = stampBuyin(state, p, item.amount, now);
+        const next = stampBuyin(state, p, item.amount, now, sid);
         state.players[already.index] = next;
         record.push({
           t: "approve",
@@ -238,12 +255,14 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const fresh = {
-        name: resolveAlias(item.name, aliases),
+        /* שחקן שהביטול הסיר לגמרי (החותמה הייתה כל מה שהיה לו) נוצר מחדש
+           בשמו הנוכחי מהביטול, לא בשם הגולמי של הממתין. */
+        name: rtApproveName ?? resolveAlias(item.name, aliases),
         buyin: 0,
         cashout: "",
         buyinEvents: [],
       };
-      const seated = stampBuyin(state, fresh, item.amount, now);
+      const seated = stampBuyin(state, fresh, item.amount, now, sid);
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
       if (!state.approvedNames.includes(seated.name)) state.approvedNames.push(seated.name);
@@ -333,7 +352,13 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       continue;
     }
 
-    const found = findInState(state, cmd.name, aliases);
+    /* החלה־מחדש של פקודת קנייה: אם הביטול נגע בשחקן בשביל החותמת של
+       הפקודה הזו, מאתרים אותו בשמו הנוכחי ישירות — בלי findInState,
+       שפתרון הכינוי/הרחבת־השם שלו עלולים להחזיר שם ישן או אדם אחר. */
+    const rtName = cmd.kind === "add" && sid ? retarget.get(sid) : undefined;
+    const rtIdx = rtName ? state.players.findIndex((p) => p.name === rtName) : -1;
+    const found =
+      rtIdx !== -1 ? { index: rtIdx, resolved: rtName as string } : findInState(state, cmd.name, aliases);
     if (found.ambiguous) {
       problems.push(`${cmd.name} → ${found.ambiguous.join(" / ")}`);
       continue;
@@ -446,12 +471,15 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         problems.push(`${cmd.name} לא בשולחן`);
         continue;
       }
-      const name = found.resolved || resolveAlias(cmd.name, aliases);
+      /* החלה־מחדש שהביטול הסיר את השחקן לגמרי: יוצרים מחדש בשם הנוכחי
+         מהביטול ועוקפים את הסחת־הממתין — השחקן כבר הושב על ידי ההודעה
+         הזו עצמה, והשם המתוקן שלו לא חייב להיות ברשימת המוכרים. */
+      const name = rtName || found.resolved || resolveAlias(cmd.name, aliases);
       const extras = [
         ...(state.players || []).map((p) => p.name),
         ...(state.approvedNames || []),
       ];
-      if (!isKnownName(name, opts.knownNames, extras, aliases)) {
+      if (!rtName && !isKnownName(name, opts.knownNames, extras, aliases)) {
         const at = now;
         const existing = (state.pendingApprovals || []).find((p) => p.name === name);
         if (existing) {
@@ -467,7 +495,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const fresh = { name, buyin: 0, cashout: "", buyinEvents: [] };
-      const seated = stampBuyin(state, fresh, cmd.amount, now);
+      const seated = stampBuyin(state, fresh, cmd.amount, now, sid);
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
       record.push({
@@ -482,7 +510,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     }
 
     const p = state.players[found.index];
-    const next = stampBuyin(state, p, cmd.amount, now);
+    const next = stampBuyin(state, p, cmd.amount, now, sid);
     const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
     state.players[found.index] = next;
     record.push({ t: "add", name: p.name, delta, ev: stampedEventOf(p, next) });

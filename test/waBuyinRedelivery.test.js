@@ -208,3 +208,68 @@ describe("wa buyin creation undo — stamp-level across messages and renames", (
     expectPotInvariant(live);
   });
 });
+
+describe("wa buyin stamp identity — stable id across renames and identical snapshots (round 4)", () => {
+  it("תרחיש 4: יצירה + ריביי, שינוי שם, מסירות חוזרות — הכסף לא מהגר לאדם אחר והשם המתוקן שורד", () => {
+    const knownPlus = [...known, "דני"];
+    const applyD = (live, cmds, msgId) =>
+      applyCommands(live, cmds, msgId, 2, { knownNames: knownPlus, now: T0 }).live;
+
+    let live = applyD(null, [{ kind: "add", name: "דני", amount: 50 }], "d1");
+    live = applyD(live, [{ kind: "add", name: "דני", amount: 50 }], "d2");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].name).toBe("דני גוטניק"); // "דני" בטבלת הכינויים של הייצור
+    expectPlayer(live, 0, { buyin: 100, events: 2, chips: 190 });
+    // זהות החותמת: מזהה הודעה + אינדקס פקודה, שמור על האירוע עצמו
+    expect(live.players[0].buyinEvents.map((e) => e.sid)).toEqual(["d1:0", "d2:0"]);
+
+    // בן־אדם מתקן את השם: ההודעה הושיבה את הקנוני, אבל יושב שם אדם אחר
+    live = applyD(live, [{ kind: "rename", from: "דני", to: "דני לוי" }], "d3");
+    expect(live.players[0].name).toBe("דני לוי");
+
+    // מסירה חוזרת של הודעת היצירה: לפני התיקון נולד כאן שחקן חדש
+    // "דני גוטניק" עם 50₪, ודני לוי נשאר רק עם הריביי.
+    live = applyD(live, [{ kind: "add", name: "דני", amount: 50 }], "d1");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].name).toBe("דני לוי");
+    expectPlayer(live, 0, { buyin: 100, events: 2, chips: 190 });
+    expect(live.savingsPot).toBe(5);
+    expectPotInvariant(live);
+
+    // ומסירה חוזרת של הריביי אחריה: לפני התיקון כל ה־100₪ היגרו לדני
+    // גוטניק ודני לוי נשאר שחקן־רפאים עם buyin ‏0. עכשיו — אותה תמונה.
+    live = applyD(live, [{ kind: "add", name: "דני", amount: 50 }], "d2");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].name).toBe("דני לוי");
+    expectPlayer(live, 0, { buyin: 100, events: 2, chips: 190 });
+    expect(live.players[0].buyinEvents.map((e) => e.sid).sort()).toEqual(["d1:0", "d2:0"]);
+    expect(live.savingsPot).toBe(5);
+    expect(computeLiveRebuys(live.players).totalEntries).toBe(2);
+    expectPotInvariant(live);
+  });
+
+  it("תרחיש 5ב: שני אירועים עם צילום זהה לגמרי + שינוי שם — הביטול לא מדולג ואין שחקן רפאים", () => {
+    let live = apply(null, [{ kind: "add", name: "דוד בני גיל", amount: 50 }], "s1");
+    live = apply(live, [{ kind: "add", name: "עדן גיל", amount: 50 }], "s2");
+    expect(live.players).toHaveLength(2);
+    // אותו now בדיוק לשתי ההודעות הנפרדות — הצילומים (amount+at+total) זהים
+    expect(live.players[0].buyinEvents[0]).toMatchObject({ amount: 50, at: T0, total: 50 });
+    expect(live.players[1].buyinEvents[0]).toMatchObject({ amount: 50, at: T0, total: 50 });
+    expect(live.savingsPot).toBe(5);
+
+    live = apply(live, [{ kind: "rename", from: "דוד בני גיל", to: "דוד שרון" }], "s3");
+    expect(live.players.map((p) => p.name)).toEqual(["דוד שרון", "עדן גיל"]);
+
+    // מסירה חוזרת של יצירת דוד: לפני התיקון הצילום הרב־משמעי דילג על
+    // הביטול בשקט וההחלה הושיבה עותק שלישי — 3 שחקנים וקופה 7.5.
+    live = apply(live, [{ kind: "add", name: "דוד בני גיל", amount: 50 }], "s1");
+    expect(live.players).toHaveLength(2);
+    expect(live.players.map((p) => p.name).sort()).toEqual(["דוד שרון", "עדן גיל"]);
+    const david = live.players.find((p) => p.name === "דוד שרון");
+    expect(david.buyin).toBe(50);
+    expect(david.buyinEvents).toHaveLength(1);
+    expect(david.buyinEvents[0].sid).toBe("s1:0");
+    expect(live.savingsPot).toBe(5);
+    expectPotInvariant(live);
+  });
+});
