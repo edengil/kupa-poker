@@ -7,6 +7,7 @@ import { reportBeacon } from "../lib/diagReport";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY, DB_KEY } from "../lib/store";
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
+import { updateGroupCas } from "../lib/groupCas";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
@@ -210,13 +211,25 @@ export default function OwnerApp() {
       let nextLive = data?.live ?? null;
       const mergeBase = latestLocal ?? localSnap;
       if (decision.merge && mergeBase && nextLive) {
-        nextLive = mergeLiveStates(mergeBase, nextLive);
-        const { error: writeError } = await supabase
-          .from("groups")
-          .update({ live: nextLive })
-          .eq("id", row.id);
-        if (writeError) {
-          console.warn("live merge write failed:", writeError.message);
+        /* הכתיבה עוברת דרך CAS (ממצא 9): המיזוג נבנה בתוך ה־build מול
+           השורה הטרייה בכל ניסיון — כתיבה שנוחתת בין הקריאה שלמעלה
+           לכתיבה (למשל של הבוט) כבר לא נדרסת בעיוורון. */
+        try {
+          let mergedLive = null;
+          const res = await updateGroupCas(supabase, row.id, (freshRow) => {
+            const freshLive = freshRow?.live ?? null;
+            if (!freshLive) return null;
+            mergedLive = mergeLiveStates(mergeBase, freshLive);
+            return { live: mergedLive };
+          });
+          if (res.ok && !res.skipped && mergedLive) {
+            nextLive = mergedLive;
+          } else {
+            if (!res.ok) console.warn("live merge write failed: conflict");
+            nextLive = data?.live ?? null;
+          }
+        } catch (e) {
+          console.warn("live merge write failed:", e?.message || e);
           nextLive = data?.live ?? null;
         }
       }
