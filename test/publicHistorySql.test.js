@@ -27,16 +27,24 @@ describe("public history SQL enforcement", () => {
       JSON.stringify({ players: [{ name: "live player" }], cps: 4 }),
       JSON.stringify({ shareHistory: false, chipsPerShekel: 4, botOn: true, internal: "private setting" }),
     ]);
-    const migration = readFileSync(new URL("../supabase/migrations/202609150001_last_settlement_payments.sql", import.meta.url), "utf8");
-    await db.exec(migration);
-    await db.exec(migration); // Safe to apply twice.
-    const receipt = readFileSync(new URL("../supabase/migrations/202609250001_receipt_confirmation.sql", import.meta.url), "utf8");
-    await db.exec(receipt);
-    await db.exec(receipt);
-    const history = readFileSync(new URL("../supabase/migrations/202609250002_confirmation_history.sql", import.meta.url), "utf8");
-    await db.exec(history);
-    await db.exec(history);
-  }, 30000);
+    /* שרשרת הפונקציות הציבוריות המלאה, בסדר כרונולוגי — כולל מיגרציות
+       האבטחה (20261008/20261019/20261025/גל־1) שהרתמה לא טענה בעבר. */
+    for (const name of [
+      "202609090001_public_history.sql",
+      "202609150001_last_settlement_payments.sql",
+      "202609250001_receipt_confirmation.sql",
+      "202609250002_confirmation_history.sql",
+      "202610010001_player_of_night_vote.sql",
+      "202610080001_fix_rpc_sharehistory_leak.sql",
+      "202610190001_pot_privacy.sql",
+      "202610250001_mark_payment_projection_potpaid.sql",
+      "202610300001_wave1_pot_privacy.sql",
+    ]) {
+      const sql = readFileSync(new URL(`../supabase/migrations/${name}`, import.meta.url), "utf8");
+      await db.exec(sql);
+      await db.exec(sql); // Safe to apply twice.
+    }
+  }, 60000);
   afterAll(async () => { await db?.close(); });
 
   it("exposes only the latest session when history is hidden", async () => {

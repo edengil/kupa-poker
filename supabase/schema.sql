@@ -91,6 +91,170 @@ grant all privileges on table public.groups to service_role;
 -- מי שאין לו את הלינק לא יכול להגיע לשום דבר, וגם לא לרשימת הקבוצות.
 -- live נכלל כדי שהצופים יראו משחק פעיל. owner_id ו-slug לעולם לא יוצאים החוצה.
 -- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- פרטיות קופה (גל 1, 30.10): הקרנת צופה אחת לכל הפונקציות הציבוריות.
+-- הגדרות זהות למיגרציה 202610300001_wave1_pot_privacy.sql.
+-- project_payments_for_viewer: שורת הקופה יוצאת ממחרוזת התוכנית והסימונים
+-- ממופים מחדש לקואורדינטות המוקרנות; potPaid מוסר מהתגובה (באחסון נשמר).
+-- ---------------------------------------------------------------------------
+create or replace function public.project_payments_for_viewer(p_payments jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  plan_txt text;
+  plan_arr jsonb;
+  elem jsonb;
+  i integer;
+  kept jsonb := '[]'::jsonb;
+  idx_map jsonb := '{}'::jsonb;
+  has_pot boolean := false;
+  out_payments jsonb;
+  new_paid jsonb := '{}'::jsonb;
+  new_received jsonb := '{}'::jsonb;
+  new_conf jsonb := '[]'::jsonb;
+  kv record;
+  ev jsonb;
+  new_idx text;
+begin
+  if p_payments is null or jsonb_typeof(p_payments) <> 'object' then
+    return p_payments;
+  end if;
+  out_payments := p_payments - 'potPaid';
+  plan_txt := p_payments->>'plan';
+  if plan_txt is null then
+    return out_payments;
+  end if;
+  begin
+    plan_arr := plan_txt::jsonb;
+  exception when others then
+    return out_payments;
+  end;
+  if jsonb_typeof(plan_arr) <> 'array' then
+    return out_payments;
+  end if;
+
+  for i in 0 .. jsonb_array_length(plan_arr) - 1 loop
+    elem := plan_arr->i;
+    if coalesce(elem->>'pot', 'false') = 'true'
+       or coalesce(elem->>'residual', 'false') = 'true' then
+      has_pot := true;
+    else
+      idx_map := jsonb_set(idx_map, array[i::text], to_jsonb(jsonb_array_length(kept)), true);
+      kept := kept || jsonb_build_array(elem);
+    end if;
+  end loop;
+
+  if not has_pot then
+    return out_payments;
+  end if;
+
+  for kv in select key, value from jsonb_each(coalesce(p_payments->'paid', '{}'::jsonb)) loop
+    if kv.value = 'true'::jsonb and idx_map ? kv.key then
+      new_paid := jsonb_set(new_paid, array[idx_map->>kv.key], 'true'::jsonb, true);
+    end if;
+  end loop;
+  for kv in select key, value from jsonb_each(coalesce(p_payments->'received', '{}'::jsonb)) loop
+    if kv.value = 'true'::jsonb and idx_map ? kv.key then
+      new_received := jsonb_set(new_received, array[idx_map->>kv.key], 'true'::jsonb, true);
+    end if;
+  end loop;
+  for ev in select value from jsonb_array_elements(coalesce(p_payments->'confirmations', '[]'::jsonb)) loop
+    if jsonb_typeof(ev) <> 'object' then
+      continue;
+    end if;
+    if coalesce(ev->>'pot', 'false') = 'true' then
+      continue;
+    end if;
+    new_idx := idx_map->>(ev->>'index');
+    if new_idx is null then
+      continue;
+    end if;
+    new_conf := new_conf || jsonb_build_array(jsonb_set(ev, '{index}', to_jsonb(new_idx::integer), true));
+  end loop;
+
+  return jsonb_build_object(
+    'plan', to_jsonb(kept::text),
+    'paid', new_paid,
+    'received', new_received,
+    'confirmations', new_conf
+  );
+end;
+$$;
+
+revoke all on function public.project_payments_for_viewer(jsonb) from public, anon;
+
+-- הקרנת ערב בודד לצופה: בלי שדות קופה, בלי coupleFills, בלי frozenActual.
+create or replace function public.project_session_for_viewer(p_sess jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  out jsonb;
+begin
+  if p_sess is null or jsonb_typeof(p_sess) <> 'object' then
+    return p_sess;
+  end if;
+  out := p_sess - 'savingsPot' - 'savingsPotActual' - 'coupleFills';
+  if out ? 'manualSettlement' and jsonb_typeof(out->'manualSettlement') = 'object' then
+    out := jsonb_set(out, '{manualSettlement}', (out->'manualSettlement') - 'frozenActual', true);
+  end if;
+  if out ? 'payments' then
+    out := jsonb_set(out, '{payments}', public.project_payments_for_viewer(out->'payments'), true);
+  end if;
+  return out;
+end;
+$$;
+
+revoke all on function public.project_session_for_viewer(jsonb) from public, anon;
+
+-- סינון נתוני קבוצה לתגובות RPC ציבוריות: shareHistory + הקרנת קופה מלאה.
+create or replace function public.filter_shared_group_data(p_data jsonb, p_config jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  sessions jsonb;
+  projected jsonb;
+  last_sess jsonb;
+begin
+  if p_data is null then
+    return null;
+  end if;
+  sessions := coalesce(p_data->'sessions', '[]'::jsonb);
+  if p_config->'shareHistory' = 'false'::jsonb then
+    select public.project_session_for_viewer(elem)
+      into last_sess
+      from jsonb_array_elements(sessions) elem
+      order by coalesce((elem->>'endedAt')::numeric, 0) desc,
+               coalesce(elem->>'iso', '') desc
+      limit 1;
+    return jsonb_build_object(
+      'sessions', case when last_sess is null then '[]'::jsonb
+                       else jsonb_build_array(last_sess) end,
+      'yearly', '[]'::jsonb,
+      'monthly', '[]'::jsonb,
+      'roster', '[]'::jsonb,
+      'aliases', coalesce(p_data->'aliases', '{}'::jsonb),
+      'plan', p_data->'plan'
+    );
+  end if;
+  select coalesce(jsonb_agg(public.project_session_for_viewer(elem) order by ord), '[]'::jsonb)
+    into projected
+    from jsonb_array_elements(sessions) with ordinality as t(elem, ord);
+  return (p_data - 'savingsPot' - 'savingsWithdrawals')
+    || jsonb_build_object('sessions', projected);
+end;
+$$;
+
+revoke all on function public.filter_shared_group_data(jsonb, jsonb) from public, anon;
+
 -- שינוי חתימה מחייב drop קודם
 drop function if exists public.public_group(text);
 
@@ -105,9 +269,9 @@ as $$
     case when g.config->'shareHistory' = 'false'::jsonb then
       jsonb_build_object(
         'sessions', coalesce((
-          select jsonb_agg(sess)
+          select jsonb_agg(ps)
           from (
-            select elem as sess
+            select public.project_session_for_viewer(elem) as ps
             from jsonb_array_elements(coalesce(g.data->'sessions', '[]'::jsonb)) elem
             order by coalesce((elem->>'endedAt')::numeric, 0) desc,
                      coalesce(elem->>'iso', '') desc
@@ -120,8 +284,19 @@ as $$
         'aliases', coalesce(g.data->'aliases', '{}'::jsonb),
         'plan', g.data->'plan'
       )
-    else g.data end,
-    g.live, g.updated_at
+    else
+      (g.data - 'savingsPot' - 'savingsWithdrawals')
+        || jsonb_build_object('sessions',
+             coalesce(
+               (select jsonb_agg(public.project_session_for_viewer(elem) order by ord)
+                  from jsonb_array_elements(coalesce(g.data->'sessions', '[]'::jsonb))
+                         with ordinality as t(elem, ord)),
+               '[]'::jsonb))
+    end,
+    case when g.live is null then null
+         else g.live - 'savingsPot' - 'savingsPotActual' - 'savingsWithdrawals'
+                    - 'potDraft' - 'frozenActual' - 'potPaid' - 'coupleFills' end,
+    g.updated_at
   from public.groups g
   where g.slug = p_slug
   limit 1;
@@ -417,7 +592,8 @@ begin
   where id = g.id
   returning data into g.data;
 
-  return g.data;
+  -- גל 1: התגובה לצופה מסוננת ומוקרנת־קופה, כמו public_group
+  return public.filter_shared_group_data(g.data, g.config);
 end;
 $$;
 
@@ -426,7 +602,7 @@ grant execute on function public.mark_group_payment(text, text, text, integer, b
 
 -- Viewers vote for "player of the night" without full group write access.
 -- Votes live on the session: session.playerOfNightVotes = { voter: candidate }.
--- Identical definition lives in migrations/202610010001_player_of_night_vote.sql.
+-- התגובה מסוננת כמו במיגרציה 202610080001 (ולא כהגדרה הגולמית ב־202610010001).
 create or replace function public.vote_player_of_night(
   p_slug text,
   p_session_id text,
@@ -494,7 +670,8 @@ begin
   where id = g.id
   returning data into g.data;
 
-  return g.data;
+  -- גל 1: התגובה לצופה מסוננת ומוקרנת־קופה, כמו public_group
+  return public.filter_shared_group_data(g.data, g.config);
 end;
 $$;
 

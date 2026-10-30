@@ -38,13 +38,28 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
       "202609150001_last_settlement_payments.sql",
       "202609250001_receipt_confirmation.sql",
       "202609250002_confirmation_history.sql",
+      "202610080001_fix_rpc_sharehistory_leak.sql",
+      "202610190001_pot_privacy.sql",
       "202610250001_mark_payment_projection_potpaid.sql",
+      "202610300001_wave1_pot_privacy.sql",
     ]) {
       await db.exec(migration(file));
       await db.exec(migration(file)); // Safe to apply twice.
     }
   }, 30000);
   afterAll(async () => { await db?.close(); });
+
+  /* מגל 1 התגובה של ה־RPC מוקרנת לצופה — טענות על שמירת נתונים באחסון
+     (potPaid, מפתח עתידי, התוכנית הגולמית) נקראות מהטבלה עצמה, בתפקיד
+     הבעלים (לטבלת groups אין grant ל־authenticated), ואז התפקיד מוחזר. */
+  const storedData = async () => {
+    await db.exec("reset role");
+    try {
+      return (await db.query(`select data from groups where slug = $1`, [SLUG])).rows[0].data;
+    } finally {
+      await db.exec("set role authenticated");
+    }
+  };
 
   const callMark = (fingerprint, index, field = "paid", by = "נתנאל כהן") =>
     db.query(`select mark_group_payment($1,$2,$3,$4,true,$5,$6) as data`, [
@@ -71,8 +86,10 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
       const sess = sessionOf(rows[0].data);
       // הסימון נחת באינדקס הגולמי של נתנאל→אופיר (0 בתוכנית הלילה)
       expect(sess.payments.paid["0"]).toBe(true);
-      // התוכנית הגולמית לא הוחלפה בהקרנה
-      expect(sess.payments.plan).toBe(NIGHT_24_10.payments.plan);
+      // התגובה לצופה היא ההקרנה (בלי שורת הקופה) — והתוכנית הגולמית
+      // באחסון לא הוחלפה בהקרנה
+      expect(JSON.parse(sess.payments.plan).some((t) => t.pot)).toBe(false);
+      expect(sessionOf(await storedData()).payments.plan).toBe(NIGHT_24_10.payments.plan);
       // האישור נרשם בקואורדינטות הגולמיות
       expect(sess.payments.confirmations).toEqual(
         expect.arrayContaining([expect.objectContaining({ index: 0, action: "paid", by: "נתנאל כהן" })])
@@ -84,19 +101,22 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
     }
   });
 
-  it("F3: potPaid ומפתח עתידי שורדים סימון ציבורי — בהקרנה וגם בגולמי", async () => {
+  it("F3: potPaid ומפתח עתידי שורדים סימון ציבורי באחסון — בהקרנה וגם בגולמי", async () => {
     await db.exec("set role authenticated");
     try {
       const projected = JSON.parse(
         snapshotForViewer({ id: "g", data: { sessions: [storedSession] }, config: { shareHistory: true } })
           .data.sessions[0].payments.plan
       );
-      const afterProjected = sessionOf((await callMark(JSON.stringify(projected), 2, "received", "אופיר סנה")).rows[0].data);
+      await callMark(JSON.stringify(projected), 2, "received", "אופיר סנה");
+      /* התגובה מוקרנת לצופה (גל 1) — השמירה נבדקת באחסון עצמו */
+      const afterProjected = sessionOf(await storedData());
       expect(afterProjected.payments.received["2"]).toBe(true);
       expect(afterProjected.payments.potPaid).toBe(true);
       expect(afterProjected.payments.futureKey).toBe("keep-me");
 
-      const raw = sessionOf((await callMark(NIGHT_24_10.payments.plan, 3, "paid", "עדן גיל")).rows[0].data);
+      await callMark(NIGHT_24_10.payments.plan, 3, "paid", "עדן גיל");
+      const raw = sessionOf(await storedData());
       expect(raw.payments.paid["3"]).toBe(true);
       expect(raw.payments.potPaid).toBe(true);
       expect(raw.payments.futureKey).toBe("keep-me");

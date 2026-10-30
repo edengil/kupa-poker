@@ -54,7 +54,7 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
     [shareHistory, withLive]
   );
   const viewerSnap = useMemo(() => snapshotForViewer(snap), [snap]);
-  const live = snap.live;
+  const live = viewerSnap.live;
   const cps = viewerCps(viewerSnap, live);
   const pot = (live?.players || []).reduce((s, p) => s + (+p.buyin || 0), 0);
 

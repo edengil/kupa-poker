@@ -59,6 +59,47 @@ describe("publicShare", () => {
     expect(paymentPlan(viewerSession).transfers).toEqual(paymentPlan(frozen).transfers);
   });
 
+  it("גל 1: גם הלייב מוקרן — שדות קופה ו־coupleFills יוצאים, שחקנים ו־cps נשארים", () => {
+    const snap = {
+      config: { shareHistory: true },
+      data: { sessions: [] },
+      live: {
+        players: [{ name: "עדן גיל", buyin: 200 }],
+        cps: 4,
+        savingsPot: 25,
+        savingsPotActual: 20,
+        potDraft: { amount: 93 },
+        coupleFills: [{ from: "עדן גיל", to: "אורן גיל", amount: 100 }],
+      },
+    };
+    const out = snapshotForViewer(snap);
+    expect(out.live.players).toHaveLength(1);
+    expect(out.live.cps).toBe(4);
+    const s = JSON.stringify(out.live);
+    for (const token of ["savingsPot", "savingsPotActual", "potDraft", "coupleFills"]) {
+      expect(s).not.toContain(token);
+    }
+    // אידמפוטנטי: הקרנה כפולה לא משנה כלום
+    expect(snapshotForViewer(out)).toEqual(out);
+  });
+
+  it("גל 1: coupleFills של ערב שמור לא מגיע לצופה, בשני מצבי השיתוף", () => {
+    const session = {
+      id: "s1", iso: "2026-10-24", endedAt: 5, entries: [],
+      coupleFills: [{ from: "א", to: "ב", amount: 10 }],
+    };
+    for (const cfg of [{ shareHistory: true }, { shareHistory: false }]) {
+      const out = snapshotForViewer({ config: cfg, data: { sessions: [session] } });
+      expect(JSON.stringify(out)).not.toContain("coupleFills");
+      expect(out.data.sessions[0].id).toBe("s1");
+    }
+  });
+
+  it("גל 1: snapshot בלי live לא ממציא מפתח live", () => {
+    const out = snapshotForViewer({ config: {}, data: { sessions: [] } });
+    expect("live" in out).toBe(false);
+  });
+
   it("F4: ערך הבפועל עצמו לא מופיע בשום מקום בסריאליזציית הצופה", () => {
     const session = {
       ...NIGHT_24_10,

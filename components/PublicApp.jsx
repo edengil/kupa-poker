@@ -59,7 +59,10 @@ export default function PublicApp({ slug, nightId = null }) {
   const load = useCallback(async () => {
     const cacheKey = `poker:cache:pub:${slug}`;
 
-    const apply = (snap) => {
+    const apply = (rawSnap) => {
+      /* הקרנת צופה לפני כל שימוש/שמירה: שום נתון קופה או coupleFills לא
+         נכנס למצב הצופה ולא ל־localStorage (גל 1). ההקרנה אידמפוטנטית. */
+      const snap = snapshotForViewer(rawSnap);
       bootViewerStore(snap);
       dataRef.current = JSON.stringify([snap.data, snap.config]);
       setGroupId(snap.id);
@@ -79,7 +82,8 @@ export default function PublicApp({ slug, nightId = null }) {
 
     if (cached) apply(cached);
 
-    const snap = await fetchSnapshot(supabase, slug);
+    const fetched = await fetchSnapshot(supabase, slug);
+    const snap = fetched ? snapshotForViewer(fetched) : null;
     if (!snap) {
       if (!cached) setPhase("missing");
       return cached || null;
@@ -126,14 +130,14 @@ export default function PublicApp({ slug, nightId = null }) {
         alert("לא הצלחתי לשמור את הסימון. רענן ונסה שוב.");
         return;
       }
-      const snap = {
+      const snap = snapshotForViewer({
         id: groupId,
         data,
         live,
         config: pubConfig,
-      };
+      });
       bootViewerStore(snap);
-      dataRef.current = JSON.stringify([data, pubConfig]);
+      dataRef.current = JSON.stringify([snap.data, pubConfig]);
       bumpGeneration();
       setFresh(true);
       setTimeout(() => setFresh(false), 2500);
@@ -163,14 +167,14 @@ export default function PublicApp({ slug, nightId = null }) {
         alert("ההצבעה עדיין לא פעילה בצד השרת. המנהל צריך להריץ את עדכון מסד הנתונים האחרון.");
         return;
       }
-      const snap = {
+      const snap = snapshotForViewer({
         id: groupId,
         data,
         live,
         config: pubConfig,
-      };
+      });
       bootViewerStore(snap);
-      dataRef.current = JSON.stringify([data, pubConfig]);
+      dataRef.current = JSON.stringify([snap.data, pubConfig]);
       bumpGeneration();
       setFresh(true);
       setTimeout(() => setFresh(false), 2500);
@@ -248,7 +252,8 @@ export default function PublicApp({ slug, nightId = null }) {
 
   /* --------------------------- רענון --------------------------- */
   const refresh = useCallback(async () => {
-    const next = await fetchSnapshot(supabase, slug);
+    const fetched = await fetchSnapshot(supabase, slug);
+    const next = fetched ? snapshotForViewer(fetched) : null;
     if (!next) { setPhase("missing"); return; }
     try {
       localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap: next }));
