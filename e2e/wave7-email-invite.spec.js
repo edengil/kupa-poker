@@ -48,7 +48,7 @@ async function setEmailViaProfile(page, player, email) {
   const input = page.getByLabel("אימייל של השחקן");
   await input.waitFor({ state: "visible" });
   await input.fill(email);
-  await page.getByRole("button", { name: "שמור", exact: true }).click();
+  await page.getByTestId("profile-save-email").click();
   await expect(page.getByText("נשמר ✓")).toBeVisible();
   // סוגרים את חלון הפרופיל ברענון — הנתונים נשמרים במטמון המקומי
   await page.reload();
@@ -77,7 +77,7 @@ test.describe("גל 7 · זימוני אימייל", () => {
     // כתובת לא תקינה — הודעת שגיאה וכפתור השמירה חסום
     await input.fill("not-an-email");
     await expect(page.getByText("הכתובת לא נראית תקינה")).toBeVisible();
-    await expect(page.getByRole("button", { name: "שמור", exact: true })).toBeDisabled();
+    await expect(page.getByTestId("profile-save-email")).toBeDisabled();
 
     await setEmailViaProfileDone(page, input);
 
@@ -216,6 +216,6 @@ test.describe("גל 7 · זימוני אימייל", () => {
 
 async function setEmailViaProfileDone(page, input) {
   await input.fill("tester@poker.dev");
-  await page.getByRole("button", { name: "שמור", exact: true }).click();
+  await page.getByTestId("profile-save-email").click();
   await expect(page.getByText("נשמר ✓")).toBeVisible();
 }

@@ -24,6 +24,10 @@ test.describe("חלוקה ידנית שמורה", () => {
     const dialog = page.getByRole("dialog", { name: "חלוקת תשלומים" });
     await dialog.getByRole("button", { name: "חלוקה ב 50₪" }).click();
     await dialog.getByRole("button", { name: "רשום העברה" }).click();
+    // מודל הקופה (25.10): חלק הקופה מהחוב (5₪) הוא שיוך נפרד ל"קופת חיסכון",
+    // ורק אחריו לא נשארים חייבים והסטטוס נסגר.
+    await dialog.getByLabel("בחירת מקבל").selectOption("קופת חיסכון");
+    await dialog.getByRole("button", { name: "רשום העברה" }).click();
     await expect(dialog.getByRole("status")).toContainText("הכול סגור");
 
     await page.getByTestId("settlement-close").click();

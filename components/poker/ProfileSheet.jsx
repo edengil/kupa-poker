@@ -66,6 +66,8 @@ function EmailEditor({ current, onSave }) {
         />
         <button
           type="button"
+          aria-label="שמור אימייל"
+          data-testid="profile-save-email"
           disabled={invalid || !dirty}
           onClick={() => {
             onSave(value.trim());
@@ -135,6 +137,8 @@ function PhoneEditor({ current, onSave }) {
         />
         <button
           type="button"
+          aria-label="שמור טלפון"
+          data-testid="profile-save-phone"
           disabled={invalid || !dirty}
           onClick={() => {
             onSave(value.trim());
