@@ -78,6 +78,13 @@ function fakeSupabase(initialConfig = {}) {
   const calls = { inserts: [], updates: [] };
   let config = initialConfig;
   const sb = {
+    /* write_group_cas (מיגרציית גל 3ב): מחיל את ה־patch על ה־config
+       המתגלגל ורושם אותו ככתיבה, כמו שה־SQL עושה. */
+    rpc: async (_fn, args) => {
+      calls.updates.push(args.p_patch);
+      if (args.p_patch?.config) config = args.p_patch.config;
+      return { data: "2026-01-01T00:00:01.000Z", error: null };
+    },
     from(table) {
       if (table === "diag_events") {
         return {
@@ -91,6 +98,10 @@ function fakeSupabase(initialConfig = {}) {
         select: () => chain,
         eq: () => chain,
         single: async () => ({ data: { config }, error: null }),
+        maybeSingle: async () => ({
+          data: { config, updated_at: "2026-01-01T00:00:00.000Z" },
+          error: null,
+        }),
         update: (payload) => {
           calls.updates.push(payload);
           config = payload.config;

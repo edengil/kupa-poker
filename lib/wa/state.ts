@@ -50,6 +50,11 @@ export interface WaLiveState {
   approvedNames: string[];
   pendingRemindedAt: number | null;
   bitIdleRemindedAt?: number | null;
+  /* חותמות ניסיון־שליחה (גל 3ב): נכתבות כשהתזכורת נשלחה אך השליחה נכשלה,
+     כדי למנוע ספאם ניסיונות על ערוץ פג — בלי לסמן "נשלח" בשקר. חותמת
+     ההצלחה (RemindedAt) נכתבת רק אחרי שליחה שהצליחה בפועל. */
+  pendingRemindAttemptAt?: number | null;
+  bitIdleRemindAttemptAt?: number | null;
   ts?: number;
   tips: WaTip[];
   tipComplimentBag: number[];
@@ -317,6 +322,14 @@ export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
     approvedNames: [...(live?.approvedNames || [])],
     pendingRemindedAt: live?.pendingRemindedAt ?? null,
     bitIdleRemindedAt: live?.bitIdleRemindedAt ?? null,
+    /* חותמות הניסיון עוברות רק כשהן קיימות — כדי לא לשנות את צורת הלייב
+       לערבים שמעולם לא ניסו תזכורת. */
+    ...(live?.pendingRemindAttemptAt != null
+      ? { pendingRemindAttemptAt: live.pendingRemindAttemptAt }
+      : {}),
+    ...(live?.bitIdleRemindAttemptAt != null
+      ? { bitIdleRemindAttemptAt: live.bitIdleRemindAttemptAt }
+      : {}),
     /* טיפים: יוצאים מערימת השחקן. tipsGiven על השחקן + יומן tips.
        tipComplimentBag — שקית מחמאות בלי חזרה ברצף. */
     tips: [...(live?.tips || [])],

@@ -135,6 +135,23 @@ export async function POST(request) {
     const amount = Number(body.amount) || 0;
     if (!payerName) return NextResponse.json({ error: "missing payer" }, { status: 400 });
 
+    /* גל 3ב (ממצא 10): לא סומכים על דיווח הלקוח — ההתראה יוצאת רק אם
+       סימון ה"שולם" של ההעברה הזו באמת שמור במסד, בתוכנית כפי שהשרת
+       מחשב אותה מהערב השמור (אותו paymentPlan של צד הלקוח). סימון
+       שנכשל ב־RPC או עוד לא נחת — אין התראה. */
+    const plan = paymentPlan(session);
+    const transferIndex = Number(body.transferIndex);
+    const transfer =
+      Number.isInteger(transferIndex) && transferIndex >= 0
+        ? plan.transfers[transferIndex]
+        : null;
+    if (!transfer || !plan.paid[transferIndex]) {
+      return NextResponse.json({ ok: true, sent: 0, skipped: "not marked" });
+    }
+    if (amount && Math.round(Math.abs(Number(transfer.amount) || 0)) !== Math.round(Math.abs(amount))) {
+      return NextResponse.json({ ok: true, sent: 0, skipped: "amount mismatch" });
+    }
+
     const adminSubs = await subsForEmail(supabase, row.id, user.email);
     if (!adminSubs.length) {
       return NextResponse.json({ ok: true, sent: 0, skipped: "admin not subscribed" });

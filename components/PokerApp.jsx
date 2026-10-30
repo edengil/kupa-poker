@@ -278,16 +278,18 @@ function App({
     const next = field === "received"
       ? markReceipt(session, item.index, true, viewerName)
       : markTransfer(session, item.index, true, viewerName);
+    /* גל 3ב (ממצא 10): הכרזת הסגירה רק כשהסימון נחת בשרת בפועל. */
+    let persisted = false;
     if (typeof onMarkPayment === "function") {
-      await onMarkPayment(session, item.index, true, field, viewerName);
+      persisted = Boolean(await onMarkPayment(session, item.index, true, field, viewerName));
     } else if (!readOnly) {
       commit({
         ...db,
         sessions: db.sessions.map((s) => (s.id === next.id ? next : s)),
       });
-      await flushStore();
+      persisted = Boolean(await flushStore());
     }
-    if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
+    if (persisted && allTransfersPaid(next)) await announceSettlementClosed(next.id);
   }, [db, onMarkPayment, readOnly, viewerName, commit]);
   const confirmOwnTransfers = useCallback(async () => {
     if (!transferPrompt || !db) return;
@@ -295,18 +297,22 @@ function App({
     for (const row of transferPrompt.rows) {
       next = markTransfer(next, row.index, true, viewerName);
     }
+    let persisted = false;
     if (typeof onMarkPayment === "function") {
+      persisted = true;
       for (const row of transferPrompt.rows) {
-        await onMarkPayment(transferPrompt.session, row.index, true, "paid", viewerName);
+        if (!Boolean(await onMarkPayment(transferPrompt.session, row.index, true, "paid", viewerName))) {
+          persisted = false;
+        }
       }
     } else if (!readOnly) {
       commit({
         ...db,
         sessions: db.sessions.map((s) => (s.id === next.id ? next : s)),
       });
-      await flushStore();
+      persisted = Boolean(await flushStore());
     }
-    if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
+    if (persisted && allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setTransferPromptDismissed(true);
   }, [transferPrompt, db, onMarkPayment, readOnly, viewerName, commit]);
   const confirmOwnReceipts = useCallback(async () => {
@@ -315,18 +321,22 @@ function App({
     for (const row of receiptPrompt.rows) {
       next = markReceipt(next, row.index, true, viewerName);
     }
+    let persisted = false;
     if (typeof onMarkPayment === "function") {
+      persisted = true;
       for (const row of receiptPrompt.rows) {
-        await onMarkPayment(receiptPrompt.session, row.index, true, "received", viewerName);
+        if (!Boolean(await onMarkPayment(receiptPrompt.session, row.index, true, "received", viewerName))) {
+          persisted = false;
+        }
       }
     } else if (!readOnly) {
       commit({
         ...db,
         sessions: db.sessions.map((s) => (s.id === next.id ? next : s)),
       });
-      await flushStore();
+      persisted = Boolean(await flushStore());
     }
-    if (allTransfersPaid(next)) await announceSettlementClosed(next.id);
+    if (persisted && allTransfersPaid(next)) await announceSettlementClosed(next.id);
     setReceiptPromptDismissed(true);
   }, [receiptPrompt, db, onMarkPayment, readOnly, viewerName, commit]);
 

@@ -23,6 +23,12 @@ vi.mock("next/server", () => ({
 }));
 vi.mock("@/lib/supabaseAdmin", () => ({
   getAdminSupabase: () => ({
+    /* write_group_cas (מיגרציית גל 3ב): ה־patch נרשם כמו update רגיל,
+       וחותמת מוחזרת כהצלחה. */
+    rpc: async (_fn, args) => {
+      h.updates.push(args.p_patch);
+      return { data: "2026-10-24T20:00:01.000Z", error: null };
+    },
     from(table) {
       if (table === "diag_events") {
         return {

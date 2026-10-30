@@ -110,12 +110,14 @@ export default function PublicApp({ slug, nightId = null }) {
 
   const markPayment = useCallback(
     async (session, index, paid, field = "paid", by = null) => {
+      /* מחזיר true רק כשהסימון נחת בשרת — המתקשרים משרשרים את זה לתנאי
+         ההתראות (גל 3ב, ממצא 10): אין התראת "אושר תשלום" על סימון שנכשל. */
       /* השרת מקבל רק את ה־fingerprint השמור במסד; כשהחלוקה השתנתה מאז,
          rpcMarkTarget מתרגם את ההעברה לאינדקס שלה בתוכנית השמורה. */
       const target = rpcMarkTarget(session, index);
       if (!target) {
         alert("החלוקה של הערב עודכנה, וההעברה הזו לא הייתה בתוכנית הקודמת — המנהל צריך לפתוח את האפליקציה פעם אחת כדי לאמץ את החלוקה החדשה, ואז הסימון יישמר.");
-        return;
+        return false;
       }
       const data = await markPaymentViaRpc(supabase, {
         slug,
@@ -128,7 +130,7 @@ export default function PublicApp({ slug, nightId = null }) {
       });
       if (!data) {
         alert("לא הצלחתי לשמור את הסימון. רענן ונסה שוב.");
-        return;
+        return false;
       }
       const snap = snapshotForViewer({
         id: groupId,
@@ -150,6 +152,7 @@ export default function PublicApp({ slug, nightId = null }) {
         await ch.send({ type: "broadcast", event: "update", payload: { at: Date.now() } });
         supabase.removeChannel(ch);
       } catch {}
+      return true;
     },
     [supabase, slug, groupId, live, pubConfig]
   );

@@ -1,4 +1,5 @@
 import { getAdminSupabase, pingViewers } from "@/lib/supabaseAdmin";
+import { updateGroupCas } from "@/lib/groupCas";
 import { reportError } from "@/lib/monitor";
 import { verifyRsvpToken } from "@/lib/rsvpToken";
 import { applyEmailRsvp } from "@/lib/poker/emailRsvp";
@@ -64,16 +65,26 @@ export async function GET(request) {
       return fail("הערב שאליו הוזמנת כבר אינו פתוח. אם נפתח ערב חדש, תקבלו הזמנה חדשה.");
     }
 
-    const nextPlan = applyEmailRsvp(plan, payload.name, answer);
-    if (!nextPlan) {
+    if (!applyEmailRsvp(plan, payload.name, answer)) {
       return fail("לא הצלחנו לרשום את התשובה. נסו שוב בעוד רגע.");
     }
-    const { error: writeErr } = await admin
-      .from("groups")
-      .update({ data: { ...db, plan: nextPlan } })
-      .eq("id", groupRow.id);
-    if (writeErr) {
-      console.error("rsvp-confirm write failed:", writeErr.message);
+    /* כתיבה דרך CAS (גל 3ב): התשובה מחושבת מחדש על התוכנית הטרייה בכל
+       ניסיון, כדי שתשובות מקבילות לא ידרסו זו את זו. */
+    const writeRes = await updateGroupCas(
+      admin,
+      groupRow.id,
+      (fresh) => {
+        const freshDb = fresh.data || {};
+        const freshPlan = freshDb.plan || null;
+        if (!freshPlan?.iso || freshPlan.iso !== payload.planIso) return null;
+        const np = applyEmailRsvp(freshPlan, payload.name, answer);
+        if (!np) return null;
+        return { data: { ...freshDb, plan: np } };
+      },
+      { columns: "id, data, updated_at" }
+    ).catch(() => null);
+    if (!writeRes?.ok || writeRes.skipped) {
+      console.error("rsvp-confirm write failed: CAS did not land");
       return fail("לא הצלחנו לרשום את התשובה. נסו שוב בעוד רגע.");
     }
     if (groupRow.slug) await pingViewers(groupRow.slug);

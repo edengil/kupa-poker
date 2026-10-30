@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabaseServer";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
+import { updateGroupCas } from "@/lib/groupCas";
 import { reportError } from "@/lib/monitor";
 import {
   calendarConfigured,
@@ -133,11 +134,26 @@ export async function POST(request) {
     }
   }
 
-  const nextData = {
-    ...db,
-    plan: { ...plan, calendarRsvps: rsvps, calendarSyncedAt: Date.now() },
-  };
-  await admin.from("groups").update({ data: nextData }).eq("id", groupRow.id);
+  /* כתיבה דרך CAS על data טרי (גל 3ב): מפת התשובות של הריצה נכתבת על
+     התוכנית הטרייה, בלי לדרוס שדות/ערבים שהשתנו מאז קריאת הריצה. */
+  const writeRes = await updateGroupCas(
+    admin,
+    groupRow.id,
+    (fresh) => {
+      const freshDb = fresh.data || {};
+      return {
+        data: {
+          ...freshDb,
+          plan: { ...(freshDb.plan || {}), calendarRsvps: rsvps, calendarSyncedAt: Date.now() },
+        },
+      };
+    },
+    { columns: "id, data, updated_at" }
+  ).catch(() => null);
+  if (!writeRes?.ok) {
+    await reportError(new Error("calendar-sync data write did not land"), "calendar-sync/write");
+    return NextResponse.json({ configured: true, synced, removed, rsvps, writeFailed: true });
+  }
 
   return NextResponse.json({ configured: true, synced, removed, rsvps });
 }

@@ -266,19 +266,22 @@ export function LastSettlementCard({
     setBusy(index);
     try {
       const next = markTransfer(session, index, value, viewerName);
+      /* גל 3ב (ממצא 10): ההתראות מותנות בכך שהסימון נחת בשרת בפועל —
+         תוצאת ה־RPC או ה־flush — לא בתקווה המקומית. */
+      let persisted = false;
       if (typeof onMarkPayment === "function") {
-        await onMarkPayment(session, index, value, "paid", viewerName);
+        persisted = Boolean(await onMarkPayment(session, index, value, "paid", viewerName));
       } else if (commit) {
         commit({
           ...db,
           sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
         });
-        await flushStore();
+        persisted = Boolean(await flushStore());
       }
-      if (value && allTransfersPaid(next)) {
+      if (value && persisted && allTransfersPaid(next)) {
         await announceSettlementClosed(session.id);
       }
-      if (value) {
+      if (value && persisted) {
         // שחקן אישר תשלום — מתריע למנהל
         const t = transfers[index];
         void notifyPaymentConfirmed(session.id, {
