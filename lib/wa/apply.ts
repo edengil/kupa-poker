@@ -237,16 +237,23 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         acks.push(`${p.name} ${byGender(p.name, "אושר", "אושרה")} · +${item.amount}₪ · סה״כ ${next.buyin}₪`);
         continue;
       }
-      const seated = stampBuyin(
-        state,
-        { name: resolveAlias(item.name, aliases), buyin: 0, cashout: "", buyinEvents: [] },
-        item.amount,
-        now,
-      );
+      const fresh = {
+        name: resolveAlias(item.name, aliases),
+        buyin: 0,
+        cashout: "",
+        buyinEvents: [],
+      };
+      const seated = stampBuyin(state, fresh, item.amount, now);
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
       if (!state.approvedNames.includes(seated.name)) state.approvedNames.push(seated.name);
-      record.push({ t: "approve", name: seated.name, pending: item, created: true });
+      record.push({
+        t: "approve",
+        name: seated.name,
+        pending: item,
+        created: true,
+        ev: stampedEventOf(fresh, seated),
+      });
       acks.push(
         `${seated.name} ${byGender(seated.name, "אושר · נכנס", "אושרה · נכנסה")} ב-${item.amount}₪`
       );
@@ -459,15 +466,17 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         }
         continue;
       }
-      const seated = stampBuyin(
-        state,
-        { name, buyin: 0, cashout: "", buyinEvents: [] },
-        cmd.amount,
-        now,
-      );
+      const fresh = { name, buyin: 0, cashout: "", buyinEvents: [] };
+      const seated = stampBuyin(state, fresh, cmd.amount, now);
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
-      record.push({ t: "add", name, delta: cmd.amount, created: true });
+      record.push({
+        t: "add",
+        name,
+        delta: cmd.amount,
+        created: true,
+        ev: stampedEventOf(fresh, seated),
+      });
       acks.push(`${name} ${byGender(name, "נכנס", "נכנסה")} ב-${cmd.amount}₪`);
       continue;
     }
