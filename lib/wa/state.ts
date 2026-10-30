@@ -416,7 +416,18 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
     /* רשומות קנייה מאותבות לפי מזהה/צילום האירוע, לא רק לפי שם — שם ששונה
        מאז ההחלה לא שובר את הביטול. שאר סוגי הרשומות: לפי שם, כמקודם. */
     if (e.t === "add" || e.t === "approve") i = findStampPlayerIndex(state, e);
-    if (i === -1) continue;
+    if (i === -1) {
+      /* החותמת איננה (אין מחזיק חי — השחקן הוסר מאז) וצריכתה היא no-op,
+         אבל רשומת אישור נושאת גם את שחזור הממתין שאושר: בלעדיו ההחלה־מחדש
+         לא מוצאת ממתין, מתעלמת בשקט, והקנייה המאושרת אובדת מהלייב בלי
+         סימן (אושר → הוסר → הודעת האישור נמסרת שוב). ה־no-op חל על צריכת
+         החותמת בלבד; שחזור הממתין וניקוי approvedNames מתבצעים בכל מקרה. */
+      if (e.t === "approve") {
+        if (e.pending) state.pendingApprovals = [...(state.pendingApprovals || []), e.pending];
+        state.approvedNames = (state.approvedNames || []).filter((n) => n !== e.name);
+      }
+      continue;
+    }
     if (e.t === "add" || e.t === "approve") {
       const sid = stampIdOf(e);
       if (sid) retarget.set(sid, state.players[i].name);
@@ -482,10 +493,17 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
   // הסרה מוחזרת בסוף, אחרי שכל השאר חזר למקומו
   for (const e of [...entries].reverse()) {
     if (e.t === "remove") {
-      state.players.splice(e.at as number, 0, e.player as WaPlayer);
+      const snap = e.player as WaPlayer;
+      /* שחקן באותו שם כבר יושב = גלגול חי חדש של אותו מושב (הושב בהודעת
+         יצירה מאוחרת יותר), לא הצילום שהוסר. החזרת הצילום לצידו יוצרת
+         כפילות־שם, וההחלה־מחדש של ההסרה מסירה את הצילום ומשאירה את החי —
+         עם אישור "הוסר מהשולחן" מטעה. מדלגים על החזרת הצילום (ועל החזרת
+         ה־pot שלו); ההחלה־מחדש תאתר ותסיר את השחקן החי עצמו. */
+      if (snap && state.players.some((p) => p.name === snap.name)) continue;
+      state.players.splice(e.at as number, 0, snap);
       /* השחקן חוזר עם אירועי הקנייה שלו — גם ה־pot שלהם חוזר לקופה,
          מול הפירוק בהסרה עצמה, כדי שהאינווריאנט יישמר (תצפית גל 2). */
-      const potBack = playerPotSum(e.player as WaPlayer);
+      const potBack = playerPotSum(snap);
       if (potBack) state.savingsPot = r2((Number(state.savingsPot) || 0) + potBack);
     }
     if (e.t === "entries") state.entriesCount = e.before as string;

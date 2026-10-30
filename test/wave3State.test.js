@@ -293,6 +293,120 @@ describe("גל 3א — כתיבת האפליקציה שומרת את מטא־ה�
   });
 });
 
+describe("גל 3א — סבב תיקון 2: מסירת אישור אחרי הסרת השחקן (פסילת בודק A, סבב 1)", () => {
+  it("approve-created: אישור → הסרה → מסירת האישור שוב — הממתין משוחזר והקנייה לא אובדת", () => {
+    let live = apply(null, [{ kind: "add", name: "יוסי", amount: 100 }], "s2a-req");
+    expect(live.pendingApprovals).toHaveLength(1);
+    live = apply(live, [{ kind: "approve", name: "יוסי" }], "s2a-ap");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].buyin).toBe(100);
+    expect(live.approvedNames).toEqual(["יוסי"]);
+    // שחקן נוסף שאירוע ה־100 שלו זהה־צילום לגמרי (אותו now) — ההגנה
+    // מסבב 1 (חותמת בלי מחזיק חי לא צורכת אירוע זר) חייבת להישמר.
+    live = apply(live, [{ kind: "add", name: "דוד", amount: 100 }], "s2a-d1");
+    live = apply(live, [{ kind: "add", name: "דוד", amount: 50 }], "s2a-d2");
+    expect(live.savingsPot).toBe(12.5);
+    live = apply(live, [{ kind: "remove", name: "יוסי" }], "s2a-rm");
+    expect(live.players).toHaveLength(1);
+    expect(live.savingsPot).toBe(7.5);
+
+    // מסירה חוזרת של הודעת האישור. לפני התיקון: לחותמת אין מחזיק חי,
+    // וה־continue על ‎-1 דילג על כל רשומת ה־approve — הממתין לא שוחזר,
+    // ההחלה־מחדש לא מצאה ממתין והתעלמה בשקט (תשובה null), ו־100₪ של
+    // קנייה מאושרת אובדים מהלייב בלי סימן.
+    const res = applyCommands(live, [{ kind: "approve", name: "יוסי" }], "s2a-ap", 2, {
+      knownNames: known,
+      now: T0,
+    });
+    live = res.live;
+    expect(res.reply).not.toBeNull();
+    expect(live.pendingApprovals).toHaveLength(0);
+    expect(live.players).toHaveLength(2);
+    const yossi = live.players.find((p) => p.name === "יוסי");
+    expect(yossi.buyin).toBe(100);
+    expect(yossi.buyinEvents).toHaveLength(1);
+    expect(yossi.buyinEvents[0].sid).toBe("s2a-ap:0");
+    const david = live.players.find((p) => p.name === "דוד");
+    expect(david.buyin).toBe(150);
+    expect(david.buyinEvents.map((e) => e.sid)).toEqual(["s2a-d1:0", "s2a-d2:0"]);
+    expect(live.approvedNames).toEqual(["יוסי"]);
+    expect(live.savingsPot).toBe(12.5);
+    expectPotInvariant(live);
+    // מסירה שלישית של האישור — יציבה, הקנייה נספרת פעם אחת.
+    live = apply(live, [{ kind: "approve", name: "יוסי" }], "s2a-ap");
+    expect(live.players.find((p) => p.name === "יוסי").buyin).toBe(100);
+    expect(live.players).toHaveLength(2);
+    expectPotInvariant(live);
+  });
+
+  it("approve-to-existing: אישור לשחקן קיים → הסרה → מסירת האישור שוב — הממתין משוחזר והקנייה לא אובדת", () => {
+    const liveIn = {
+      savings5: true,
+      savingsPot: 2.5,
+      players: [
+        {
+          name: "יוסי",
+          buyin: 50,
+          cashout: "",
+          buyinEvents: [{ amount: 50, at: 1, total: 50, pot: 2.5 }],
+        },
+      ],
+      pendingApprovals: [{ name: "יוסי", amount: 50, at: 2 }],
+    };
+    let live = apply(liveIn, [{ kind: "approve", name: "יוסי" }], "s2b-ap");
+    expect(live.players[0].buyin).toBe(100);
+    expect(live.players[0].buyinEvents).toHaveLength(2);
+    expect(live.savingsPot).toBe(5);
+    expect(live.approvedNames).toEqual(["יוסי"]);
+
+    live = apply(live, [{ kind: "remove", name: "יוסי" }], "s2b-rm");
+    expect(live.players).toHaveLength(0);
+    expect(live.savingsPot).toBe(0);
+
+    // לפני התיקון: אותו דילוג כמו בנתיב היצירה — הממתין לא שוחזר,
+    // ההחלה־מחדש התעלמה בשקט, ו־50₪ המאושרים אובדים.
+    const res = applyCommands(live, [{ kind: "approve", name: "יוסי" }], "s2b-ap", 2, {
+      knownNames: known,
+      now: T0,
+    });
+    live = res.live;
+    expect(res.reply).not.toBeNull();
+    expect(live.pendingApprovals).toHaveLength(0);
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].buyin).toBe(50);
+    expect(live.players[0].buyinEvents).toHaveLength(1);
+    expect(live.players[0].buyinEvents[0].sid).toBe("s2b-ap:0");
+    expect(live.savingsPot).toBe(2.5);
+    expect(live.approvedNames).toEqual(["יוסי"]);
+    expectPotInvariant(live);
+  });
+
+  it("מסירת הודעת הסרה אחרי תחיית־מיצירה: ההסרה חלה על השחקן החי, לא על הצילום", () => {
+    let live = apply(null, [{ kind: "add", name: "קובי", amount: 50 }], "s2c-c1");
+    live = apply(live, [{ kind: "remove", name: "קובי" }], "s2c-rm");
+    expect(live.players).toHaveLength(0);
+    expect(live.savingsPot).toBe(0);
+    // תחייה: הודעת יצירה חדשה מושיבה את קובי שוב, בקנייה אחרת.
+    live = apply(live, [{ kind: "add", name: "קובי", amount: 100 }], "s2c-c2");
+    expect(live.players).toHaveLength(1);
+    expect(live.players[0].buyin).toBe(100);
+    expect(live.savingsPot).toBe(5);
+
+    // מסירה חוזרת של הודעת ההסרה הישנה. לפני התיקון ביטול ההסרה החזיר
+    // את צילום השחקן הישן לצד השחקן החי, וההחלה־מחדש הסירה את הצילום —
+    // האישור טען "הוסר מהשולחן" בעוד קובי החי (100₪) נשאר יושב.
+    const res = applyCommands(live, [{ kind: "remove", name: "קובי" }], "s2c-rm", 2, {
+      knownNames: known,
+      now: T0,
+    });
+    live = res.live;
+    expect(res.reply).toContain("הוסר");
+    expect(live.players).toHaveLength(0);
+    expect(live.savingsPot).toBe(0);
+    expectPotInvariant(live);
+  });
+});
+
 describe("גל 3א — סבב תיקון: חותמת בלי מחזיק חי וביטול שינוי־שם (פסילת בודק A)", () => {
   it("מסירת יצירה של שחקן שהוסר: הביטול לא צורך אירוע זהה־מראה של שחקן אחר", () => {
     let live = apply(null, [{ kind: "add", name: "קובי", amount: 100 }], "f1-k1");
