@@ -267,11 +267,14 @@ export async function POST(request) {
     ...(live?.approvedNames || []),
   ];
 
-  // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה
+  // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה.
+  // msgTs (חותמת ההודעה מ־Whapi, לא זמן העיבוד) מזין את שער המסירה
+  // המאוחרת — הודעה מערב שכבר נסגר ונשמר לא פותחת לייב רפאים (ממצא 21).
   const { live: nextLive, reply, ownerDm } = applyCommands(live, cmds, msg.id, undefined, {
     knownNames,
     aliases,
     lastSession: latestSession(db.sessions),
+    msgTs: msg.timestamp,
   });
   if (!reply) return ok({ skipped: "nothing to do" });
 

@@ -69,6 +69,15 @@ export interface UndoEntry {
   before?: string | number;
   amount?: number;
   tipId?: string | number;
+  /* צילום־לפני של סכום היציאה כשהטיפ הוריד ממנו (השחקן כבר היה סגור) —
+     הביטול מחזיר אותו בדיוק; בלעדיו הטיפ "אכל" מהיציאה שוב בכל מסירה
+     חוזרת (ממצא 4). רשומות ישנות בלי השדה: הביטול לא נוגע ביציאה, כמקודם. */
+  cashoutBefore?: string | number;
+  /* צילום־לפני של פריט הממתין שפעולת "pending" שינתה: null = הפעולה
+     יצרה את הפריט (הביטול מסיר אותו); אובייקט = הפעולה הגדילה פריט קיים
+     (הביטול מחזיר amount/at לערכי הצילום). רשומות ישנות בלי השדה נופלות
+     להתאמת name+amount+at ההיסטורית (ממצא 4). */
+  pendingBefore?: { amount: number; at: number } | null;
   bagBefore?: number[];
   lastBefore?: number | null;
   female?: boolean;
@@ -177,6 +186,13 @@ export function stampBuyin(
   return { ...player, buyin, buyinEvents: events };
 }
 
+/** סך ה־pot החתום על אירועי הקנייה של שחקן — החלק שלו ב־savingsPot של
+ * הלייב. האינווריאנט של הלייב: savingsPot == ‏Σ playerPotSum על כל
+ * השחקנים החיים; כל הוספה/הסרה של שחקן או אירוע חייבת לעדכן את שניהם. */
+export function playerPotSum(player?: WaPlayer | null): number {
+  return r2((player?.buyinEvents || []).reduce((t, ev) => t + (Number(ev.pot) || 0), 0));
+}
+
 /** האירוע שחותמת הוסיפה לשחקן, אם הוסיפה — נרשם ברשומת הביטול של הפעולה
  * כדי שהביטול יסיר בדיוק אותו אירוע (ולא אירוע זהה־סכום מהודעה אחרת). */
 export function stampedEventOf(before: WaPlayer, after: WaPlayer): WaBuyinEvent | undefined {
@@ -196,10 +212,12 @@ function stampIdOf(entry: UndoEntry): string | undefined {
 }
 
 /** היפוך מדויק של חותמת על שחקן קיים: מסיר את האירוע שהחותמת הוסיפה
- * ומחסיר את ה־pot שלו מ־savingsPot. זיהוי האירוע: קודם לפי מזהה החותמת
- * (חד־משמעי, לא תלוי שם/סכום/זמן); בנפילה לאחור לפי צילום האירוע שנרשם
- * בפעולה (amount+at+total), ולרשומות ישנות בלי צילום — לפי האירוע האחרון
- * עם אותו סכום. */
+ * ומחסיר את ה־pot שלו מ־savingsPot. זיהוי האירוע: לפי מזהה החותמת
+ * (חד־משמעי, לא תלוי שם/סכום/זמן). לרשומה עם מזהה אין נפילה לצילום —
+ * אם האירוע עם המזהה לא על השחקן, החותמת איננה וההסרה היא no-op;
+ * נפילה לצילום הייתה צורכת אירוע זהה־מראה ומעבירה כסף לאדם הלא־נכון.
+ * הנפילה לצילום (amount+at+total), ולרשומות ישנות בלי צילום — לאירוע
+ * האחרון עם אותו סכום, נשארת רק לרשומות ישנות בלי מזהה. */
 function unstampEvent(
   state: WaLiveState,
   player: WaPlayer,
@@ -212,8 +230,8 @@ function unstampEvent(
   let idx = -1;
   if (sid) {
     idx = events.findIndex((cand) => cand.sid === sid);
-  }
-  if (idx === -1) {
+    if (idx === -1) return events;
+  } else {
     const matches = (cand: WaBuyinEvent): boolean =>
       snap ? matchesEventSnapshot(cand, snap) : cand.amount === amount;
     for (let k = events.length - 1; k >= 0; k--) {
@@ -222,16 +240,16 @@ function unstampEvent(
         break;
       }
     }
-  }
-  if (idx === -1 && snap) {
-    for (let k = events.length - 1; k >= 0; k--) {
-      if (events[k].amount === amount) {
-        idx = k;
-        break;
+    if (idx === -1 && snap) {
+      for (let k = events.length - 1; k >= 0; k--) {
+        if (events[k].amount === amount) {
+          idx = k;
+          break;
+        }
       }
     }
+    if (idx === -1) return events;
   }
-  if (idx === -1) return events;
   const [removed] = events.splice(idx, 1);
   if (removed.pot) state.savingsPot = r2((Number(state.savingsPot) || 0) - removed.pot);
   return events;
@@ -241,9 +259,12 @@ function unstampEvent(
  * ששמו תוקן בין ההחלה למסירה החוזרת כבר לא נמצא לפי השם שברשומה, והביטול
  * מדולג והפקודה חותמת שוב. לכן מאתרים קודם לפי מזהה החותמת: אירוע שייך
  * לשחקן אחד בדיוק, והמזהה חד־משמעי גם כששני אירועים חולקים צילום זהה.
- * בנפילה לאחור (רשומות בלי מזהה): צילום האירוע — שחקן בשם המדויק שמחזיק
- * את האירוע קודם; אחרת השחקן היחיד שמחזיק אותו. בלי צילום או בצילום לא
- * חד־משמעי לא מנחשים שחקן אחר, ונשארים עם ההתאמה לפי שם. */
+ * לרשומה עם מזהה שאין לו מחזיק חי (השחקן הוסר מאז) — החותמת איננה
+ * והביטול הוא no-op: אסור ליפול לצילום, כי אירוע זהה־מראה של שחקן אחר
+ * (אותו סכום/at/total) ייצרך והכסף ינחת על האדם הלא־נכון.
+ * בנפילה לאחור (רק רשומות בלי מזהה): צילום האירוע — שחקן בשם המדויק
+ * שמחזיק את האירוע קודם; אחרת השחקן היחיד שמחזיק אותו. בלי צילום או
+ * בצילום לא חד־משמעי לא מנחשים שחקן אחר, ונשארים עם ההתאמה לפי שם. */
 function findStampPlayerIndex(state: WaLiveState, entry: UndoEntry): number {
   const exact = state.players.findIndex((p) => p.name === entry.name);
   const sid = stampIdOf(entry);
@@ -253,6 +274,7 @@ function findStampPlayerIndex(state: WaLiveState, entry: UndoEntry): number {
       .filter((i) => i !== -1);
     if (byId.length === 1) return byId[0];
     if (byId.length > 1) return exact; // כפילות שחיתותית — לא מנחשים
+    return -1; // אין מחזיק חי למזהה — החותמת איננה, הביטול no-op
   }
   if (!entry.ev) return exact;
   if (
@@ -304,33 +326,44 @@ function undoCreatedStamp(
   }
 }
 
+/** תקרת יומן הביטולים (applied) בלייב — ראו את הגיזום ב־apply. */
+export const MAX_APPLIED_RECORDS = 200;
+
+/** אתחול מצב הלייב לפקודת בוט — הבעלים היחיד של צורת הלייב בצד הבוט.
+ * מתחיל מהאובייקט השמור כמו שהוא ומנרמל רק את השדות שהבוט עצמו מנהל;
+ * כל שדה אחר (של האפליקציה — actionLog/planSnap/handOfNight/liveAnnounced/
+ * cps/editedAt, או שדה עתידי) עובר כמו שהוא. רשימת שדות סגורה כאן מחקה
+ * שדות של האפליקציה מהמסד בכל פקודת בוט (ממצא 5); הצד של האפליקציה
+ * לאותו חוזה הוא pickLiveMeta ב־lib/liveMeta.js. */
 export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
+  const src = (live && typeof live === "object" ? live : {}) as Partial<WaLiveState>;
   return {
-    entriesCount: live?.entriesCount ?? "",
-    addAmt: live?.addAmt || 50,
-    startedAt: live?.startedAt || null,
-    players: [...(live?.players || [])],
-    applied: { ...(live?.applied || {}) },
-    pending: live?.pending ?? null,
-    closing: live?.closing ?? false, // סגירה מודרכת בעיצומה
-    pendingApprovals: [...(live?.pendingApprovals || [])],
-    approvedNames: [...(live?.approvedNames || [])],
-    pendingRemindedAt: live?.pendingRemindedAt ?? null,
-    bitIdleRemindedAt: live?.bitIdleRemindedAt ?? null,
+    ...src,
+    entriesCount: src.entriesCount ?? "",
+    addAmt: src.addAmt || 50,
+    startedAt: src.startedAt || null,
+    players: [...(src.players || [])],
+    applied: { ...(src.applied || {}) },
+    pending: src.pending ?? null,
+    closing: src.closing ?? false, // סגירה מודרכת בעיצומה
+    pendingApprovals: [...(src.pendingApprovals || [])],
+    approvedNames: [...(src.approvedNames || [])],
+    pendingRemindedAt: src.pendingRemindedAt ?? null,
+    bitIdleRemindedAt: src.bitIdleRemindedAt ?? null,
     /* טיפים: יוצאים מערימת השחקן. tipsGiven על השחקן + יומן tips.
        tipComplimentBag — שקית מחמאות בלי חזרה ברצף. */
-    tips: [...(live?.tips || [])],
-    tipComplimentBag: Array.isArray(live?.tipComplimentBag) ? [...live.tipComplimentBag] : [],
-    tipComplimentLast: live?.tipComplimentLast ?? null,
-    coupleFills: [...(live?.coupleFills || [])],
+    tips: [...(src.tips || [])],
+    tipComplimentBag: Array.isArray(src.tipComplimentBag) ? [...src.tipComplimentBag] : [],
+    tipComplimentLast: src.tipComplimentLast ?? null,
+    coupleFills: [...(src.coupleFills || [])],
     /* 5% לקופה הצדדית: דלוק אוטומטית (עדן, 2026-10-14) — מכובה רק אם כובה
        במפורש באפליקציה. חייב לעבור דרך blank, אחרת כל כתיבת בוט מוחקת אותו. */
-    savings5: live?.savings5 !== false,
-    savingsPot: Number(live?.savingsPot) || 0,
+    savings5: src.savings5 !== false,
+    savingsPot: Number(src.savingsPot) || 0,
     /* עריכת המנהל לסכום הקופה של הערב (אישור בסוף ערב) — חייבת לעבור דרך
        blank, אחרת כל כתיבת בוט מוחקת אותה, כמו שקרה ל־savings5 בעבר. */
-    potDraft: typeof live?.potDraft === "string" ? live.potDraft : "",
-  };
+    potDraft: typeof src.potDraft === "string" ? src.potDraft : "",
+  } as WaLiveState;
 }
 
 export const openPlayers = (state: WaLiveState): WaPlayer[] =>
@@ -344,11 +377,57 @@ export const openPlayers = (state: WaLiveState): WaPlayer[] =>
 export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, string> {
   const retarget = new Map<string, string>();
   for (const e of [...entries].reverse()) {
+    /* רשומות ממתין לא תלויות בשחקן יושב — הממתין בהגדרתו מחוץ לשולחן.
+       כשהן ישבו מאחורי שער השחקן שלמטה, ביטולן דולג תמיד והגדלת־ממתין
+       נספרה שוב בכל מסירה חוזרת (ממצא 4). */
+    if (e.t === "pending") {
+      if (e.pendingBefore === null) {
+        /* הפעולה יצרה את הפריט — הביטול מסיר אותו (לפי הצילום שאחרי). */
+        state.pendingApprovals = (state.pendingApprovals || []).filter(
+          (p) => !(p.name === e.name && p.amount === e.amount && p.at === e.at),
+        );
+      } else if (e.pendingBefore) {
+        /* הפעולה הגדילה פריט קיים — הביטול מחזיר amount/at לצילום־לפני.
+           ההתאמה ההיסטורית (amount מצטבר מול דלתא) מעולם לא פגעה.
+           הפריט מזוהה לפי ה־at שאחרי ההגדלה; אם כבר נצרך (אושר/נדחה) —
+           אין מה להשיב. */
+        const before = e.pendingBefore;
+        state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
+          p.name === e.name && p.at === e.at ? { ...p, amount: before.amount, at: before.at } : p,
+        );
+      } else {
+        /* רשומה ישנה בלי צילום־לפני — ההתנהגות ההיסטורית, לא גרוע ממנה. */
+        state.pendingApprovals = (state.pendingApprovals || []).filter(
+          (p) => !(p.name === e.name && p.amount === e.amount && p.at === e.at),
+        );
+      }
+      continue;
+    }
+    /* רשומות שינוי־שם לא תלויות בשער השחקן שלמטה: אין להן שדה name
+       (יש from/to), ולכן findIndex לפי e.name החזיר תמיד ‎-1 והענף שלהן
+       בשרשרת שלמטה היה בלתי־ניתן־להשגה — הודעת rename ערוכה אבדה בשקט,
+       כי הביטול לא הפך את השם וההחלה־מחדש לא מצאה את שם המקור (ממצא 4).
+       מטפלים בהן כאן, לפני השער, כמו ברשומות הממתין. */
+    if (e.t === "rename") {
+      renameEverywhere(state, e.to as string, e.from as string);
+      continue;
+    }
     let i = state.players.findIndex((p) => p.name === e.name);
     /* רשומות קנייה מאותבות לפי מזהה/צילום האירוע, לא רק לפי שם — שם ששונה
        מאז ההחלה לא שובר את הביטול. שאר סוגי הרשומות: לפי שם, כמקודם. */
     if (e.t === "add" || e.t === "approve") i = findStampPlayerIndex(state, e);
-    if (i === -1) continue;
+    if (i === -1) {
+      /* החותמת איננה (אין מחזיק חי — השחקן הוסר מאז) וצריכתה היא no-op,
+         אבל רשומת אישור נושאת גם את שחזור הממתין שאושר: בלעדיו ההחלה־מחדש
+         לא מוצאת ממתין, מתעלמת בשקט, והקנייה המאושרת אובדת מהלייב בלי
+         סימן (אושר → הוסר → הודעת האישור נמסרת שוב). ה־no-op חל על צריכת
+         החותמת בלבד; שחזור הממתין וניקוי approvedNames מתבצעים בכל מקרה. */
+      if (e.t === "approve") {
+        if (e.pending) state.pendingApprovals = [...(state.pendingApprovals || []), e.pending];
+        state.approvedNames = (state.approvedNames || []).filter((n) => n !== e.name);
+      }
+      continue;
+    }
     if (e.t === "add" || e.t === "approve") {
       const sid = stampIdOf(e);
       if (sid) retarget.set(sid, state.players[i].name);
@@ -369,7 +448,13 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
       state.players[i] = { ...state.players[i], cashout: e.before };
     } else if (e.t === "tip") {
       const tipsGiven = Math.max(0, r2((+state.players[i].tipsGiven || 0) - (e.amount as number)));
-      state.players[i] = { ...state.players[i], tipsGiven };
+      state.players[i] = {
+        ...state.players[i],
+        tipsGiven,
+        /* הטיפ הוריד מסכום היציאה — הביטול מחזיר את היציאה לצילום־לפני
+           בדיוק (ממצא 4). רשומות ישנות בלי צילום: לא נוגעים ביציאה. */
+        ...(e.cashoutBefore !== undefined ? { cashout: e.cashoutBefore } : {}),
+      };
       if (e.tipId != null) {
         state.tips = (state.tips || []).filter((t) => t.id !== e.tipId);
       }
@@ -377,10 +462,6 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
         state.tipComplimentBag = e.bagBefore;
         state.tipComplimentLast = e.lastBefore ?? null;
       }
-    } else if (e.t === "pending") {
-      state.pendingApprovals = (state.pendingApprovals || []).filter(
-        (p) => !(p.name === e.name && p.amount === e.amount && p.at === e.at),
-      );
     } else if (e.t === "approve") {
       const j = i;
       const currentName = state.players[j]?.name;
@@ -405,13 +486,32 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
       state.approvedNames = (state.approvedNames || []).filter(
         (n) => n !== e.name && n !== currentName,
       );
-    } else if (e.t === "rename") {
-      renameEverywhere(state, e.to as string, e.from as string);
     }
+    /* ענף rename לא מופיע כאן — רשומות שינוי־שם מטופלות לפני שער השחקן
+       שבראש הלולאה (אין להן שדה name לעבור אותו). */
   }
   // הסרה מוחזרת בסוף, אחרי שכל השאר חזר למקומו
   for (const e of [...entries].reverse()) {
-    if (e.t === "remove") state.players.splice(e.at as number, 0, e.player as WaPlayer);
+    if (e.t === "remove") {
+      const snap = e.player as WaPlayer;
+      /* שחקן שהוא אותו אדם כבר יושב = גלגול חי חדש של אותו מושב (הושב
+         בהודעת יצירה מאוחרת יותר), לא הצילום שהוסר. החזרת הצילום לצידו
+         יוצרת כפילות, וההחלה־מחדש של ההסרה מסירה את הצילום ומשאירה את
+         החי — עם אישור "הוסר מהשולחן" מטעה. מדלגים על החזרת הצילום (ועל
+         החזרת ה־pot שלו); ההחלה־מחדש תאתר ותסיר את השחקן החי עצמו.
+         הזהות נקבעת ברזולוציה של findPlayer (כינוי/קידומת דו־כיוונית),
+         לא בשוויון שם: רשומת ההסרה נשמרת בשם המורחב ("דוד בני גיל" —
+         ההרחבה קרתה בזמן ההסרה), בעוד הגלגול החי יושב בשם הגולמי
+         ("דוד"); שוויון מחרוזות פספס אותו והצילום חזר כרפאים. שקילות
+         לא חד־משמעית (ambiguous) לא מדלגת: לא מנחשים אדם, וההתנהגות
+         הקיימת (החזרת הצילום) עדיפה על הסרת האדם הלא־נכון. */
+      if (snap && findPlayer(state.players, snap.name, ALIASES).index !== -1) continue;
+      state.players.splice(e.at as number, 0, snap);
+      /* השחקן חוזר עם אירועי הקנייה שלו — גם ה־pot שלהם חוזר לקופה,
+         מול הפירוק בהסרה עצמה, כדי שהאינווריאנט יישמר (תצפית גל 2). */
+      const potBack = playerPotSum(snap);
+      if (potBack) state.savingsPot = r2((Number(state.savingsPot) || 0) + potBack);
+    }
     if (e.t === "entries") state.entriesCount = e.before as string;
   }
   return retarget;
