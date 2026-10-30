@@ -25,6 +25,7 @@ const CHAIN = [
   "202610300001_wave1_pot_privacy.sql",
   "202610300002_wave2b_stamp_sid_privacy.sql",
   "202610300003_wave2b_applied_privacy.sql",
+  "202610300004_wave2_frozen_flags_privacy.sql",
 ];
 
 const POT_PLAN = JSON.stringify([
@@ -61,7 +62,7 @@ function potData() {
         ],
         savingsPot: 93, savingsPotActual: 70,
         coupleFills: [{ from: "עדן גיל", to: "אורן גיל", amount: 285 }],
-        manualSettlement: { shortfall: { "אורן גיל": 13 }, frozenActual: 70 },
+        manualSettlement: { shortfall: { "אורן גיל": 13 }, frozenActual: 70, frozenReal: true, frozenAuto: true },
         payments: {
           plan: POT_PLAN,
           paid: { "0": true, "2": true },
@@ -103,7 +104,7 @@ function potLive() {
   };
 }
 
-const FORBIDDEN = ["savingsPot", "savingsPotActual", "savingsWithdrawals", "frozenActual", "potPaid", "potDraft", "coupleFills", "קופת חיסכון"];
+const FORBIDDEN = ["savingsPot", "savingsPotActual", "savingsWithdrawals", "frozenActual", "frozenReal", "frozenAuto", "potPaid", "potDraft", "coupleFills", "קופת חיסכון"];
 function expectNoPotLeaks(value, label) {
   const s = JSON.stringify(value);
   for (const token of FORBIDDEN) {
@@ -284,6 +285,35 @@ describe("wave1 pot privacy SQL", () => {
       const st = await stored("pot-link");
       expect(Object.keys(st.live.applied)).toEqual(["wamid.AAA", "wamid.BBB"]);
       expect(st.live.applied["wamid.AAA"][0].ev.sid).toBe("wamid.AAA:0");
+    } finally { await db.exec("reset role"); }
+  });
+
+  it("גל 2: filter_shared_group_data מסיר את סימוני ההקפאה frozenReal/frozenAuto מ־manualSettlement — בשני מצבי השיתוף; האחסון שומר אותם", async () => {
+    await db.exec("reset role");
+    try {
+      for (const [slug, count] of [["pot-link", 2], ["pot-hidden", 1]]) {
+        const { rows } = await db.query(
+          `select filter_shared_group_data(data, config) as data from groups where slug = $1`,
+          [slug]
+        );
+        const data = rows[0].data;
+        expectNoPotLeaks(data, `filter(${slug})`);
+        expect(data.sessions).toHaveLength(count);
+        const night = data.sessions.find((s) => s.id === "pot-night");
+        /* רק הסימונים יוצאים — מפת החוסר הקפואה נשארת, כמו בהקרנת האפליקציה */
+        expect(night.manualSettlement).toEqual({ shortfall: { "אורן גיל": 13 } });
+        /* שאר ההתנהגות זהה: ב־shareHistory=false נשמרים הכינויים וה־plan */
+        if (slug === "pot-hidden") {
+          expect(data.aliases).toEqual({ "דני": "דן ינקלויץ" });
+          expect(data.plan).toEqual({ iso: "2026-10-24" });
+        }
+      }
+      /* ההקרנה בלבד: באחסון הסימונים נשארים מלאים */
+      const st = await stored("pot-link");
+      const storedNight = st.data.sessions.find((x) => x.id === "pot-night");
+      expect(storedNight.manualSettlement.frozenActual).toBe(70);
+      expect(storedNight.manualSettlement.frozenReal).toBe(true);
+      expect(storedNight.manualSettlement.frozenAuto).toBe(true);
     } finally { await db.exec("reset role"); }
   });
 
