@@ -146,11 +146,28 @@ export function findInState(
   return found;
 }
 
-export function stampBuyin(player: WaPlayer, delta: number, at: number = Date.now()): WaPlayer {
-  if (!(delta > 0)) return player;
-  const events = [...(player.buyinEvents || [])];
-  events.push({ amount: delta, at, total: r2(+player.buyin || 0) });
-  return { ...player, buyinEvents: events };
+/** חותמת קנייה מרכזית אחת לכל נתיבי הבוט (ישיבה ישירה, ריביי, אישור) —
+ * זהה להתנהגות האפליקציה (LiveTab): החוב נשאר מלא, 5% מהקנייה נרשם כ־pot
+ * על האירוע (בשקלים) ומצטבר ב־savingsPot של הלייב, ונוצר אירוע קנייה אחד
+ * בדיוק לכל קנייה. הג'יטונים בפועל נגזרים בצריכה: (buyin − Σ pot) × cps.
+ * הפחתה (delta שלילי) רק מורידה את החוב — בלי אירוע ובלי קופה, כמו באפליקציה. */
+export function stampBuyin(
+  state: WaLiveState,
+  player: WaPlayer,
+  delta: number,
+  at: number = Date.now(),
+): WaPlayer {
+  const prev = +player.buyin || 0;
+  const buyin = Math.max(0, r2(prev + delta));
+  const applied = r2(buyin - prev);
+  if (!(applied > 0)) return { ...player, buyin };
+  const toPot = state.savings5 ? r2(applied * 0.05) : 0;
+  if (toPot > 0) state.savingsPot = r2((Number(state.savingsPot) || 0) + toPot);
+  const events = [
+    ...(player.buyinEvents || []),
+    { amount: applied, at, total: buyin, pot: toPot || undefined },
+  ];
+  return { ...player, buyin, buyinEvents: events };
 }
 
 export function blank(live?: Partial<WaLiveState> | null): WaLiveState {

@@ -23,7 +23,7 @@ import { helpText, ownerAskText } from "./help.js";
 
 export { helpText } from "./help.js";
 
-import type { UndoEntry, WaLiveState, WaPlayer } from "./state";
+import type { UndoEntry, WaLiveState } from "./state";
 
 export interface WaCmd {
   kind: string;
@@ -220,25 +220,22 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const already = findInState(state, item.name, aliases);
-      // 5% לקופה הצדדית — החוב נשאר מלא
-      const toPot = state.savings5 ? r2(item.amount * 0.05) : 0;
-      if (toPot > 0) state.savingsPot = r2((Number(state.savingsPot) || 0) + toPot);
+      // הקנייה עוברת דרך החותמת המרכזית — אירוע אחד, pot ו־savingsPot כמו באפליקציה
       if (already.index !== -1) {
         const p = state.players[already.index];
-        const buyin = r2((+p.buyin || 0) + item.amount);
-        const events = [...(p.buyinEvents || []), { amount: item.amount, at: now, total: buyin, pot: toPot || undefined }];
-        state.players[already.index] = stampBuyin({ ...p, buyin, buyinEvents: events }, item.amount, now);
+        const next = stampBuyin(state, p, item.amount, now);
+        state.players[already.index] = next;
         record.push({ t: "approve", name: p.name, pending: item, created: false });
         if (!state.approvedNames.includes(p.name)) state.approvedNames.push(p.name);
-        acks.push(`${p.name} ${byGender(p.name, "אושר", "אושרה")} · +${item.amount}₪ · סה״כ ${buyin}₪`);
+        acks.push(`${p.name} ${byGender(p.name, "אושר", "אושרה")} · +${item.amount}₪ · סה״כ ${next.buyin}₪`);
         continue;
       }
-      const seated = {
-        name: resolveAlias(item.name, aliases),
-        buyin: item.amount,
-        cashout: "",
-        buyinEvents: [{ amount: item.amount, at: now, total: item.amount, pot: toPot || undefined }],
-      };
+      const seated = stampBuyin(
+        state,
+        { name: resolveAlias(item.name, aliases), buyin: 0, cashout: "", buyinEvents: [] },
+        item.amount,
+        now,
+      );
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
       if (!state.approvedNames.includes(seated.name)) state.approvedNames.push(seated.name);
@@ -455,12 +452,12 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         }
         continue;
       }
-      const seated = {
-        name,
-        buyin: cmd.amount,
-        cashout: "",
-        buyinEvents: [{ amount: cmd.amount, at: now, total: cmd.amount }],
-      };
+      const seated = stampBuyin(
+        state,
+        { name, buyin: 0, cashout: "", buyinEvents: [] },
+        cmd.amount,
+        now,
+      );
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
       record.push({ t: "add", name, delta: cmd.amount, created: true });
@@ -469,13 +466,11 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     }
 
     const p = state.players[found.index];
-    const buyin = Math.max(0, r2((+p.buyin || 0) + cmd.amount));
-    const delta = r2(buyin - (+p.buyin || 0));
-    let next: WaPlayer = { ...p, buyin };
-    if (delta > 0) next = stampBuyin(next, delta, now);
+    const next = stampBuyin(state, p, cmd.amount, now);
+    const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
     state.players[found.index] = next;
     record.push({ t: "add", name: p.name, delta });
-    acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${buyin}₪`);
+    acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${next.buyin}₪`);
   }
 
   if (!acks.length && !problems.length) return { live, reply: null };
