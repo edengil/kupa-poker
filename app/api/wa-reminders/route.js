@@ -5,12 +5,17 @@ import { reportError } from "@/lib/monitor";
 import { envValue } from "@/lib/env";
 import { sendToGroup, maybeRemindPending, maybeRemindBitIdle } from "@/lib/whatsapp";
 import { trackWaSend } from "@/lib/wa/healthServer";
+import { reminderKind, writeReminderStamp } from "@/lib/wa/reminderWrite";
 
 /* ============================================================================
    תזכורות בוט תלויות־זמן — ממתינים לאישור (8 דק׳) וביט שקט (שעתיים).
    עד היום הן רצו רק כתופעת לוואי של הודעות נכנסות ב־webhook: קבוצה שקטה =
    אין תזכורות. הנתיב הזה רץ על שעון (pg_cron במסד או cron חיצוני, עם
    authorizedCron) ומריץ בדיוק את אותה לוגיקה של ה־webhook.
+
+   סדר הפעולות (גל 3ב, ממצא 10): שולחים קודם — ורק שליחה שהצליחה חותמת
+   "נשלח". כשל שליחה חותם ניסיון בלבד (מרסן את הניסיון הבא ב־cooldown)
+   ומדווח בכנות בתשובה, במקום לסמן הצלחה בשקר.
    ============================================================================ */
 
 export const dynamic = "force-dynamic";
@@ -45,19 +50,11 @@ export async function GET(request) {
       maybeRemindBitIdle(live, now, { groupNudge: true });
     if (!reminded) return NextResponse.json({ ok: true, reminded: null });
 
-    const kind = reminded.live?.bitIdleRemindedAt === now ? "bit-idle" : "pending";
-    const { error: writeError } = await supabase
-      .from("groups")
-      .update({ live: reminded.live })
-      .eq("id", row.id);
-    if (writeError) {
-      await reportError(writeError, `wa-reminders/${kind}`);
-      return NextResponse.json({ error: "write failed" }, { status: 500 });
-    }
-
+    const kind = reminderKind(reminded, now);
     const token = envValue("WHAPI_TOKEN");
     const ownerPhone = envValue("WHATSAPP_OWNER");
     const groupId = envValue("WHAPI_GROUP_ID");
+    let sendFailed = false;
     try {
       if (reminded.ownerDm && ownerPhone) {
         await trackWaSend(
@@ -72,7 +69,15 @@ export async function GET(request) {
         );
       }
     } catch (e) {
+      sendFailed = true;
       console.warn(`${kind} remind failed:`, e.message);
+      await reportError(e, `wa-reminders/${kind}-send`);
+    }
+
+    /* החותמת נכתבת רק עכשיו: הצלחה → "נשלח"; כשל → ניסיון בלבד. */
+    await writeReminderStamp(supabase, row.id, reminded, now, { sent: !sendFailed });
+    if (sendFailed) {
+      return NextResponse.json({ ok: true, reminded: kind, sent: false });
     }
     return NextResponse.json({ ok: true, reminded: kind });
   } catch (err) {

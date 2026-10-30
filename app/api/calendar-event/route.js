@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabaseServer";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
+import { updateGroupCas } from "@/lib/groupCas";
 import { reportError } from "@/lib/monitor";
 import {
   calendarConfigured,
@@ -102,6 +103,20 @@ async function resolveOwner(request) {
   if (gErr) return { error: "שגיאת מסד נתונים", status: 500, code: "db" };
   if (!group) return { error: "אין קבוצה למשתמש הזה", status: 403, code: "no_group" };
   return { user, group, supabase };
+}
+
+/* כתיבת שדות plan דרך CAS על data טרי (גל 3ב) — שדות התוכנית האחרים
+   (תשובות, סימוני הזמנה) נשמרים כפי שהם במסד, לא כפי שהיו בקריאת הנתיב. */
+async function savePlanFields(admin, groupId, fields) {
+  return updateGroupCas(
+    admin,
+    groupId,
+    (fresh) => {
+      const freshDb = fresh.data || {};
+      return { data: { ...freshDb, plan: { ...(freshDb.plan || {}), ...fields } } };
+    },
+    { columns: "id, data, updated_at" }
+  );
 }
 
 export async function POST(request) {
@@ -218,19 +233,15 @@ export async function POST(request) {
         } catch { /* ניקוי נכשל — לא חוסם */ }
       }
       // מעדכן חותמת סנכרון
-      const nextData = {
-        ...db,
-        plan: { ...plan, calendarEventId: eventId, calendarSyncedAt: Date.now() },
-      };
-      await admin.from("groups").update({ data: nextData }).eq("id", groupRow.id);
+      await savePlanFields(admin, groupRow.id, {
+        calendarEventId: eventId,
+        calendarSyncedAt: Date.now(),
+      });
     } else {
       // כותבים סמן pending לפני הקריאה לגוגל — אם הבקשה תיכשל/תתנתק אחרי
       // שהאירוע נוצר, ניסיון חוזר לא ייצור אירוע כפול
       const pendingMarker = `pending:${Math.random().toString(36).slice(2)}:${Date.now()}`;
-      await admin
-        .from("groups")
-        .update({ data: { ...db, plan: { ...plan, calendarEventId: pendingMarker } } })
-        .eq("id", groupRow.id);
+      await savePlanFields(admin, groupRow.id, { calendarEventId: pendingMarker });
       // בדיקה אטומית: אם בקשה מקבילה כתבה סמן משלה אחרינו — היא מנצחת, מחכים לה
       const { data: checkRow } = await admin.from("groups").select("data").eq("id", groupRow.id).single();
       const checkMarker = checkRow?.data?.plan?.calendarEventId || null;
@@ -252,18 +263,19 @@ export async function POST(request) {
         if (existing.length) {
           eventId = existing[0].id;
           await updateEveningEvent(eventId, eveningPayload);
-          const nextData = { ...db, plan: { ...plan, calendarEventId: eventId, calendarSyncedAt: Date.now() } };
-          await admin.from("groups").update({ data: nextData }).eq("id", groupRow.id);
+          await savePlanFields(admin, groupRow.id, {
+            calendarEventId: eventId,
+            calendarSyncedAt: Date.now(),
+          });
           return NextResponse.json({ configured: true, eventId, attendees: emails.length });
         }
       }
       eventId = await createEveningEvent(eveningPayload);
       // שומר את מזהה האירוע בתוכנית לסנכרון
-      const nextData = {
-        ...db,
-        plan: { ...plan, calendarEventId: eventId, calendarSyncedAt: Date.now() },
-      };
-      await admin.from("groups").update({ data: nextData }).eq("id", groupRow.id);
+      await savePlanFields(admin, groupRow.id, {
+        calendarEventId: eventId,
+        calendarSyncedAt: Date.now(),
+      });
     }
     return NextResponse.json({ configured: true, eventId, attendees: emails.length });
   } catch (e) {

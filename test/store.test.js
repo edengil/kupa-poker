@@ -8,9 +8,16 @@ function client() {
     update,
     read,
     from: () => ({
-      update: (patch) => ({ eq: () => update(patch) }),
       select: () => ({ eq: () => ({ single: read }) }),
     }),
+    /* כתיבת החנות עוברת דרך write_group_cas (גל 3ב): ה־mock מעביר את
+       ה־patch לאותו update מדומה, כדי שכל הציפיות עליו נשמרות. */
+    rpc: async (name, args) => {
+      if (name !== "write_group_cas") return { data: null, error: { message: "unknown rpc" } };
+      const res = await update(args.p_patch);
+      if (res?.error) return { data: null, error: res.error };
+      return { data: "2026-01-01T00:00:00.000Z", error: null };
+    },
   };
 }
 

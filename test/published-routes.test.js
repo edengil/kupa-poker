@@ -29,6 +29,11 @@ vi.mock("@/lib/waPins", async (importOriginal) => {
 
 vi.mock("@/lib/supabaseAdmin", () => ({
   getAdminSupabase: () => ({
+    /* write_group_cas (מיגרציית גל 3ב): ה־patch נרשם כמו update רגיל. */
+    rpc: async (_fn, args) => {
+      h.writes.push(args.p_patch);
+      return { data: "2026-10-24T20:00:01.000Z", error: null };
+    },
     from() {
       const chain = {
         select() {

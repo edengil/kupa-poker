@@ -602,6 +602,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   /* ביט חדש מאפס את תזכורת השקט — השעון מתחיל מחדש מפעילות אמיתית. */
   if (record.some((e) => e.t === "add" || e.t === "approve")) {
     delete state.bitIdleRemindedAt;
+    delete state.bitIdleRemindAttemptAt;
   }
 
   /* גם האזהרות מקבלות את סימן הבוט. תשובה שכולה אזהרות התחילה פעם ב-⚠️,

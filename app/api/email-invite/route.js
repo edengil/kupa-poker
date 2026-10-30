@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabaseServer";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
+import { updateGroupCas } from "@/lib/groupCas";
 import { reportError } from "@/lib/monitor";
 import { serverSiteUrl } from "@/lib/env";
 import { signRsvpToken, rsvpTokenExpiry, rsvpTokensConfigured } from "@/lib/rsvpToken";
@@ -150,20 +151,20 @@ export async function POST(request) {
   }
 
   if (sent.length) {
-    // כתיבה מחדש מנתונים טריים, כדי לא לדרוס אישור שהגיע בינתיים מהאימייל
-    const { data: fresh } = await admin
-      .from("groups")
-      .select("data")
-      .eq("id", groupRow.id)
-      .maybeSingle();
-    const freshDb = fresh?.data || db;
-    if (freshDb.plan?.iso === plan.iso) {
-      const nextDb = { ...freshDb, plan: markEmailInvites(freshDb.plan, sent) };
-      const { error: writeErr } = await admin
-        .from("groups")
-        .update({ data: nextDb })
-        .eq("id", groupRow.id);
-      if (writeErr) console.error("email-invite mark write failed:", writeErr.message);
+    /* כתיבה מחדש על נתונים טריים דרך CAS (גל 3ב), כדי לא לדרוס אישור
+       שהגיע בינתיים מהאימייל — הסימון מחושב על התוכנית הטרייה בכל ניסיון. */
+    const writeRes = await updateGroupCas(
+      admin,
+      groupRow.id,
+      (fresh) => {
+        const freshDb = fresh.data || {};
+        if (freshDb.plan?.iso !== plan.iso) return null;
+        return { data: { ...freshDb, plan: markEmailInvites(freshDb.plan, sent) } };
+      },
+      { columns: "id, data, updated_at" }
+    ).catch(() => null);
+    if (writeRes && !writeRes.ok) {
+      console.error("email-invite mark write failed: CAS did not land");
     }
   }
 

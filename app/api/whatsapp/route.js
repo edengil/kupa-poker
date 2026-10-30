@@ -11,6 +11,8 @@ import {
 import { knownPlayerNames } from "@/lib/poker/personalHighlights";
 import { appendAction } from "@/lib/liveActionLog";
 import { trackWaSend } from "@/lib/wa/healthServer";
+import { casWriteGroup, updateGroupCas } from "@/lib/groupCas";
+import { reminderKind, writeReminderStamp } from "@/lib/wa/reminderWrite";
 import { AL, canon } from "@/lib/poker/helpers";
 import { normalize } from "@/lib/poker/db";
 import { latestSession } from "@/lib/lastSession";
@@ -37,21 +39,32 @@ const ok = (extra = {}) => NextResponse.json({ ok: true, ...extra });
 
 /* נפילה מסודרת: שליחת התשובה לקבוצה נכשלה — הכשל נרשם ביומן הפעולות של
    הלייב כפעולה גלויה למנהל (בנוסף לתיעוד ב־diag_events דרך trackWaSend),
-   כדי שהודעה שלא הגיעה לא תיבלע בשקט. best-effort: לא זורק לעולם. */
+   כדי שהודעה שלא הגיעה לא תיבלע בשקט. best-effort: לא זורק לעולם.
+   הכתיבה על הלייב הטרי מהשרת דרך CAS (גל 3ב) — לא על צילום הבקשה,
+   כדי לא לדרוס מצב שהתקדם מאז. */
 async function appendWaFailToLive(supabase, rowId, nextLive, prevLive, error) {
   try {
-    const fromNext = Array.isArray(nextLive?.actionLog) ? nextLive.actionLog : [];
-    const fromPrev = Array.isArray(prevLive?.actionLog) ? prevLive.actionLog : [];
-    const baseLog = fromNext.length >= fromPrev.length ? fromNext : fromPrev;
-    const actionLog = appendAction(baseLog, {
-      t: "waFail",
-      where: "reply",
-      error: String(error?.message || error || "").slice(0, 120),
-    });
-    await supabase
-      .from("groups")
-      .update({ live: { ...(nextLive || prevLive || {}), actionLog } })
-      .eq("id", rowId);
+    await updateGroupCas(
+      supabase,
+      rowId,
+      (fresh) => {
+        const baseLive =
+          fresh.live && typeof fresh.live === "object"
+            ? fresh.live
+            : nextLive || prevLive || null;
+        if (!baseLive) return null;
+        const actionLog = appendAction(
+          Array.isArray(baseLive.actionLog) ? baseLive.actionLog : [],
+          {
+            t: "waFail",
+            where: "reply",
+            error: String(error?.message || error || "").slice(0, 120),
+          }
+        );
+        return { live: { ...baseLive, actionLog } };
+      },
+      { columns: "id, live, updated_at", retries: 2 }
+    );
   } catch {
     /* היומן הוא בונוס נראות — הכשל כבר תועד ב־diag_events וב־botHealth */
   }
@@ -140,7 +153,7 @@ export async function POST(request) {
   const supabase = getAdminSupabase();
   const { data: row, error } = await supabase
     .from("groups")
-    .select("id, slug, live, config, data")
+    .select("id, slug, live, config, data, updated_at")
     .eq("slug", envValue("KUPA_GROUP_SLUG"))
     .single();
 
@@ -159,12 +172,15 @@ export async function POST(request) {
       reply = `${BOT_MARK} הבוט כרגע ${row.config?.botOn ? "פעיל ✅" : "כבוי 💤"}`;
     } else {
       const botOn = botCmd === "on";
-      const { error: cfgError } = await supabase
-        .from("groups")
-        .update({ config: { ...(row.config || {}), botOn } })
-        .eq("id", row.id);
-      if (cfgError) {
-        console.error("bot toggle failed:", cfgError.message);
+      /* כתיבת config דרך CAS על הצילום הטרי — לא לדרוס מפתחות שרת אחרים */
+      const cfgRes = await updateGroupCas(
+        supabase,
+        row.id,
+        (fresh) => ({ config: { ...(fresh.config || {}), botOn } }),
+        { columns: "id, config, updated_at" }
+      ).catch(() => null);
+      if (!cfgRes?.ok) {
+        console.error("bot toggle failed: config write did not land");
         return ok({ skipped: "toggle failed" });
       }
       reply = botOn
@@ -197,15 +213,10 @@ export async function POST(request) {
       maybeRemindPending(live, now, { groupNudge: false }) ||
       maybeRemindBitIdle(live, now, { groupNudge: true });
     if (!reminded) return null;
-    const kind = reminded.live?.bitIdleRemindedAt === now ? "bit-idle" : "pending";
-    const { error: writeError } = await supabase
-      .from("groups")
-      .update({ live: reminded.live })
-      .eq("id", row.id);
-    if (writeError) {
-      await reportError(writeError, `whatsapp/${kind}-remind`);
-      return "write-failed";
-    }
+    const kind = reminderKind(reminded, now);
+    /* גל 3ב (ממצא 10): שולחים קודם, חותמים אחר כך — חותמת "נשלח" נכתבת רק
+       על שליחה שהצליחה; כשל חותם ניסיון בלבד ומדווח ככשל, לא כהצלחה. */
+    let sendFailed = false;
     try {
       if (reminded.ownerDm && ownerPhone) {
         await trackWaSend(
@@ -229,15 +240,17 @@ export async function POST(request) {
         );
       }
     } catch (e) {
+      sendFailed = true;
       console.warn(`${kind} remind failed:`, e.message);
     }
-    return "sent";
+    await writeReminderStamp(supabase, row.id, reminded, now, { sent: !sendFailed });
+    return sendFailed ? "send-failed" : "sent";
   };
 
   if (!cmds.length) {
     const r = await remindIfDue();
     if (r === "sent") return ok({ reminded: true });
-    if (r === "write-failed") return ok({ skipped: "write failed" });
+    if (r === "send-failed") return ok({ skipped: "send failed" });
     return ok({ skipped: "not a command" });
   }
 
@@ -259,35 +272,74 @@ export async function POST(request) {
     c.slug = row.slug;
   }
 
-  const db = normalize(row.data || {});
-  const aliases = AL(db);
-  const knownNames = [
-    ...knownPlayerNames(db),
-    ...(live?.players || []).map((p) => canon(p.name, aliases)),
-    ...(live?.approvedNames || []),
-  ];
+  /* כתיבת הלייב אטומית עם הגנת גרסה (גל 3ב, ממצא 9): מחשבים מול השורה
+     שנקראה וכותבים דרך write_group_cas. אם השורה זזה בינתיים (האפליקציה
+     שמרה, תזכורת חתמה) — קוראים את הטרייה ומחילים את הפקודות מחדש עליה;
+     מפת ה־applied בלייב הופכת את ההחלה החוזרת של אותה הודעה לבטוחה. */
+  let nextLive = null;
+  let reply = null;
+  let ownerDm = null;
+  let changed = false;
+  {
+    let attemptRow = row;
+    for (let attempt = 1; ; attempt++) {
+      const attemptLive = attemptRow.live || null;
+      const db = normalize(attemptRow.data || {});
+      const aliases = AL(db);
+      const knownNames = [
+        ...knownPlayerNames(db),
+        ...(attemptLive?.players || []).map((p) => canon(p.name, aliases)),
+        ...(attemptLive?.approvedNames || []),
+      ];
 
-  // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה.
-  // msgTs (חותמת ההודעה מ־Whapi, לא זמן העיבוד) מזין את שער המסירה
-  // המאוחרת — הודעה מערב שכבר נסגר ונשמר לא פותחת לייב רפאים (ממצא 21).
-  const { live: nextLive, reply, ownerDm } = applyCommands(live, cmds, msg.id, undefined, {
-    knownNames,
-    aliases,
-    lastSession: latestSession(db.sessions),
-    msgTs: msg.timestamp,
-  });
-  if (!reply) return ok({ skipped: "nothing to do" });
+      // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה.
+      // msgTs (חותמת ההודעה מ־Whapi, לא זמן העיבוד) מזין את שער המסירה
+      // המאוחרת — הודעה מערב שכבר נסגר ונשמר לא פותחת לייב רפאים (ממצא 21).
+      const applied = applyCommands(attemptLive, cmds, msg.id, undefined, {
+        knownNames,
+        aliases,
+        lastSession: latestSession(db.sessions),
+        msgTs: msg.timestamp,
+      });
+      nextLive = applied.live;
+      reply = applied.reply;
+      ownerDm = applied.ownerDm;
+      if (!reply) return ok({ skipped: "nothing to do" });
 
-  const changed = nextLive !== live;
-  if (changed) {
-    const { error: writeError } = await supabase
-      .from("groups")
-      .update({ live: nextLive })
-      .eq("id", row.id);
-    if (writeError) {
-      await reportError(writeError, "whatsapp/live-write");
-      return ok({ skipped: "write failed" });
+      changed = nextLive !== attemptLive;
+      if (!changed) break;
+
+      let writeRes = null;
+      let writeErr = null;
+      try {
+        writeRes = await casWriteGroup(
+          supabase,
+          row.id,
+          attemptRow.updated_at ?? null,
+          { live: nextLive }
+        );
+      } catch (e) {
+        writeErr = e;
+      }
+      if (writeRes?.ok) break;
+      if (writeErr || attempt >= 3) {
+        await reportError(writeErr || new Error("live write conflict"), "whatsapp/live-write");
+        return ok({ skipped: "write failed" });
+      }
+      const { data: freshRow, error: freshErr } = await supabase
+        .from("groups")
+        .select("id, slug, live, config, data, updated_at")
+        .eq("id", row.id)
+        .single();
+      if (freshErr || !freshRow) {
+        await reportError(freshErr || new Error("group not found"), "whatsapp/live-write");
+        return ok({ skipped: "write failed" });
+      }
+      attemptRow = freshRow;
     }
+  }
+
+  if (changed) {
     await pingViewers(row.slug);
 
     // המשחק נפתח דרך הוואטסאפ (שחקן ראשון בשולחן) — מודיעים לצופים
@@ -344,16 +396,13 @@ export async function POST(request) {
         token,
         pins: normalizePins(row.config?.pins),
         savePins: async (pins) => {
-          // קוראים מחדש config כדי לא לדרוס botOn/sentReports אם השתנו במקביל
-          const { data: fresh } = await supabase
-            .from("groups")
-            .select("config")
-            .eq("id", row.id)
-            .maybeSingle();
-          await supabase
-            .from("groups")
-            .update({ config: { ...(fresh?.config || row.config || {}), pins } })
-            .eq("id", row.id);
+          // כותבים על config טרי דרך CAS כדי לא לדרוס botOn/sentReports
+          await updateGroupCas(
+            supabase,
+            row.id,
+            (fresh) => ({ config: { ...(fresh.config || {}), pins } }),
+            { columns: "id, config, updated_at" }
+          );
         },
       });
     } catch (e) {

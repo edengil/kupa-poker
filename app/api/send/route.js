@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabaseServer";
+import { updateGroupCas } from "@/lib/groupCas";
 import { sendToGroup } from "@/lib/whatsapp";
 import { recordWaSend } from "@/lib/wa/healthServer";
 import { reportError } from "@/lib/monitor";
@@ -158,10 +159,12 @@ export async function POST(request) {
             token,
             pins: normalizePins(group.config?.pins),
             savePins: async (pins) => {
-              await supabase
-                .from("groups")
-                .update({ config: { ...(group.config || {}), pins } })
-                .eq("id", group.id);
+              await updateGroupCas(
+                supabase,
+                group.id,
+                (fresh) => ({ config: { ...(fresh.config || {}), pins } }),
+                { columns: "id, config, updated_at" }
+              );
             },
           }
         );

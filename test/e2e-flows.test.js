@@ -31,9 +31,15 @@ function clientOk() {
   return {
     update,
     read,
+    /* write_group_cas (מיגרציית גל 3ב): מתרגם את ה־patch ל־update רגיל,
+       בדיוק כמו פונקציית ה־SQL — NULL בהתנגשות, חותמת בהצלחה. */
+    rpc: (_fn, args) =>
+      Promise.resolve(update(args.p_patch)).then(({ error }) =>
+        error ? { data: null, error } : { data: "2026-01-01T00:00:01.000Z", error: null }
+      ),
     from: () => ({
       update: (patch) => ({ eq: () => update(patch) }),
-      select: () => ({ eq: () => ({ single: read }) }),
+      select: () => ({ eq: () => ({ single: read, maybeSingle: read }) }),
     }),
   };
 }

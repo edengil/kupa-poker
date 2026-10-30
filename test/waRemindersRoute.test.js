@@ -26,11 +26,17 @@ vi.mock("@/lib/whatsapp", () => ({
 }));
 vi.mock("@/lib/supabaseAdmin", () => ({
   getAdminSupabase: () => ({
+    /* write_group_cas (מיגרציית גל 3ב): ה־patch נרשם כמו update רגיל. */
+    rpc: async (_fn, args) => {
+      h.writes.push(args.p_patch);
+      return { data: "2026-10-24T20:00:01.000Z", error: null };
+    },
     from() {
       const chain = {
         select: () => chain,
         eq: () => chain,
         single: async () => ({ data: h.row, error: null }),
+        maybeSingle: async () => ({ data: h.row, error: null }),
         update: (payload) => {
           h.writes.push(payload);
           return { eq: async () => ({ error: null }) };
@@ -91,24 +97,50 @@ describe("wa-reminders route", () => {
     expect(h.sendToGroup).not.toHaveBeenCalled();
   });
 
-  it("תזכורת ממתינים בשלה — כותב מצב ושולח DM לבעלים בלבד", async () => {
-    const nextLive = { players: [{ name: "אבי" }], pendingRemindedAt: 123 };
-    h.maybeRemindPending.mockReturnValue({ live: nextLive, ownerDm: "יש ממתינים", reply: null });
+  it("תזכורת ממתינים בשלה — שולח קודם, חותם הצלחה אחר כך (גל 3ב)", async () => {
+    /* המועמד חותם ב־now שהנתיב מעביר — כמו המימוש האמיתי. */
+    h.maybeRemindPending.mockImplementation((_live, now) => ({
+      live: { players: [{ name: "אבי" }], pendingRemindedAt: now },
+      attemptLive: { players: [{ name: "אבי" }], pendingRemindAttemptAt: now },
+      ownerDm: "יש ממתינים",
+      reply: null,
+    }));
     const res = await GET(makeReq(true));
     expect(res.body).toMatchObject({ ok: true, reminded: "pending" });
-    /* כתיבה ראשונה = מצב הלייב; אחריה כתיבת config של ניטור הערוץ
-       (botHealth — השליחה הצליחה, lib/wa/healthServer). */
-    expect(h.writes[0]).toEqual({ live: nextLive });
-    expect(h.writes[1]?.config?.botHealth).toMatchObject({ fails: 0 });
-    expect(h.writes[1]?.config?.botHealth?.lastOkAt).toEqual(expect.any(Number));
+    /* כתיבת הלייב נושאת את חותמת ההצלחה; כתיבת ה־config היא של ניטור
+       הערוץ (botHealth — השליחה הצליחה, lib/wa/healthServer). */
+    const liveWrite = h.writes.find((w) => w.live);
+    const healthWrite = h.writes.find((w) => w.config?.botHealth);
+    expect(liveWrite.live.players).toEqual([{ name: "אבי" }]);
+    expect(liveWrite.live.pendingRemindedAt).toEqual(expect.any(Number));
+    expect(liveWrite.live.pendingRemindAttemptAt).toBeUndefined();
+    expect(healthWrite?.config?.botHealth).toMatchObject({ fails: 0 });
+    expect(healthWrite?.config?.botHealth?.lastOkAt).toEqual(expect.any(Number));
     expect(h.sendToGroup).toHaveBeenCalledTimes(1);
     expect(h.sendToGroup).toHaveBeenCalledWith("יש ממתינים", { token: "tok", groupId: "972500000000" });
+  });
+
+  it("שליחת התזכורת נכשלת — נחתמת רק חותמת ניסיון, לא הצלחה (גל 3ב)", async () => {
+    h.maybeRemindPending.mockImplementation((_live, now) => ({
+      live: { players: [{ name: "אבי" }], pendingRemindedAt: now },
+      attemptLive: { players: [{ name: "אבי" }], pendingRemindAttemptAt: now },
+      ownerDm: "יש ממתינים",
+      reply: null,
+    }));
+    h.sendToGroup.mockRejectedValueOnce(new Error("whapi down"));
+    const res = await GET(makeReq(true));
+    expect(res.body).toMatchObject({ ok: true, reminded: "pending", sent: false });
+    const liveWrites = h.writes.filter((w) => w.live);
+    expect(liveWrites).toHaveLength(1);
+    expect(liveWrites[0].live.pendingRemindAttemptAt).toEqual(expect.any(Number));
+    expect(liveWrites[0].live.pendingRemindedAt).toBeUndefined();
   });
 
   it("תזכורת ביט שקט — שולח גם נדנוד לקבוצה", async () => {
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(999);
     const nextLive = { players: [{ name: "אבי" }], bitIdleRemindedAt: 999 };
-    h.maybeRemindBitIdle.mockReturnValue({ live: nextLive, ownerDm: "שקט פה", reply: "נדנוד" });
+    const attemptLive = { players: [{ name: "אבי" }], bitIdleRemindAttemptAt: 999 };
+    h.maybeRemindBitIdle.mockReturnValue({ live: nextLive, attemptLive, ownerDm: "שקט פה", reply: "נדנוד" });
     const res = await GET(makeReq(true));
     expect(res.body).toMatchObject({ ok: true, reminded: "bit-idle" });
     expect(h.sendToGroup).toHaveBeenCalledTimes(2);

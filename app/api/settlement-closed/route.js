@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
+import { updateGroupCas } from "@/lib/groupCas";
 import { sendToGroup } from "@/lib/whatsapp";
 import { recordWaSend } from "@/lib/wa/healthServer";
 import { reportError } from "@/lib/monitor";
@@ -84,11 +85,24 @@ export async function POST(request) {
     return NextResponse.json({ error: "send failed" }, { status: 502 });
   }
 
+  /* החותמת נכתבת דרך CAS על config טרי ועם בדיקת תוצאה (גל 3ב): חותמת
+     שלא נחתה = הכרזה שעלולה לחזור, ולכן מדווחים כשל ולא הצלחה שקרית. */
   sentMap[sessionId] = new Date().toISOString();
-  await supabase
-    .from("groups")
-    .update({ config: { ...(row.config || {}), settlementClosed: sentMap } })
-    .eq("id", row.id);
+  const stampRes = await updateGroupCas(
+    supabase,
+    row.id,
+    (fresh) => ({
+      config: {
+        ...(fresh.config || {}),
+        settlementClosed: { ...(fresh.config?.settlementClosed || {}), ...sentMap },
+      },
+    }),
+    { columns: "id, config, updated_at" }
+  ).catch(() => null);
+  if (!stampRes?.ok) {
+    await reportError(new Error("settlement-closed stamp did not land"), "settlement-closed/stamp");
+    return NextResponse.json({ error: "stamp failed" }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, sent: true });
 }

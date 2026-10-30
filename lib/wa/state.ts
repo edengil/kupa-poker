@@ -50,6 +50,11 @@ export interface WaLiveState {
   approvedNames: string[];
   pendingRemindedAt: number | null;
   bitIdleRemindedAt?: number | null;
+  /* חותמות ניסיון־שליחה (גל 3ב): נכתבות כשהתזכורת נשלחה אך השליחה נכשלה,
+     כדי למנוע ספאם ניסיונות על ערוץ פג — בלי לסמן "נשלח" בשקר. חותמת
+     ההצלחה (RemindedAt) נכתבת רק אחרי שליחה שהצליחה בפועל. */
+  pendingRemindAttemptAt?: number | null;
+  bitIdleRemindAttemptAt?: number | null;
   ts?: number;
   tips: WaTip[];
   tipComplimentBag: number[];
@@ -337,7 +342,7 @@ export const MAX_APPLIED_RECORDS = 200;
  * לאותו חוזה הוא pickLiveMeta ב־lib/liveMeta.js. */
 export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
   const src = (live && typeof live === "object" ? live : {}) as Partial<WaLiveState>;
-  return {
+  const out = {
     ...src,
     entriesCount: src.entriesCount ?? "",
     addAmt: src.addAmt || 50,
@@ -364,6 +369,13 @@ export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
        blank, אחרת כל כתיבת בוט מוחקת אותה, כמו שקרה ל־savings5 בעבר. */
     potDraft: typeof src.potDraft === "string" ? src.potDraft : "",
   } as WaLiveState;
+  /* חותמות הניסיון של גל 3ב (ממצא 10): מפתח חסר = לא נוסה מעולם, מפתח
+     עם חותמת = נוסה. ה־spread מעביר מהאובייקט השמור גם null מפורש —
+     מוחקים אותו, כדי שערב שלא נוסתה בו תזכורת לא יישא את המפתח בכלל
+     ולא ישנה צורה. חותמת אמיתית עוברת כמו שהיא. */
+  if (out.pendingRemindAttemptAt == null) delete out.pendingRemindAttemptAt;
+  if (out.bitIdleRemindAttemptAt == null) delete out.bitIdleRemindAttemptAt;
+  return out;
 }
 
 export const openPlayers = (state: WaLiveState): WaPlayer[] =>
