@@ -16,6 +16,7 @@ import {
   r2,
   renameEverywhere,
   stampBuyin,
+  stampedEventOf,
   undo,
 } from "./state";
 import { allClosedNote, closingStatus, finalSummary, snapshot } from "./summary";
@@ -225,7 +226,13 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         const p = state.players[already.index];
         const next = stampBuyin(state, p, item.amount, now);
         state.players[already.index] = next;
-        record.push({ t: "approve", name: p.name, pending: item, created: false });
+        record.push({
+          t: "approve",
+          name: p.name,
+          pending: item,
+          created: false,
+          ev: stampedEventOf(p, next),
+        });
         if (!state.approvedNames.includes(p.name)) state.approvedNames.push(p.name);
         acks.push(`${p.name} ${byGender(p.name, "אושר", "אושרה")} · +${item.amount}₪ · סה״כ ${next.buyin}₪`);
         continue;
@@ -469,7 +476,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     const next = stampBuyin(state, p, cmd.amount, now);
     const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
     state.players[found.index] = next;
-    record.push({ t: "add", name: p.name, delta });
+    record.push({ t: "add", name: p.name, delta, ev: stampedEventOf(p, next) });
     acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${next.buyin}₪`);
   }
 

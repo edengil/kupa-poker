@@ -59,6 +59,7 @@ export interface UndoEntry {
   name?: string;
   delta?: number;
   created?: boolean;
+  ev?: WaBuyinEvent;
   before?: string | number;
   amount?: number;
   tipId?: string | number;
@@ -170,6 +171,58 @@ export function stampBuyin(
   return { ...player, buyin, buyinEvents: events };
 }
 
+/** האירוע שחותמת הוסיפה לשחקן, אם הוסיפה — נרשם ברשומת הביטול של הפעולה
+ * כדי שהביטול יסיר בדיוק אותו אירוע (ולא אירוע זהה־סכום מהודעה אחרת). */
+export function stampedEventOf(before: WaPlayer, after: WaPlayer): WaBuyinEvent | undefined {
+  const b = before.buyinEvents || [];
+  const a = after.buyinEvents || [];
+  return a.length > b.length ? a[a.length - 1] : undefined;
+}
+
+/** מחסיר מ־savingsPot את ה־pot של כל אירועי שחקן שיוצא מהשולחן בביטול —
+ * שומר על האינווריאנט savingsPot = ‏Σ pot של כל האירועים החיים. */
+function unstampPlayerPots(state: WaLiveState, player: WaPlayer): void {
+  const sum = (player.buyinEvents || []).reduce((t, ev) => t + (Number(ev.pot) || 0), 0);
+  if (sum) state.savingsPot = r2((Number(state.savingsPot) || 0) - sum);
+}
+
+/** היפוך מדויק של חותמת על שחקן קיים: מסיר את האירוע שהחותמת הוסיפה
+ * ומחסיר את ה־pot שלו מ־savingsPot. זיהוי האירוע: קודם לפי צילום האירוע
+ * שנרשם בפעולה (amount+at+total), ובנפילה לאחור — לרשומות ישנות בלי
+ * צילום — לפי האירוע האחרון עם אותו סכום. */
+function unstampEvent(
+  state: WaLiveState,
+  player: WaPlayer,
+  entry: UndoEntry,
+  amount: number,
+): WaBuyinEvent[] {
+  const events = [...(player.buyinEvents || [])];
+  const snap = entry.ev;
+  const matches = (cand: WaBuyinEvent): boolean =>
+    snap
+      ? cand.amount === snap.amount && cand.at === snap.at && cand.total === snap.total
+      : cand.amount === amount;
+  let idx = -1;
+  for (let k = events.length - 1; k >= 0; k--) {
+    if (matches(events[k])) {
+      idx = k;
+      break;
+    }
+  }
+  if (idx === -1 && snap) {
+    for (let k = events.length - 1; k >= 0; k--) {
+      if (events[k].amount === amount) {
+        idx = k;
+        break;
+      }
+    }
+  }
+  if (idx === -1) return events;
+  const [removed] = events.splice(idx, 1);
+  if (removed.pot) state.savingsPot = r2((Number(state.savingsPot) || 0) - removed.pot);
+  return events;
+}
+
 export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
   return {
     entriesCount: live?.entriesCount ?? "",
@@ -208,12 +261,18 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): void {
     const i = state.players.findIndex((p) => p.name === e.name);
     if (i === -1) continue;
     if (e.t === "add") {
-      if (e.created) state.players.splice(i, 1);
-      else
+      if (e.created) {
+        unstampPlayerPots(state, state.players[i]);
+        state.players.splice(i, 1);
+      } else {
+        const p = state.players[i];
+        const delta = e.delta as number;
         state.players[i] = {
-          ...state.players[i],
-          buyin: r2((+state.players[i].buyin || 0) - (e.delta as number)),
+          ...p,
+          buyin: r2((+p.buyin || 0) - delta),
+          buyinEvents: delta > 0 ? unstampEvent(state, p, e, delta) : p.buyinEvents,
         };
+      }
     } else if (e.t === "out") {
       state.players[i] = { ...state.players[i], cashout: e.before };
     } else if (e.t === "tip") {
@@ -232,7 +291,22 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): void {
       );
     } else if (e.t === "approve") {
       const j = state.players.findIndex((p) => p.name === e.name);
-      if (e.created && j !== -1) state.players.splice(j, 1);
+      if (e.created && j !== -1) {
+        unstampPlayerPots(state, state.players[j]);
+        state.players.splice(j, 1);
+      } else if (!e.created && j !== -1) {
+        /* אישור לשחקן קיים הוסיף קנייה דרך החותמת — הופכים גם אותה:
+           חוב, אירוע חתום ו־pot, בדיוק כמו בביטול ריביי. */
+        const p = state.players[j];
+        const amount = e.pending?.amount ?? e.amount ?? 0;
+        if (amount > 0) {
+          state.players[j] = {
+            ...p,
+            buyin: Math.max(0, r2((+p.buyin || 0) - amount)),
+            buyinEvents: unstampEvent(state, p, e, amount),
+          };
+        }
+      }
       if (e.pending) state.pendingApprovals = [...(state.pendingApprovals || []), e.pending];
       state.approvedNames = (state.approvedNames || []).filter((n) => n !== e.name);
     } else if (e.t === "rename") {
