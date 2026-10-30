@@ -83,6 +83,57 @@ describe("publicShare", () => {
     expect(snapshotForViewer(out)).toEqual(out);
   });
 
+  it("גל 2ב: מזהה החותמת הפנימי (sid) של הבוט לא דולף לצופה — לא מהלייב ולא מערב שמור", () => {
+    const ev = { amount: 50, at: 1700000000000, total: 50, pot: 2.5, sid: "wamid.123:0" };
+    const snap = {
+      config: { shareHistory: true },
+      data: {
+        sessions: [
+          { id: "s1", iso: "2026-10-30", endedAt: 5, entries: [{ name: "עדן גיל", buyin: 50, buyinEvents: [ev] }] },
+        ],
+      },
+      live: { players: [{ name: "עדן גיל", buyin: 50, buyinEvents: [ev] }], cps: 2 },
+    };
+    const out = snapshotForViewer(snap);
+    expect(JSON.stringify(out)).not.toContain('"sid"');
+    expect(JSON.stringify(out)).not.toContain("wamid");
+    // שאר שדות האירוע — שכבר חשופים לצופה היום — נשארים כמו שהם
+    const kept = { amount: 50, at: 1700000000000, total: 50, pot: 2.5 };
+    expect(out.live.players[0].buyinEvents).toEqual([kept]);
+    expect(out.data.sessions[0].entries[0].buyinEvents).toEqual([kept]);
+    // אידמפוטנטי
+    expect(snapshotForViewer(out)).toEqual(out);
+  });
+
+  it("גל 2ב סבב 5: applied של הבוט (יומן ביטולים עם צילומי ev ו־sid) לא מגיע לצופה כלל", () => {
+    const ev = { amount: 50, at: 1700000000000, total: 50, pot: 2.5, sid: "wamid.123:0" };
+    const snap = {
+      config: { shareHistory: true },
+      data: { sessions: [] },
+      live: {
+        players: [{ name: "עדן גיל", buyin: 50, buyinEvents: [ev] }],
+        cps: 2,
+        applied: {
+          "wamid.123": [{ t: "add", name: "עדן גיל", delta: 50, created: true, ev }],
+          "wamid.456": [{ t: "approve", name: "עדן גיל", ev: { ...ev, sid: "wamid.456:0" } }],
+        },
+      },
+    };
+    const out = snapshotForViewer(snap);
+    // applied כולו בחוץ — לצופה אין בו שום שימוש, ובתוכו יושבים מזהי הודעות
+    expect("applied" in out.live).toBe(false);
+    const s = JSON.stringify(out.live);
+    expect(s).not.toContain('"sid"');
+    expect(s).not.toContain("wamid");
+    // שאר הלייב נשאר: שחקנים, cps, ושדות האירוע החשופים
+    expect(out.live.cps).toBe(2);
+    expect(out.live.players[0].buyinEvents).toEqual([{ amount: 50, at: 1700000000000, total: 50, pot: 2.5 }]);
+    // האובייקט המקורי לא נגעו בו — הבוט ממשיך לקרוא applied מהלייב הגולמי
+    expect(snap.live.applied["wamid.123"][0].ev.sid).toBe("wamid.123:0");
+    // אידמפוטנטי
+    expect(snapshotForViewer(out)).toEqual(out);
+  });
+
   it("גל 1: coupleFills של ערב שמור לא מגיע לצופה, בשני מצבי השיתוף", () => {
     const session = {
       id: "s1", iso: "2026-10-24", endedAt: 5, entries: [],

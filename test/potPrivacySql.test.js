@@ -23,6 +23,8 @@ const CHAIN = [
   "202610190001_pot_privacy.sql",
   "202610250001_mark_payment_projection_potpaid.sql",
   "202610300001_wave1_pot_privacy.sql",
+  "202610300002_wave2b_stamp_sid_privacy.sql",
+  "202610300003_wave2b_applied_privacy.sql",
 ];
 
 const POT_PLAN = JSON.stringify([
@@ -52,7 +54,11 @@ function potData() {
       },
       {
         id: "pot-night", iso: "2026-10-24", endedAt: 2000,
-        entries: [{ name: "עדן גיל" }, { name: "אורן גיל" }, { name: "נתנאל כהן" }],
+        entries: [
+          { name: "עדן גיל", buyinEvents: [{ amount: 550, at: 1700000000000, total: 550, pot: 27.5, sid: "wamid.NIGHT:0" }] },
+          { name: "אורן גיל" },
+          { name: "נתנאל כהן" },
+        ],
         savingsPot: 93, savingsPotActual: 70,
         coupleFills: [{ from: "עדן גיל", to: "אורן גיל", amount: 285 }],
         manualSettlement: { shortfall: { "אורן גיל": 13 }, frozenActual: 70 },
@@ -73,7 +79,23 @@ function potData() {
 
 function potLive() {
   return {
-    players: [{ name: "עדן גיל", buyin: 200, cashout: "" }],
+    players: [
+      {
+        name: "עדן גיל", buyin: 200, cashout: "",
+        buyinEvents: [{ amount: 200, at: 1700000000000, total: 200, pot: 10, sid: "wamid.LIVE:0" }],
+      },
+    ],
+    /* יומן הביטולים של הבוט: רשומות לפי מזהה הודעה, עם צילום ev שנושא sid */
+    applied: {
+      "wamid.AAA": [
+        { t: "add", name: "עדן גיל", delta: 200, created: true,
+          ev: { amount: 200, at: 1700000000000, total: 200, pot: 10, sid: "wamid.AAA:0" } },
+      ],
+      "wamid.BBB": [
+        { t: "approve", name: "עדן גיל", created: false,
+          ev: { amount: 50, at: 1700000001000, total: 250, pot: 2.5, sid: "wamid.BBB:0" } },
+      ],
+    },
     cps: 2,
     savingsPot: 25,
     potDraft: { amount: 93 },
@@ -212,6 +234,56 @@ describe("wave1 pot privacy SQL", () => {
       expectNoPotLeaks(rows[0].data, "mark response (hidden)");
       expect(rows[0].data.sessions).toHaveLength(1);
       expect(rows[0].data.sessions[0].id).toBe("pot-night");
+    } finally { await db.exec("reset role"); }
+  });
+
+  it("גל 2ב: sid של חותמת הבוט לא דולף לצופה — לא מהלייב ולא מערב שמור, האחסון שומר אותו", async () => {
+    await db.exec("set role authenticated");
+    try {
+      for (const slug of ["pot-link", "pot-hidden"]) {
+        const { rows } = await db.query(`select * from public_group($1)`, [slug]);
+        const row = rows[0];
+        const s = JSON.stringify(row);
+        expect(s, `${slug} leaks sid`).not.toContain('"sid"');
+        expect(s, `${slug} leaks wamid`).not.toContain("wamid");
+        /* שאר שדות האירוע נשארים — הם כבר חשופים לצופה היום */
+        expect(row.live.players[0].buyinEvents).toEqual([
+          { amount: 200, at: 1700000000000, total: 200, pot: 10 },
+        ]);
+        const night = row.data.sessions.find((x) => x.id === "pot-night");
+        expect(night.entries[0].buyinEvents).toEqual([
+          { amount: 550, at: 1700000000000, total: 550, pot: 27.5 },
+        ]);
+      }
+      /* ההקרנה בלבד: באחסון ה־sid נשאר — הבוט קורא אותו משם */
+      const st = await stored("pot-link");
+      expect(st.live.players[0].buyinEvents[0].sid).toBe("wamid.LIVE:0");
+      const storedNight = st.data.sessions.find((x) => x.id === "pot-night");
+      expect(storedNight.entries[0].buyinEvents[0].sid).toBe("wamid.NIGHT:0");
+    } finally { await db.exec("reset role"); }
+  });
+
+  it("גל 2ב סבב 5: applied של הבוט לא מגיע לצופה — לא ב־public_group, בשני מצבי השיתוף; האחסון שומר אותו", async () => {
+    await db.exec("set role authenticated");
+    try {
+      for (const slug of ["pot-link", "pot-hidden"]) {
+        const { rows } = await db.query(`select * from public_group($1)`, [slug]);
+        const row = rows[0];
+        expect(row.live, `${slug} viewer live must not carry applied`).not.toHaveProperty("applied");
+        const s = JSON.stringify(row);
+        expect(s, `${slug} leaks applied`).not.toContain('"applied"');
+        expect(s, `${slug} leaks sid`).not.toContain('"sid"');
+        expect(s, `${slug} leaks wamid`).not.toContain("wamid");
+        /* שאר הלייב נשאר — שחקנים ו־cps */
+        expect(row.live.players).toHaveLength(1);
+        expect(row.live.cps).toBe(2);
+        const v2 = (await db.query(`select * from public_group_v2($1)`, [slug])).rows[0];
+        expect(v2.live).toEqual(row.live);
+      }
+      /* ההקרנה בלבד: באחסון ה־applied נשאר מלא — הבוט צריך אותו למסירות חוזרות */
+      const st = await stored("pot-link");
+      expect(Object.keys(st.live.applied)).toEqual(["wamid.AAA", "wamid.BBB"]);
+      expect(st.live.applied["wamid.AAA"][0].ev.sid).toBe("wamid.AAA:0");
     } finally { await db.exec("reset role"); }
   });
 

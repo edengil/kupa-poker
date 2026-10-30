@@ -16,6 +16,7 @@ import {
   r2,
   renameEverywhere,
   stampBuyin,
+  stampedEventOf,
   undo,
 } from "./state";
 import { allClosedNote, closingStatus, finalSummary, snapshot } from "./summary";
@@ -23,7 +24,7 @@ import { helpText, ownerAskText } from "./help.js";
 
 export { helpText } from "./help.js";
 
-import type { UndoEntry, WaLiveState, WaPlayer } from "./state";
+import type { UndoEntry, WaLiveState } from "./state";
 
 export interface WaCmd {
   kind: string;
@@ -128,8 +129,14 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     };
   }
 
+  /* מסירה חוזרת/עריכה: מבטלים את מה שההודעה עשתה ומחילים מחדש. ה־undo
+     מחזיר מפת נחיתה (מזהה חותמת → שם נוכחי של השחקן) — ההחלה־מחדש של
+     פקודת קנייה נוחתת על השחקן שהביטול נגע בו, בשמו הנוכחי, ולא פותרת
+     את השם הגולמי מההודעה מחדש (זהות החותמת: מזהה הודעה + אינדקס פקודה,
+     יציבה בין ההחלה למסירה החוזרת של אותה הודעה). */
+  let retarget = new Map<string, string>();
   if (msgId && state.applied[msgId]) {
-    undo(state, state.applied[msgId] as UndoEntry[]);
+    retarget = undo(state, state.applied[msgId] as UndoEntry[]);
     delete state.applied[msgId];
   }
 
@@ -137,7 +144,9 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   const acks = [];
   const problems = [];
 
-  for (let cmd of cmds) {
+  for (let ci = 0; ci < cmds.length; ci++) {
+    let cmd = cmds[ci];
+    const sid = msgId ? `${msgId}:${ci}` : undefined;
     if (READ_ONLY.has(cmd.kind)) continue;
 
     if (cmd.kind === "tipNoName") {
@@ -219,30 +228,51 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         );
         continue;
       }
-      const already = findInState(state, item.name, aliases);
-      // 5% לקופה הצדדית — החוב נשאר מלא
-      const toPot = state.savings5 ? r2(item.amount * 0.05) : 0;
-      if (toPot > 0) state.savingsPot = r2((Number(state.savingsPot) || 0) + toPot);
+      /* החלה־מחדש של אישור: נוחתים על השחקן שהביטול נגע בו בשמו הנוכחי,
+         אם הוא עדיין בשולחן — לא על פתרון שם הממתין מחדש. */
+      const rtApproveName = sid ? retarget.get(sid) : undefined;
+      const rtApproveIdx = rtApproveName
+        ? state.players.findIndex((p) => p.name === rtApproveName)
+        : -1;
+      const already =
+        rtApproveIdx !== -1
+          ? { index: rtApproveIdx, resolved: rtApproveName as string }
+          : findInState(state, item.name, aliases);
+      // הקנייה עוברת דרך החותמת המרכזית — אירוע אחד, pot ו־savingsPot כמו באפליקציה
       if (already.index !== -1) {
         const p = state.players[already.index];
-        const buyin = r2((+p.buyin || 0) + item.amount);
-        const events = [...(p.buyinEvents || []), { amount: item.amount, at: now, total: buyin, pot: toPot || undefined }];
-        state.players[already.index] = stampBuyin({ ...p, buyin, buyinEvents: events }, item.amount, now);
-        record.push({ t: "approve", name: p.name, pending: item, created: false });
+        const next = stampBuyin(state, p, item.amount, now, sid);
+        state.players[already.index] = next;
+        record.push({
+          t: "approve",
+          name: p.name,
+          pending: item,
+          created: false,
+          ev: stampedEventOf(p, next),
+        });
         if (!state.approvedNames.includes(p.name)) state.approvedNames.push(p.name);
-        acks.push(`${p.name} ${byGender(p.name, "אושר", "אושרה")} · +${item.amount}₪ · סה״כ ${buyin}₪`);
+        acks.push(`${p.name} ${byGender(p.name, "אושר", "אושרה")} · +${item.amount}₪ · סה״כ ${next.buyin}₪`);
         continue;
       }
-      const seated = {
-        name: resolveAlias(item.name, aliases),
-        buyin: item.amount,
+      const fresh = {
+        /* שחקן שהביטול הסיר לגמרי (החותמה הייתה כל מה שהיה לו) נוצר מחדש
+           בשמו הנוכחי מהביטול, לא בשם הגולמי של הממתין. */
+        name: rtApproveName ?? resolveAlias(item.name, aliases),
+        buyin: 0,
         cashout: "",
-        buyinEvents: [{ amount: item.amount, at: now, total: item.amount, pot: toPot || undefined }],
+        buyinEvents: [],
       };
+      const seated = stampBuyin(state, fresh, item.amount, now, sid);
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
       if (!state.approvedNames.includes(seated.name)) state.approvedNames.push(seated.name);
-      record.push({ t: "approve", name: seated.name, pending: item, created: true });
+      record.push({
+        t: "approve",
+        name: seated.name,
+        pending: item,
+        created: true,
+        ev: stampedEventOf(fresh, seated),
+      });
       acks.push(
         `${seated.name} ${byGender(seated.name, "אושר · נכנס", "אושרה · נכנסה")} ב-${item.amount}₪`
       );
@@ -322,7 +352,13 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       continue;
     }
 
-    const found = findInState(state, cmd.name, aliases);
+    /* החלה־מחדש של פקודת קנייה: אם הביטול נגע בשחקן בשביל החותמת של
+       הפקודה הזו, מאתרים אותו בשמו הנוכחי ישירות — בלי findInState,
+       שפתרון הכינוי/הרחבת־השם שלו עלולים להחזיר שם ישן או אדם אחר. */
+    const rtName = cmd.kind === "add" && sid ? retarget.get(sid) : undefined;
+    const rtIdx = rtName ? state.players.findIndex((p) => p.name === rtName) : -1;
+    const found =
+      rtIdx !== -1 ? { index: rtIdx, resolved: rtName as string } : findInState(state, cmd.name, aliases);
     if (found.ambiguous) {
       problems.push(`${cmd.name} → ${found.ambiguous.join(" / ")}`);
       continue;
@@ -435,12 +471,15 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         problems.push(`${cmd.name} לא בשולחן`);
         continue;
       }
-      const name = found.resolved || resolveAlias(cmd.name, aliases);
+      /* החלה־מחדש שהביטול הסיר את השחקן לגמרי: יוצרים מחדש בשם הנוכחי
+         מהביטול ועוקפים את הסחת־הממתין — השחקן כבר הושב על ידי ההודעה
+         הזו עצמה, והשם המתוקן שלו לא חייב להיות ברשימת המוכרים. */
+      const name = rtName || found.resolved || resolveAlias(cmd.name, aliases);
       const extras = [
         ...(state.players || []).map((p) => p.name),
         ...(state.approvedNames || []),
       ];
-      if (!isKnownName(name, opts.knownNames, extras, aliases)) {
+      if (!rtName && !isKnownName(name, opts.knownNames, extras, aliases)) {
         const at = now;
         const existing = (state.pendingApprovals || []).find((p) => p.name === name);
         if (existing) {
@@ -455,27 +494,27 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         }
         continue;
       }
-      const seated = {
-        name,
-        buyin: cmd.amount,
-        cashout: "",
-        buyinEvents: [{ amount: cmd.amount, at: now, total: cmd.amount }],
-      };
+      const fresh = { name, buyin: 0, cashout: "", buyinEvents: [] };
+      const seated = stampBuyin(state, fresh, cmd.amount, now, sid);
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
-      record.push({ t: "add", name, delta: cmd.amount, created: true });
+      record.push({
+        t: "add",
+        name,
+        delta: cmd.amount,
+        created: true,
+        ev: stampedEventOf(fresh, seated),
+      });
       acks.push(`${name} ${byGender(name, "נכנס", "נכנסה")} ב-${cmd.amount}₪`);
       continue;
     }
 
     const p = state.players[found.index];
-    const buyin = Math.max(0, r2((+p.buyin || 0) + cmd.amount));
-    const delta = r2(buyin - (+p.buyin || 0));
-    let next: WaPlayer = { ...p, buyin };
-    if (delta > 0) next = stampBuyin(next, delta, now);
+    const next = stampBuyin(state, p, cmd.amount, now, sid);
+    const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
     state.players[found.index] = next;
-    record.push({ t: "add", name: p.name, delta });
-    acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${buyin}₪`);
+    record.push({ t: "add", name: p.name, delta, ev: stampedEventOf(p, next) });
+    acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${next.buyin}₪`);
   }
 
   if (!acks.length && !problems.length) return { live, reply: null };
