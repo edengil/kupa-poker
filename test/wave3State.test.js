@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { applyCommands, extractMessage } from "../lib/whatsapp.js";
-import { blank, playerPotSum } from "../lib/wa/state";
+import { blank, playerPotSum, undo } from "../lib/wa/state";
 import { pickLiveMeta } from "../lib/liveMeta.js";
 
 /* גל 3א — שלמות־מצב (ממצאי ביקורת 4־שארית, 5, 21, 22 + תצפיות גל 2):
@@ -463,5 +463,80 @@ describe("גל 3א — סבב תיקון: חותמת בלי מחזיק חי וב
     expect(live.players[0].name).toBe("קובי שני");
     expect(live.players[0].buyin).toBe(50);
     expectPotInvariant(live);
+  });
+});
+
+describe("גל 3א — סבב תיקון 3: החזרת צילום־הסרה לפי שקילות־זהות (פסילת בודק A)", () => {
+  it("הושבה קצרה, הסרה בשם מלא, תחייה קצרה: מסירת ההסרה מסירה את החי בפועל", () => {
+    // הושבה בשם קצר — השחקן יושב כ"דוד" (אין כינוי ל"דוד" לבדו).
+    let live = apply(null, [{ kind: "add", name: "דוד", amount: 100 }], "r3-c1");
+    expect(live.players.map((p) => p.name)).toEqual(["דוד"]);
+    expect(live.savingsPot).toBe(5);
+
+    // הסרה בשם המלא: החיפוש מרחיב את שם היושב (expandSeatedName),
+    // ורשומת ההסרה נשמרת עם צילום ששמו "דוד בני גיל" — צורת הייצור.
+    live = apply(live, [{ kind: "remove", name: "דוד בני גיל" }], "r3-rm");
+    expect(live.players).toHaveLength(0);
+    expect(live.savingsPot).toBe(0);
+    const snapName = live.applied["r3-rm"].find((e) => e.t === "remove").player.name;
+    expect(snapName).toBe("דוד בני גיל");
+
+    // תחייה: הודעת יצירה חדשה בשם הקצר מושיבה גלגול חי כ"דוד".
+    live = apply(live, [{ kind: "add", name: "דוד", amount: 100 }], "r3-c2");
+    expect(live.players.map((p) => p.name)).toEqual(["דוד"]);
+    expect(live.players[0].buyin).toBe(100);
+    expect(live.savingsPot).toBe(5);
+
+    // מסירה חוזרת של הודעת ההסרה. לפני התיקון דילוג־ההחזרה השווה שמות
+    // בשוויון מחרוזות ("דוד" ≠ "דוד בני גיל"), הצילום חזר כרפאים לצד
+    // החי, וההחלה־מחדש הסירה את הרפאים — האישור טען "הוסר מהשולחן"
+    // בעוד החי נשאר במשחק עם קנייה חיה.
+    const res = applyCommands(live, [{ kind: "remove", name: "דוד בני גיל" }], "r3-rm", 2, {
+      knownNames: known,
+      now: T0,
+    });
+    live = res.live;
+    expect(res.reply).toContain("הוסר");
+    expect(live.players).toHaveLength(0);
+    expect(live.savingsPot).toBe(0);
+    expectPotInvariant(live);
+  });
+
+  it("שקילות לא חד־משמעית: לא מנחשים אדם — הצילום מוחזר כמקודם", () => {
+    // שני יושבים ששניהם תואמי־קידומת לשם הצילום: findPlayer מחזיר
+    // ambiguous, ודילוג־ההחזרה לא חל — ההתנהגות הקיימת (החזרת הצילום)
+    // עדיפה על הסרת האדם הלא־נכון.
+    const state = blank(null);
+    state.players = [
+      {
+        name: "דוד",
+        buyin: 100,
+        cashout: "",
+        buyinEvents: [{ amount: 100, at: 1, total: 100, pot: 5 }],
+      },
+      {
+        name: "דוד ב",
+        buyin: 50,
+        cashout: "",
+        buyinEvents: [{ amount: 50, at: 2, total: 50, pot: 2.5 }],
+      },
+    ];
+    state.savingsPot = 7.5;
+    undo(state, [
+      {
+        t: "remove",
+        name: "דוד בני גיל",
+        at: 0,
+        player: {
+          name: "דוד בני גיל",
+          buyin: 100,
+          cashout: "",
+          buyinEvents: [{ amount: 100, at: 3, total: 100, pot: 5 }],
+        },
+      },
+    ]);
+    expect(state.players).toHaveLength(3);
+    expect(state.players[0].name).toBe("דוד בני גיל");
+    expect(state.savingsPot).toBe(12.5);
   });
 });
