@@ -8,6 +8,7 @@ import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
 import { r2, AL, canon, waSend } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, liveAlreadySaved } from "../../lib/liveMerge";
+import { pickLiveMeta } from "../../lib/liveMeta";
 import { applyManualTip, removeManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
@@ -168,17 +169,9 @@ export function LiveTab({
           if (typeof d.handOfNight === "string") setHandOfNight(d.handOfNight);
           if (Array.isArray(d.liveAnnounced)) setLiveAnnounced(d.liveAnnounced);
           if (d.planSnap && typeof d.planSnap === "object") setPlanSnap(d.planSnap);
-          liveMetaRef.current = {
-            applied: d.applied,
-            pending: d.pending,
-            closing: d.closing,
-            pendingApprovals: d.pendingApprovals,
-            approvedNames: d.approvedNames,
-            tipComplimentBag: d.tipComplimentBag,
-            tipComplimentLast: d.tipComplimentLast,
-            // שומרים ts קיים — לא לכתוב Date.now() בכל שמירה (גורם להבדל מול השרת)
-            ...(d.ts != null ? { ts: d.ts } : {}),
-          };
+          // מטא־הבוט נשמר כמו שהוא דרך pickLiveMeta — כולל חותמות
+          // התזכורות של הבוט, ששמירת אפליקציה בלי הן הייתה מאפסת (ממצא 5)
+          liveMetaRef.current = pickLiveMeta(d);
         } catch {}
       }
       if (alive) setHydrated(true);
@@ -239,6 +232,10 @@ export function LiveTab({
     setActionLog([]);
     setHandOfNight("");
     setPlanSnap(null);
+    /* ממצא 22: גם טיוטת הקופה ומטא־הלייב מתאפסים — בלעדיהם טיוטת הערב
+       הקודם הייתה נרשמת שוב בקופת הערב הבא, ו־applied ישן היה רוכב עליו. */
+    setPotDraft("");
+    liveMetaRef.current = {};
   }, [hydrated, startedAt, players.length, db?.sessions]);
 
   // שיא חי נשבר באמצע הערב → הכרזה בקבוצה פעם אחת לכל שיא+שחקן.
@@ -558,6 +555,10 @@ export function LiveTab({
     setTips([]);
     setCoupleFills([]);
     setActionLog([]);
+    /* ממצא 22: טיוטת הקופה ומטא־הלייב של הערב שנסגר לא עוברים הלאה —
+       טיוטה ישנה הייתה מתאמתת שוב כקופת הערב הבא בשמירתו. */
+    setPotDraft("");
+    liveMetaRef.current = {};
     setHandOfNight("");
     setPlanSnap(null);
     setMenuIdx(null);

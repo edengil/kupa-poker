@@ -11,8 +11,10 @@ import {
   blank,
   findInState,
   isKnownName,
+  MAX_APPLIED_RECORDS,
   openPlayers,
   pickPending,
+  playerPotSum,
   r2,
   renameEverywhere,
   stampBuyin,
@@ -42,6 +44,9 @@ export interface WaCmd {
 
 export interface WaApplyOpts {
   now?: number;
+  /* חותמת הזמן של ההודעה עצמה (מ־Whapi, במילישניות) — לשער המסירה
+     המאוחרת ב־applyCommandsCore. שונה מ־now, שהוא זמן העיבוד. */
+  msgTs?: number;
   lastSession?: Record<string, unknown> | null;
   knownNames?: Set<string> | string[] | null;
   [k: string]: unknown;
@@ -71,6 +76,24 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   const now = opts.now ?? Date.now();
   const aliases = aliasesOf(opts);
   const state = blank(live);
+
+  /* שער מסירה מאוחרת (ממצא 21): הלייב ריק לגמרי אבל חותמת ההודעה קודמת
+     לסוף הערב השמור האחרון — זו לא פתיחת ערב חדש אלא ניסיון־מסירה זקן
+     של Whapi להודעה מערב שכבר נסגר ונשמר. בלי השער היא הייתה פותחת
+     לייב רפאים עם שחקן אחד. סובלנות של דקה מול סטיות שעון בין Whapi
+     למכשיר; כשיש משחק פעיל השער לא חל — הדדופ של applied מטפל. */
+  const msgTs = Number(opts.msgTs) || 0;
+  const lastEndedAt = Number((opts.lastSession as { endedAt?: unknown } | null)?.endedAt) || 0;
+  if (
+    msgTs > 0 &&
+    lastEndedAt > 0 &&
+    msgTs < lastEndedAt - 60_000 &&
+    state.players.length === 0 &&
+    (state.pendingApprovals || []).length === 0
+  ) {
+    return { live, reply: null };
+  }
+
   const report = () =>
     buildReport({ players: state.players, entriesCount: state.entriesCount as string, startedAt: state.startedAt, cps });
 
@@ -135,8 +158,13 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
      את השם הגולמי מההודעה מחדש (זהות החותמת: מזהה הודעה + אינדקס פקודה,
      יציבה בין ההחלה למסירה החוזרת של אותה הודעה). */
   let retarget = new Map<string, string>();
+  /* הרשומה הקודמת של ההודעה נשמרת גם אחרי הביטול: ההחלה־מחדש צריכה
+     לדעת מה ההודעה עשתה קודם — בפרט אם היא יצרה בקשת־ממתין שכבר אושרה
+     (השער לפני החתמת הקנייה למטה). */
+  let prevRecord: UndoEntry[] | null = null;
   if (msgId && state.applied[msgId]) {
-    retarget = undo(state, state.applied[msgId] as UndoEntry[]);
+    prevRecord = state.applied[msgId] as UndoEntry[];
+    retarget = undo(state, prevRecord);
     delete state.applied[msgId];
   }
 
@@ -372,6 +400,13 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       const p = state.players[found.index];
       record.push({ t: "remove", name: p.name, at: found.index, player: p });
       state.players.splice(found.index, 1);
+      /* הסרה מפרקת גם את ה־pot שהשחקן צבר: savingsPot הוא סכום ה־pot של
+         האירועים החיים, ואירועיו של המוסר כבר לא חיים. בלעדיו הקופה
+         נשארת מנופחת, ומסירה חוזרת של הודעת היצירה מחזירה את השחקן עם
+         קופה כפולה מהאירועים (תצפית גל 2). ביטול ההסרה ב־undo מחזיר
+         את ה־pot יחד עם השחקן. */
+      const potSum = playerPotSum(p);
+      if (potSum) state.savingsPot = r2((Number(state.savingsPot) || 0) - potSum);
       acks.push(`${p.name} ${byGender(p.name, "הוסר", "הוסרה")} מהשולחן`);
       continue;
     }
@@ -427,7 +462,11 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       }
       const tipsGiven = r2((+p.tipsGiven || 0) + amount);
       let next = { ...p, tipsGiven };
+      /* צילום־לפני של היציאה כשהטיפ מוריד ממנה — הביטול ישחזר אותו
+         בדיוק (ממצא 4); בלי הצילום כל מסירה חוזרת הורידה מהיציאה שוב. */
+      let cashoutBefore: string | number | undefined;
       if (p.cashout !== "" && p.cashout != null) {
+        cashoutBefore = p.cashout;
         next.cashout = String(Math.max(0, (+p.cashout || 0) - amount));
       }
       state.players[found.index] = next;
@@ -440,6 +479,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         bagBefore,
         lastBefore,
         female,
+        ...(cashoutBefore !== undefined ? { cashoutBefore } : {}),
       });
       // BOT_MARK מתווסף אוטומטית על כל ack
       if (resolveAlias(p.name, aliases) === KOBI) acks.push(KOBI_TIP_OPENER);
@@ -483,13 +523,19 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         const at = now;
         const existing = (state.pendingApprovals || []).find((p) => p.name === name);
         if (existing) {
-          existing.amount = r2(existing.amount + cmd.amount);
-          existing.at = at;
-          record.push({ t: "pending", name, amount: cmd.amount, at });
-          acks.push(`${name} עדיין ממתין לאישור עדן · ${existing.amount}₪`);
+          /* צילום־לפני של הפריט: הביטול ישחזר amount/at בדיוק. ההתאמה
+             הישנה (amount מצטבר מול דלתא) מעולם לא פגעה, ולכן כל מסירה
+             חוזרת של הודעת ההגדלה ספרה אותה שוב (ממצא 4). */
+          const pendingBefore = { amount: existing.amount, at: existing.at };
+          const grown = { ...existing, amount: r2(existing.amount + cmd.amount), at };
+          state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
+            p === existing ? grown : p,
+          );
+          record.push({ t: "pending", name, amount: cmd.amount, at, pendingBefore });
+          acks.push(`${name} עדיין ממתין לאישור עדן · ${grown.amount}₪`);
         } else {
           state.pendingApprovals = [...(state.pendingApprovals || []), { name, amount: cmd.amount, at }];
-          record.push({ t: "pending", name, amount: cmd.amount, at });
+          record.push({ t: "pending", name, amount: cmd.amount, at, pendingBefore: null });
           acks.push(`שחקן חדש — מחכה לאישור עדן: ${name} · ${cmd.amount}₪`);
         }
         continue;
@@ -509,6 +555,27 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       continue;
     }
 
+    /* מסירה חוזרת של בקשת־ממתין שכבר אושרה והושיבה את השחקן (תצפית
+       גל 2): הביטול לא מצא ממתין — הוא נצרך באישור — והחלה רגילה הייתה
+       חותמת את סכום הבקשה שוב על השחקן היושב: קנייה כפולה וקופה כפולה
+       על אותה בקשה בדיוק. הבקשה כבר מומשה, אז לא נוגעים בכסף; רשומת
+       הבקשה המקורית נרשמת מחדש כמו שהיא, כדי שמסירה נוספת של אותה
+       הודעה תתנהג שוב בדיוק כך. */
+    if (cmd.kind === "add" && prevRecord && found.index !== -1) {
+      const seatedPlayer = state.players[found.index];
+      const prevPending = prevRecord.find(
+        (e) =>
+          e.t === "pending" &&
+          (e.name === seatedPlayer.name || resolveAlias(e.name || "", aliases) === seatedPlayer.name),
+      );
+      const stillPending = (state.pendingApprovals || []).some((pp) => pp.name === seatedPlayer.name);
+      if (prevPending && !stillPending) {
+        record.push(prevPending);
+        acks.push(`${seatedPlayer.name} כבר בשולחן · סה״כ ${seatedPlayer.buyin}₪`);
+        continue;
+      }
+    }
+
     const p = state.players[found.index];
     const next = stampBuyin(state, p, cmd.amount, now, sid);
     const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
@@ -519,7 +586,18 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
 
   if (!acks.length && !problems.length) return { live, reply: null };
 
-  if (msgId) state.applied[msgId] = record;
+  if (msgId) {
+    state.applied[msgId] = record;
+    /* גיזום יומן הביטולים (ממצא 21): בלי תקרה המפה צומחת לאורך כל ערב
+       וכל כתיבת לייב נושאת אותה. הוותיקות ביותר נושרות — חלון הביטול
+       המעשי של Whapi (ניסיונות־חוזרים ועריכות) קצר בהרבה מ־200 הודעות. */
+    const appliedIds = Object.keys(state.applied);
+    if (appliedIds.length > MAX_APPLIED_RECORDS) {
+      for (const oldId of appliedIds.slice(0, appliedIds.length - MAX_APPLIED_RECORDS)) {
+        delete state.applied[oldId];
+      }
+    }
+  }
   state.ts = Date.now();
   /* ביט חדש מאפס את תזכורת השקט — השעון מתחיל מחדש מפעילות אמיתית. */
   if (record.some((e) => e.t === "add" || e.t === "approve")) {
