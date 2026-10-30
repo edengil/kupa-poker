@@ -7,6 +7,8 @@ import { fmtGap } from "../../lib/poker/format";
 import { potOverview } from "../../lib/paymentTracking";
 import {
   autoShortfallMapForPot,
+  freezeShortfallMapFor,
+  isLegacySettlement,
   potRecordedFor,
   sessionHasBuyinChips,
   sessionHasPot,
@@ -32,8 +34,23 @@ export function withActual(s, v) {
   const nowIso = new Date().toISOString();
   if (ms?.frozenActual != null) {
     if (v <= 0) {
-      const { manualSettlement, ...rest } = next;
-      return rest;
+      if (ms.frozenReal) {
+        /* הוקפאה חלוקה אמיתית שעדן שמר (גל 2): משחררים רק את סימון
+           ההקפאה. המפה הקפואה נשארת — היא משחזרת בדיוק את אותם סכומי
+           שחקנים גם תחת הרשום, כך שהתוכנית לא זזה. */
+        const { frozenActual, frozenReal, ...msRest } = ms;
+        return { ...next, manualSettlement: msRest };
+      }
+      if (ms.frozenAuto || (ms.manualPayments || []).length === 0) {
+        /* מפה שהוקפאה אוטומטית לערב בלי חלוקה שמורה (כולל מפות שנוצרו
+           לפני שהוסף סימון frozenAuto) — מחיקת הבפועל משחררת את כולה
+           וחוזרים לחישוב האוטומטי. חלוקה אמיתית עם תשלומים ידניים
+           לעולם לא נמחקת כאן. */
+        const { manualSettlement, ...rest } = next;
+        return rest;
+      }
+      const { frozenActual, ...msRest } = ms;
+      return { ...next, manualSettlement: msRest };
     }
     return { ...next, manualSettlement: { ...ms, frozenActual: r2(v) } };
   }
@@ -50,11 +67,30 @@ export function withActual(s, v) {
           preferCreditors: [],
           shortfall: map,
           frozenActual: r2(v),
+          frozenAuto: true,
           settlementVersion: 2,
           settlementUpdatedAt: nowIso,
         },
       };
     }
+  }
+  if (ms && v > 0 && sessionHasPot(next) && !isLegacySettlement(next)) {
+    /* ממצא ביקורת 8: גם כשיש חלוקה ידנית בלי frozenActual — מקפיאים את
+       חלוקת הרשום כמפה מוחלטת (freezeShortfallMapFor, כולל התשלומים
+       הידניים בחשבון). בלעדיה שינוי סכום הקופה מזיז את חיתוך החוסר,
+       וסכומי השחקנים של המנהל (קופה = בפועל) ושל הצופה (קופה = רשום)
+       מתפצלים. עם המפה, רק שורת הקופה זזה. ערבי legacy יוצאים מהכלל:
+       ה־resolver שלהם לא כולל את הקופה כצד בחלוקה כלל. */
+    const map = freezeShortfallMapFor(s);
+    return {
+      ...next,
+      manualSettlement: {
+        ...ms,
+        ...(Object.keys(map).length ? { shortfall: map } : {}),
+        frozenActual: r2(v),
+        frozenReal: true,
+      },
+    };
   }
   return next;
 }
@@ -95,10 +131,12 @@ export function PotDashboard({ db, commit, isAdmin }) {
      היא משנה את סכום ההעברה לקופה בתוכנית (R3) — ורק אותו: סכומי השחקנים
      נשארים כפי שהיו תחת הרשום (כמו ב־24.10, שם המפה נכתבה מול 93 והבפועל
      70 שינה רק את שורת הקופה; ההפרש הוא עודף פנימי). צופה מחשב עם הרשום
-     בלבד (הבפועל פרטי למנהל), ולכן לערב בלי חלוקה שמורה "מקפיאים" את
-     חלוקת החוסר האוטומטית של הרשום כמפה ידנית (frozenActual) — כך מנהל
-     וצופה מקבלים אותם סכומי שחקנים בדיוק. מפה שעדן ערך בעצמו לא נוגעים
-     בה; מחיקת הבפועל משחררת מפה קפואה וחוזרת לחישוב האוטומטי. */
+     בלבד (הבפועל פרטי למנהל), ולכן "מקפיאים" את חלוקת החוסר של הרשום
+     כמפה ידנית (frozenActual) — לערב בלי חלוקה שמורה כחלוקה חדשה
+     אוטומטית (frozenAuto), ולערב עם חלוקה ידנית כמפה מחליפה בתוך אותה
+     חלוקה (frozenReal, ממצא ביקורת 8) — כך מנהל וצופה מקבלים אותם
+     סכומי שחקנים בדיוק. מחיקת הבפועל משחררת את ההקפאה: מפה אוטומטית
+     נמחקת כולה, וחלוקה אמיתית נשארת עם המפה הקפואה (אותם סכומים). */
   const savePotActual = (sessionId) => {
     const v = Number(actualValue);
     if (!Number.isFinite(v) || v < 0) {

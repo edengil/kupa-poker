@@ -192,6 +192,12 @@ describe("מודל הקופה — legacy נשמר", () => {
     const r = resolveSettlement(session);
     expect(r.mode).toBe("legacy");
     const plan = paymentPlan(session);
-    expect(plan.problems).toEqual([]);
+    // גל 2א, ממצא 3: ההעברות עצמן לא משתנות — כל הידניים נופלים גם בקוד
+    // החדש, בדיוק כמו פעם (התשלומים המשותפים חורגים מחוב הבסיס של עדן:
+    // פיצולים של 213 מול חוב 205). מה שהשתנה: ה־catch הריק הוחלף בדגל
+    // מפורש, והחלוקה כבר לא מוצגת למנהל כ"נקייה".
+    expect(plan.transfers.every((t) => !t.manual)).toBe(true);
+    expect(plan.problems).toHaveLength(1);
+    expect(plan.problems[0]).toContain("החלוקה הידנית לא נטענה");
   });
 });

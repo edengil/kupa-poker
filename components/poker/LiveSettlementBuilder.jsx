@@ -10,6 +10,7 @@ import {
   openingBalances,
   openingBalancesWithPot,
   editorBalancesWithPot,
+  applyManualShortfall,
   debtorsOf,
   creditorsOf,
   applyManualPayment,
@@ -75,15 +76,29 @@ export function LiveSettlementBuilder({
   // אחרי מפת החוסר השמורה אם יש, אחרת אחרי החלוקה האוטומטית לפי ההעדפה.
   // ככה תקרת ההעברה (maxPayable/ולידציית applyManualPayment) היא תמיד
   // min(חוב נותר, זכאות נטו נותרת) — אי אפשר לרשום מעבר למה שמגיע למקבל.
+  // מפת החוסר היא אובייקט prop — המפתח ל־useMemo הוא החתימה הטקסטואלית
+  // שלה (פרימיטיב יציב), לא זהות האובייקט שמשתנה בין רינדורים.
+  const shortfallKey = initialShortfall ? JSON.stringify(initialShortfall) : "";
   const opening = useMemo(
-    () =>
-      potAmount > 0
-        ? editorBalancesWithPot(players, cps, potAmount, POT_SINK_NAME, {
-            preferCreditors: prefer,
-            shortfallMap: initialShortfall,
-          })
-        : openingBalances(players, cps, { preferCreditors: prefer }),
-    [players, cps, prefer, potAmount, initialShortfall]
+    () => {
+      const shortfallMap = shortfallKey ? JSON.parse(shortfallKey) : undefined;
+      if (potAmount > 0) {
+        return editorBalancesWithPot(players, cps, potAmount, POT_SINK_NAME, {
+          preferCreditors: prefer,
+          shortfallMap,
+        });
+      }
+      const base = openingBalances(players, cps, { preferCreditors: prefer });
+      // ערב בלי־קופה עם מפת חוסר שמורה: תקרות העורך מול אותן יתרות
+      // שה־resolver מחיל (applyManualShortfall, דו־צדדי) — אחרת העורך
+      // מאשר תשלום מעבר לזכאות שאחרי המפה, וה־resolver זורק אותו
+      // (ממצא ביקורת 3).
+      if (shortfallMap && Object.keys(shortfallMap).length) {
+        return { ...base, balances: applyManualShortfall(base.balances, shortfallMap) };
+      }
+      return base;
+    },
+    [players, cps, prefer, potAmount, shortfallKey]
   );
 
   const [balances, setBalances] = useState(opening.balances);

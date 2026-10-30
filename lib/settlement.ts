@@ -78,6 +78,22 @@ const findByCoupleName = (names: string[], target: string): number => {
   return names.findIndex((n) => canonName(n) === t);
 };
 
+/**
+ * חלוקת סכום שלם בין משקלים באופן יחסי, בשקלים שלמים, תוך שמירת הסכום
+ * הכולל — המימוש האחד של "חלוקת חוסר יחסית" לכל המסלולים (settle של
+ * החלוקה, קיזוז חוסר־הג'יטונים בשמירת ערב). פעם היו שני מימושים לא
+ * שקולים (ממצא ביקורת 7). מחזיר חיתוכים שסכומם בדיוק
+ * min(totalCut, Σweights); כשהמשקלים שלמים, חיתוך לא עובר את משקלו.
+ */
+export function proportionalCuts(weights: number[], totalCut: number): number[] {
+  const ws = weights.map((w) => Math.max(0, +w || 0));
+  const total = ws.reduce((s, w) => s + w, 0);
+  const take = Math.min(Math.max(0, Math.round(+totalCut || 0)), total);
+  if (take <= 0 || total <= 0) return ws.map(() => 0);
+  const shares = ws.map((w) => (w / total) * take);
+  return roundPreservingSum(shares);
+}
+
 function roundPreservingSum(values: number[]): number[] {
   const floors = values.map(Math.floor);
   const target = r0(values.reduce((s, v) => s + v, 0));
@@ -139,8 +155,7 @@ export function settle(players: SettlePlayer[] = [], cps: number = CPS, opts: Se
       const totalWins = group.reduce((s, x) => s + Math.max(0, adjusted[x.i]), 0);
       if (totalWins <= 0) return amount;
       const take = Math.min(amount, totalWins);
-      const shares = group.map((x) => (Math.max(0, adjusted[x.i]) / totalWins) * take);
-      const cuts = roundPreservingSum(shares);
+      const cuts = proportionalCuts(group.map((x) => Math.max(0, adjusted[x.i])), take);
       group.forEach((x, k) => {
         adjusted[x.i] -= cuts[k];
       });
