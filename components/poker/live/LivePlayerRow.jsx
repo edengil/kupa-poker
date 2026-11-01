@@ -47,6 +47,7 @@ export function LivePlayerRow({
   addManualTip,
   deleteManualTip,
   bump,
+  editBuyin,
   addAmt,
   rm,
   setField,
@@ -69,6 +70,18 @@ export function LivePlayerRow({
   const partnerShort = partnerName ? shortCoupleName(partnerName) : "";
   const meShort = shortCoupleName(p.name);
   const shownTip = tipShownFor(p, tips, A);
+  /* עריכה ישירה של סכום הקנייה: null = תצוגה רגילה; מחרוזת = טיוטה בעורך */
+  const [buyinDraft, setBuyinDraft] = React.useState(null);
+  const buyinCancelRef = React.useRef(false);
+  const commitBuyinDraft = () => {
+    if (buyinCancelRef.current) {
+      buyinCancelRef.current = false;
+      setBuyinDraft(null);
+      return;
+    }
+    if (buyinDraft !== null) editBuyin(i, buyinDraft);
+    setBuyinDraft(null);
+  };
   return (
     <React.Fragment key={p.name + ":" + i}>
     {showGap && (
@@ -454,15 +467,51 @@ export function LivePlayerRow({
             <Minus size={14} />
           </RoundBtn>
           <div style={{ textAlign: "center", minWidth: 70 }}>
-            <div
-              style={{
-                fontVariantNumeric: "tabular-nums",
-                fontWeight: 700,
-                fontSize: 15,
-              }}
-            >
-              {+p.buyin || 0}₪
-            </div>
+            {buyinDraft === null ? (
+              <div
+                data-testid={`live-buyin-amount-${p.name}`}
+                title="לחיצה לעריכת הסכום"
+                onClick={() => {
+                  buyinCancelRef.current = false;
+                  setBuyinDraft(String(+p.buyin || 0));
+                }}
+                style={{
+                  fontVariantNumeric: "tabular-nums",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: "pointer",
+                }}
+              >
+                {+p.buyin || 0}₪
+              </div>
+            ) : (
+              <input
+                data-testid={`live-buyin-input-${p.name}`}
+                type="number"
+                inputMode="decimal"
+                autoFocus
+                value={buyinDraft}
+                onChange={(e) => setBuyinDraft(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onBlur={commitBuyinDraft}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    buyinCancelRef.current = true;
+                    setBuyinDraft(null);
+                  }
+                }}
+                aria-label={`עריכת קנייה ${p.name}`}
+                style={{
+                  ...inputStyle,
+                  width: 70,
+                  textAlign: "center",
+                  padding: "4px 6px",
+                  fontSize: 15,
+                  fontWeight: 700,
+                }}
+              />
+            )}
             <div
               style={{
                 fontSize: 10.5,

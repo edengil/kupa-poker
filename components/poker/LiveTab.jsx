@@ -12,6 +12,7 @@ import { pickLiveMeta } from "../../lib/liveMeta";
 import { applyManualTip, removeManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
+import { parseBuyinEditInput, applyBuyinEdit } from "../../lib/liveBuyinEdit";
 import { buildPlayersView, playerChips, effectivePot } from "../../lib/liveView";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
 import { notifyTransfersSettlement } from "../../lib/poker/notifyTransfersClient";
@@ -350,6 +351,29 @@ export function LiveTab({
         id: Date.now(),
       });
     }
+  };
+  /* עריכה ישירה של סכום הקנייה (הקשה על הסכום בכרטיס) — תיקון רישום:
+     בלי חלון בקשת תשלום ובלי אירוע קנייה חדש; היומן שומר צילום "לפני"
+     כדי שביטול ישחזר בדיוק. קלט לא תקין / ערך זהה → בלי שינוי ובלי יומן. */
+  const editBuyin = (i, raw) => {
+    const p = players[i];
+    if (!p) return;
+    const parsed = parseBuyinEditInput(raw);
+    if (!parsed.ok) return;
+    const prev = r2(+p.buyin || 0);
+    if (parsed.value === prev) return;
+    const before = {
+      buyin: prev,
+      buyinEvents: Array.isArray(p.buyinEvents)
+        ? p.buyinEvents.map((e) => ({ ...e }))
+        : p.buyinEvents,
+    };
+    setPlayers((list) =>
+      list.map((x, j) => (j === i ? applyBuyinEdit(x, parsed.value, { savings5 }) : x))
+    );
+    setActionLog((log) =>
+      appendAction(log, { t: "buyinEdit", name: p.name, before, after: parsed.value })
+    );
   };
   const setField = (i, patch) =>
     setPlayers((p) =>
@@ -713,6 +737,7 @@ export function LiveTab({
                 addManualTip={addManualTip}
                 deleteManualTip={deleteManualTip}
                 bump={bump}
+                editBuyin={editBuyin}
                 addAmt={addAmt}
                 rm={rm}
                 setField={setField}
