@@ -94,12 +94,12 @@ function PotRow({ session, potTransfer, potPaid, busy, markPot, editingPot, setE
               onChange={(e) => setPotValue(e.target.value)}
               style={{
                 width: 70,
-                padding: "2px 6px",
+                padding: "0px 6px",
                 borderRadius: 6,
                 border: `1px solid ${C.line}`,
                 background: C.felt,
                 color: C.cream,
-                fontSize: 12,
+                fontSize: 16,
               }}
             />
             <button

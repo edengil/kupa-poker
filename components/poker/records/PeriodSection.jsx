@@ -34,8 +34,8 @@ export function PeriodSection({ db, periods, periodKind, setPeriodKind, effMonth
           color: C.cream,
           border: `1px solid ${C.line}`,
           borderRadius: 10,
-          padding: "10px 12px",
-          fontSize: 14,
+          padding: "9px 12px",
+          fontSize: 16,
           fontFamily: "inherit",
         }}
       >
@@ -53,8 +53,8 @@ export function PeriodSection({ db, periods, periodKind, setPeriodKind, effMonth
           color: C.cream,
           border: `1px solid ${C.line}`,
           borderRadius: 10,
-          padding: "10px 12px",
-          fontSize: 14,
+          padding: "9px 12px",
+          fontSize: 16,
           fontFamily: "inherit",
         }}
       >

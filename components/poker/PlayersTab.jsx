@@ -96,9 +96,9 @@ export function PlayersTab({ db, onPlayer }) {
     color: C.cream,
     border: `1px solid ${C.line}`,
     borderRadius: 999,
-    padding: "6px 10px",
+    padding: "4px 10px",
     fontFamily: "inherit",
-    fontSize: 13,
+    fontSize: 16,
   };
 
   return (

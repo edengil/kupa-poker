@@ -127,7 +127,7 @@ export function SessionEditSheet({ db, session, commit, onClose }) {
             border: `1px solid ${C.brass}66`,
             borderRadius: 12,
             padding: 14,
-            fontSize: 15,
+            fontSize: 16,
             lineHeight: 1.6,
             fontFamily: "inherit",
           }}
