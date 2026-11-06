@@ -9,6 +9,7 @@ import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetS
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
 import { updateGroupCas } from "../lib/groupCas";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
+import { resolveRootLanding } from "../lib/rootLanding";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import InstallButton from "./InstallButton";
@@ -297,38 +298,28 @@ export default function OwnerApp() {
       const user = sessionData.session?.user;
       if (!user) return;
 
-      // אימות מול המסד — גם במסלול המהיר, ליישור המטמון
-      const { data: rows, error } = await supabase
-        .from("groups")
-        .select("id, slug, name")
-        .eq("owner_id", user.id)
-        .order("created_at", { ascending: true })
-        .limit(1);
+      // אימות מול המסד — גם במסלול המהיר, ליישור המטמון.
+      // ההכרעה בעלים/צופה/קבוצה־ראשונה חיה ב־resolveRootLanding (נבדקת שם):
+      // בעלים עולה כרגיל; צופה בלי קבוצה בבעלותו מנותב לקבוצה שצפה בה,
+      // וקבוצה חדשה נוצרת רק למשתמש בלי שום שיוך.
+      const landing = await resolveRootLanding(supabase, user.id, newSlug);
 
-      if (error) {
+      if (landing.kind === "error") {
         if (alive && !cachedRow) {
-          setMessage(error.message);
+          setMessage(landing.message);
           setPhase("error");
         }
         return;
       }
 
-      let row = rows?.[0];
-      if (!row) {
-        const { data: created, error: insertError } = await supabase
-          .from("groups")
-          .insert({ owner_id: user.id, slug: newSlug() })
-          .select("id, slug, name")
-          .single();
-        if (insertError) {
-          if (alive && !cachedRow) {
-            setMessage(insertError.message);
-            setPhase("error");
-          }
-          return;
-        }
-        row = created;
+      if (landing.kind === "viewer") {
+        // נוחתים על אותו משטח צפייה שהוא מכיר מהדפדפן — לא על מסך מנהלים
+        // ריק. זה גם נתיב הפתיחה של האפליקציה המותקנת (start_url="/").
+        if (alive) window.location.replace(`/g/${landing.slug}`);
+        return;
       }
+
+      const row = landing.row;
 
       try {
         localStorage.setItem(cacheKey, JSON.stringify(row));

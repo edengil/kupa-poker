@@ -460,6 +460,28 @@ $$;
 revoke all on function public.public_group_v2(text) from public, anon;
 grant execute on function public.public_group_v2(text) to authenticated;
 
+-- נחיתת צופה מהשורש: ה־slug (והשם) של הקבוצה מהצפייה האחרונה של הקורא
+-- ב־group_views. השורש מנתב לפי זה צופה בלי קבוצה בבעלותו למשטח הצפייה
+-- של הקבוצה — במקום ליצור לו קבוצה חדשה וריקה. מסנן לפי auth.uid() בלבד;
+-- ה־slug נשלף דרך group_id, כך שסיבוב לינק לא שובר את הניתוב.
+create or replace function public.my_last_viewed_group()
+returns table (slug text, name text)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select g.slug, g.name
+  from public.group_views gv
+  join public.groups g on g.id = gv.group_id
+  where gv.user_id = auth.uid()
+  order by gv.at desc, gv.id desc
+  limit 1;
+$$;
+
+revoke all on function public.my_last_viewed_group() from public, anon;
+grant execute on function public.my_last_viewed_group() to authenticated;
+
 -- Viewers mark settlement transfers paid without full group write access.
 drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text);
 drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text, text);
