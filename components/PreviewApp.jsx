@@ -1,26 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import PokerApp from "./PokerApp";
 import { configureStore } from "../lib/store";
 import { buildSeedDb } from "../lib/poker/seed";
 
 const PREFIX = "poker:preview:";
 
+/* מנוי שאינו משתנה לעולם — לקריאת "האם אנחנו בלקוח אחרי hydration"
+   דרך useSyncExternalStore, כמו ב־PushPrompt. */
+const subscribeNever = () => () => {};
+
 /**
  * סביבת בדיקה מקומית.
  * ?failFlush=1 — set מצליח מקומית אבל flush נכשל (סימולציית ניתוק מהשרת).
  */
 export default function PreviewApp({ failFlush = false, viewerName = "" }) {
-  // הגדרת החנות פעם אחת באתחול ה־state (אפקט+setReady היה דפוס סנכרון מיותר).
-  const [ready] = useState(() => {
-    if (typeof window === "undefined") return false;
+  /* מימוש החנות נבנה פעם אחת באתחול state (בלי תופעות לוואי — רק סגירות
+     מעל localStorage, שלא נקראות בשרת כי החנות מוגדרת רק בלקוח). */
+  const [impl] = useState(() => {
     const defaults = {
       "poker:db": JSON.stringify(buildSeedDb()),
       "poker:config": JSON.stringify({ chipsPerShekel: 2, defaultBuyin: 50, botOn: false }),
     };
     let pending = false;
-    configureStore({
+    return {
       get: async (key) => localStorage.getItem(PREFIX + key) ?? defaults[key] ?? null,
       set: async (key, value) => {
         localStorage.setItem(PREFIX + key, value ?? "");
@@ -36,9 +40,16 @@ export default function PreviewApp({ failFlush = false, viewerName = "" }) {
         return true;
       },
       hasPending: () => pending,
-    });
-    return true;
+    };
   });
+  /* העץ הראשון חייב להיות זהה בשרת ובלקוח (רק הבאנר): אתחול ready שהסתעף
+     על typeof window נתן בשרת עץ בלי PokerApp ובלקוח עם PokerApp — שגיאת
+     hydration ובניית העץ מחדש בלקוח בכל טעינה. במקום זה: צילום־שרת false
+     וצילום־לקוח true ב־useSyncExternalStore; המעבר קורה אחרי ה־hydration,
+     בלי שגיאה ובלי setState באפקט. הגדרת החנות ברינדור הראשון שבו
+     mounted=true — לפני ש־PokerApp קיים בעץ וטוען נתונים ממנה. */
+  const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
+  if (mounted) configureStore(impl);
 
   return (
     <>
@@ -50,7 +61,7 @@ export default function PreviewApp({ failFlush = false, viewerName = "" }) {
         סביבת בדיקה מקומית · השינויים נשמרים בדפדפן בלבד · אין לשלוח הודעות לקבוצה
         {failFlush ? " · סימולציית כשל שמירה לשרת" : ""}
       </div>
-      {ready && (
+      {mounted && (
         <PokerApp viewerAuth={viewerName ? { full_name: viewerName } : null} />
       )}
     </>
