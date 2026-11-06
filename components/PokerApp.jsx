@@ -180,6 +180,28 @@ function App({
   const [profile, setProfile] = useState(null);
   const dbRawRef = useRef(null); // המחרוזת האחרונה שאומצה מהחנות — דילוג על אימוץ כפול של אותו תוכן
   const readyRef = useRef(false); // אימוץ מרוחק פעיל רק אחרי שהטעינה הראשונה הושלמה
+  /* אימוץ מרוחק שקט: רענון רקע הנחית DB חדש במטמון החנות (סימון שולם של
+     צופה דרך RPC, מיזוג נתונים ב־flush, אימות רקע) והמפתח פורסם — מאמצים
+     את הערך החדש למצב במקום. בלי זה העץ כולו היה מורכב מחדש על כל עדכון
+     מבחוץ: הבהוב, מסך טעינה, איבוד גלילה ומצב חולף. */
+  const adoptRemoteDb = useCallback(async () => {
+    if (!readyRef.current) return;
+    const raw = await store.get(DB_KEY);
+    if (raw == null || raw === dbRawRef.current) return;
+    let parsed;
+    try {
+      parsed = parseStoredDb(raw);
+    } catch {
+      return; // נתון מרוחק לא תקין — נשארים עם מה שעל המסך
+    }
+    dbRawRef.current = raw;
+    setDb(parsed.db);
+    if (parsed.filled && !readOnly) {
+      const written = JSON.stringify(parsed.db);
+      dbRawRef.current = written;
+      store.set(DB_KEY, written);
+    }
+  }, [readOnly]);
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -204,6 +226,11 @@ function App({
           dbRawRef.current = written;
           store.set(DB_KEY, written);
         }
+        /* אימות־הרקע של ה־boot עלול היה להנחית DB טרי במטמון ולפרסם אותו
+           שבריר לפני שהטעינה הסתיימה — אותו אימוץ חזר מוקדם כי readyRef
+           עוד היה כבוי, והפרסום הוא חד־פעמי. קריאת ההשלמה כאן קולטת את
+           מה שכבר יושב במטמון; dbRawRef מסנן כפילות כשלא השתנה דבר. */
+        void adoptRemoteDb();
       }
     })().catch((error) => {
       if (alive) setLoadError(error.message);
@@ -212,34 +239,12 @@ function App({
       alive = false;
       readyRef.current = false;
     };
-  }, [readOnly]);
-  /* אימוץ מרוחק שקט: רענון רקע הנחית DB חדש במטמון החנות (סימון שולם של
-     צופה דרך RPC, מיזוג נתונים ב־flush, אימות רקע) והעוטף פרסם את המפתח —
-     מאמצים את הערך החדש למצב במקום. בלי זה העץ כולו היה מורכב מחדש על כל
-     עדכון מבחוץ: הבהוב, מסך טעינה, איבוד גלילה ומצב חולף. */
+  }, [readOnly, adoptRemoteDb]);
   useEffect(() => {
-    const adopt = async () => {
-      if (!readyRef.current) return;
-      const raw = await store.get(DB_KEY);
-      if (raw == null || raw === dbRawRef.current) return;
-      let parsed;
-      try {
-        parsed = parseStoredDb(raw);
-      } catch {
-        return; // נתון מרוחק לא תקין — נשארים עם מה שעל המסך
-      }
-      dbRawRef.current = raw;
-      setDb(parsed.db);
-      if (parsed.filled && !readOnly) {
-        const written = JSON.stringify(parsed.db);
-        dbRawRef.current = written;
-        store.set(DB_KEY, written);
-      }
-    };
     return subscribeStoreKey(DB_KEY, () => {
-      void adopt();
+      void adoptRemoteDb();
     });
-  }, [readOnly]);
+  }, [adoptRemoteDb]);
   const commit = useCallback(
     (n) => {
       if (readOnly) return;

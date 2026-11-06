@@ -32,7 +32,26 @@ vi.mock("../lib/poker/notifyTransfersClient", () => ({
 }));
 vi.mock("../components/Logo", () => ({ EGFooter: () => null }));
 vi.mock("../components/poker/chrome", () => ({
-  Header: () => null,
+  /* כותרת מינימלית שמשקפת את חוזה הבאדג' האמיתי (chrome.jsx): כפתור
+     התראות עם מונה לא־נצפו — כדי שבדיקת ה־seen תוכל ללחוץ ולמדוד. */
+  Header: (p) =>
+    React.createElement(
+      "div",
+      null,
+      p.onOpenNotices
+        ? React.createElement(
+            "button",
+            { "data-testid": "notifications-button", onClick: p.onOpenNotices },
+            p.noticeCount > 0
+              ? React.createElement(
+                  "span",
+                  { "data-testid": "notifications-count" },
+                  String(p.noticeCount)
+                )
+              : null
+          )
+        : null
+    ),
   TabBar: () => null,
   Style: () => null,
   TABBAR_H: 0,
@@ -127,11 +146,13 @@ import PokerApp from "../components/PokerApp.jsx";
 import { LiveTab } from "../components/poker/LiveTab.jsx";
 import {
   configureStore,
+  makeSupabaseStore,
   publishStoreKey,
   seedStoreLive,
   DB_KEY,
   LIVE_KEY,
 } from "../lib/store.js";
+import { buildSeedDb } from "../lib/poker/seed.js";
 
 const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
@@ -310,5 +331,88 @@ describe("אימוץ מרוחק שקט — רכיבים", () => {
     expect(cashout()).toBe("450"); // יציאת הבוט על המסך בלי רענון ידני
     expect(nameInput.value).toBe("דן"); // טיוטת השם שרדה — לא הייתה הרכבה מחדש
     expect(sentinel.rowMounts).toBe(1); // שורת השחקן לא עלתה מחדש
+  });
+
+  it("אתחול קר: DB טרי מהשרת מגיע למסך מהמטמון הישן — בלי הרכבה מחדש (רגרסיית בודק)", async () => {
+    /* התרחיש המדויק מהפסילה: מטמון מקומי ישן (ערב אחד), ובשרת DB חדש
+       יותר (שני ערבים — כתיבות רקע/לילה). האפליקציה עולה מיד מהמקומי,
+       ואימות־הרקע של ה־boot חייב לאמץ את הטרי למסך במקום. על הקוד
+       שנפסל האימות החליף את מטמון החנות אבל לא פרסם — והמסך נשאר ישן. */
+    localStorage.clear();
+    localStorage.setItem("poker:cache:g-boot:data", DB_V1);
+    const row = {
+      data: JSON.parse(DB_V2),
+      config: { chipsPerShekel: 2, defaultBuyin: 50, botOn: false },
+      live: null,
+    };
+    const api = {
+      from: () => ({
+        select: (cols) => ({
+          eq: () => ({
+            single: async () => {
+              if (cols === "data") return { data: { data: row.data }, error: null };
+              if (cols === "config") return { data: { config: row.config }, error: null };
+              if (cols === "live") return { data: { live: row.live }, error: null };
+              return { data: { ...row, updated_at: "2026-01-01T00:00:00.000Z" }, error: null };
+            },
+          }),
+        }),
+      }),
+      rpc: async () => ({ data: "2026-01-01T00:00:00.000Z", error: null }),
+    };
+    const onStale = vi.fn();
+    configureStore(makeSupabaseStore(api, "g-boot", { onStale }));
+
+    await act(async () => {
+      root.render(React.createElement(PokerApp));
+      await tick(120);
+    });
+    const marker = () => container.querySelector('[data-testid="db-marker"]')?.textContent;
+    expect(marker()).toBe("sessions:2"); // הטרי מהשרת על המסך
+    expect(sentinel.tableMounts).toBe(1); // בלי הרכבה מחדש של העץ
+    expect(container.textContent).not.toContain("טוען");
+    expect(onStale).not.toHaveBeenCalled(); // boot שקט — ניסוי H נשמר
+    localStorage.clear();
+  });
+
+  it("באדג' התראות: נצפה נשמר גם אחרי הרכבה מחדש לצופה בלי שם (רגרסיית בודק)", async () => {
+    /* שחזור יחידני של ספק הקצה notifications-seen: צופה בלי שם מזוהה
+       (viewerName=null) פותח את המגירה — ה־id-ים נשמרים באחסון — ובהרכבה
+       הבאה (רענון) הבאדג' חייב להישאר 0. על הקוד הישן מעקב ה־seenFor
+       אותחל ל־null, זהה ל־viewerName של צופה בלי שם, וטעינת ה"נצפה"
+       מעולם לא נורתה — הבאדג' קם לתחייה בכל רענון. */
+    localStorage.clear();
+    configureStore(memoryImpl({ [DB_KEY]: JSON.stringify(buildSeedDb()) }));
+    const badge = () => container.querySelector('[data-testid="notifications-count"]');
+
+    await act(async () => {
+      root.render(React.createElement(PokerApp));
+      await tick(120);
+    });
+    expect(badge()).toBeTruthy();
+    expect(Number(badge().textContent)).toBeGreaterThan(0);
+
+    await act(async () => {
+      container
+        .querySelector('[data-testid="notifications-button"]')
+        .dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+      await tick();
+    });
+    expect(badge()).toBeNull(); // נצפה — הבאדג' מתאפס
+
+    /* הרכבה מחדש על אותו אחסון — כמו reload */
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root.render(React.createElement(PokerApp));
+      await tick(120);
+    });
+    expect(badge()).toBeNull(); // הנצפה נטען מהאחסון — הבאדג' לא קם לתחייה
+    localStorage.clear();
   });
 });
