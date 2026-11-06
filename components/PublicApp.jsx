@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
 import AppErrorBoundary from "./AppErrorBoundary";
 import { getSupabase } from "../lib/supabaseClient";
-import { configureStore, makeReadOnlyStore } from "../lib/store";
+import { configureStore, makeReadOnlyStore, publishStoreKey, DB_KEY } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
 import { PushPrompt } from "./PushPrompt";
@@ -42,18 +42,20 @@ export default function PublicApp({ slug, nightId = null }) {
   const [plan, setPlan] = useState(null);
   const [fresh, setFresh] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const [generation, setGeneration] = useState(0);
   const [viewerAuth, setViewerAuth] = useState(null);
   const [groupData, setGroupData] = useState(null);
   const [pubConfig, setPubConfig] = useState({});
   const dataRef = useRef(null);
   const loggedRef = useRef(false);
   const visitRef = useRef(null); // מעדכן את שורת הביקור: יציאה וטאבים
-  const tabRef = useRef("table"); // רענון נתונים לא מחזיר את הצופה לטבלה
-  const [tabSnapshot, setTabSnapshot] = useState("table"); // צילום הטאב ברענון — initialTab בלי קריאת ref ברינדור
-  const bumpGeneration = () => {
-    setTabSnapshot(tabRef.current);
-    setGeneration((g) => g + 1);
+  const tabRef = useRef("table"); // מעקב טאבים ליומן הביקור
+  /* אין הרכבה מחדש על רענון: אחרי החלפת תמונת החנות מפרסמים את מפתח
+     ה־DB, ו־PokerApp מאמצת את הנתונים החדשים למצב במקום — הטאב, הגלילה
+     והגיליונות הפתוחים של הצופה שורדים כל עדכון. */
+  const adoptInPlace = () => {
+    publishStoreKey(DB_KEY);
+    setFresh(true);
+    setTimeout(() => setFresh(false), 2500);
   };
 
   const load = useCallback(async () => {
@@ -101,9 +103,7 @@ export default function PublicApp({ slug, nightId = null }) {
     const serialized = JSON.stringify([snap.data, snap.config]);
     if (serialized !== dataRef.current) {
       apply(snap);
-      bumpGeneration();
-      setFresh(true);
-      setTimeout(() => setFresh(false), 2500);
+      adoptInPlace();
     }
     return snap;
   }, [supabase, slug]);
@@ -140,9 +140,9 @@ export default function PublicApp({ slug, nightId = null }) {
       });
       bootViewerStore(snap);
       dataRef.current = JSON.stringify([snap.data, pubConfig]);
-      bumpGeneration();
-      setFresh(true);
-      setTimeout(() => setFresh(false), 2500);
+      /* הסימון נחת בשרת — מאמצים את התמונה החדשה למסך במקום; המסך לא
+         מתרענן בגלוי והצופה נשאר בדיוק איפה שהיה */
+      adoptInPlace();
       try {
         localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap }));
       } catch {}
@@ -178,9 +178,7 @@ export default function PublicApp({ slug, nightId = null }) {
       });
       bootViewerStore(snap);
       dataRef.current = JSON.stringify([snap.data, pubConfig]);
-      bumpGeneration();
-      setFresh(true);
-      setTimeout(() => setFresh(false), 2500);
+      adoptInPlace();
       try {
         localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap }));
       } catch {}
@@ -268,9 +266,7 @@ export default function PublicApp({ slug, nightId = null }) {
     if (serialized !== dataRef.current) {
       dataRef.current = serialized;
       bootViewerStore(next);
-      bumpGeneration();
-      setFresh(true);
-      setTimeout(() => setFresh(false), 2500);
+      adoptInPlace();
     }
   }, [supabase, slug]);
 
@@ -365,10 +361,8 @@ export default function PublicApp({ slug, nightId = null }) {
 
       <AppErrorBoundary>
       <PokerApp
-        key={generation}
         readOnly
         viewerAuth={viewerAuth}
-        initialTab={tabSnapshot}
         onMarkPayment={markPayment}
         onVotePlayer={votePlayer}
         focusSessionId={nightId}

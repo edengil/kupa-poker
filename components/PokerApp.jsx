@@ -6,8 +6,8 @@
    לוגיקה ב-lib/poker, ומסכים ב-components/poker. כאן נשארת רק מעטפת ה-App.
    טאבים כבדים נטענים lazy כדי שהמסך הראשון (טבלה) יעלה מהר.
    ============================================================================ */
-import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback, ViewTransition, startTransition } from "react";
-import { store } from "../lib/store";
+import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback, useRef, ViewTransition, startTransition } from "react";
+import { store, subscribeStoreKey } from "../lib/store";
 import { reportBeacon } from "../lib/diagReport";
 import { C } from "../lib/poker/colors";
 import { Header, TabBar, Style, TABBAR_H } from "./poker/chrome";
@@ -90,6 +90,23 @@ function TabFallback() {
   );
 }
 
+/* פירוק DB גולמי מהחנות למצב המסך: נרמול + גיבויי ג'יטונים/טיפים חד־פעמיים.
+   משותף לטעינה הראשונה ולאימוץ מרוחק — אותו עיבוד בדיוק, כדי שנתון שאומץ
+   ברקע ייראה בדיוק כמו נתון שנטען בהרכבה. */
+function parseStoredDb(raw) {
+  let d;
+  try {
+    d = normalize(JSON.parse(raw));
+  } catch {
+    throw new Error("הנתונים שהתקבלו אינם תקינים. לא בוצע שינוי בהיסטוריה.");
+  }
+  // גיבוי ג'יטונים מצ'אט אוג׳ 2026 — ממלא ערבים ישנים בלי שדה chips
+  const chipsFilled = applyChipBackfill(d);
+  // גיבוי טיפים חד־פעמי (למשל טיפ שנרשם אחרי סגירת הערב)
+  const tipsFilled = applyTipBackfill(d);
+  return { db: d, filled: chipsFilled || tipsFilled };
+}
+
 // שיתוף אמין: (1) Web Share API — גיליון השיתוף של iOS, בוחרים וואטסאפ והקבוצה; הטקסט עובר נקי.
 // (2) נפילה להעתקה ללוח (כמו באפליקציית הטעינות). (3) נפילה אחרונה: deep-link ישיר לאפליקציה.
 /* ============================ APP ============================ */
@@ -155,33 +172,31 @@ function App({
     if (typeof onTabChange === "function") onTabChange(id);
   };
   const [profile, setProfile] = useState(null);
+  const dbRawRef = useRef(null); // המחרוזת האחרונה שאומצה מהחנות — דילוג על אימוץ כפול של אותו תוכן
+  const readyRef = useRef(false); // אימוץ מרוחק פעיל רק אחרי שהטעינה הראשונה הושלמה
   useEffect(() => {
     let alive = true;
     (async () => {
       await loadConfig();
       const raw = await store.get(DB_KEY);
       let d;
+      let filled = false;
       if (raw) {
-        try {
-          d = normalize(JSON.parse(raw));
-        } catch {
-          throw new Error("הנתונים שהתקבלו אינם תקינים. לא בוצע שינוי בהיסטוריה.");
-        }
+        ({ db: d, filled } = parseStoredDb(raw));
       } else {
         const { buildSeedDb } = await import("../lib/poker/seed");
         d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
       }
-      // גיבוי ג'יטונים מצ'אט אוג׳ 2026 — ממלא ערבים ישנים בלי שדה chips
-      const chipsFilled = applyChipBackfill(d);
-      // גיבוי טיפים חד־פעמי (למשל טיפ שנרשם אחרי סגירת הערב)
-      const tipsFilled = applyTipBackfill(d);
-      const filled = chipsFilled || tipsFilled;
       if (alive) {
+        dbRawRef.current = raw ?? null;
         setDb(d);
         setReady(true);
+        readyRef.current = true;
         // בעלים: שומרים פעם אחת למסד כדי ששיאי הג'יטונים / הטיפים יישארו
         if (filled && !readOnly) {
-          store.set(DB_KEY, JSON.stringify(d));
+          const written = JSON.stringify(d);
+          dbRawRef.current = written;
+          store.set(DB_KEY, written);
         }
       }
     })().catch((error) => {
@@ -189,13 +204,43 @@ function App({
     });
     return () => {
       alive = false;
+      readyRef.current = false;
     };
+  }, [readOnly]);
+  /* אימוץ מרוחק שקט: רענון רקע הנחית DB חדש במטמון החנות (סימון שולם של
+     צופה דרך RPC, מיזוג נתונים ב־flush, אימות רקע) והעוטף פרסם את המפתח —
+     מאמצים את הערך החדש למצב במקום. בלי זה העץ כולו היה מורכב מחדש על כל
+     עדכון מבחוץ: הבהוב, מסך טעינה, איבוד גלילה ומצב חולף. */
+  useEffect(() => {
+    const adopt = async () => {
+      if (!readyRef.current) return;
+      const raw = await store.get(DB_KEY);
+      if (raw == null || raw === dbRawRef.current) return;
+      let parsed;
+      try {
+        parsed = parseStoredDb(raw);
+      } catch {
+        return; // נתון מרוחק לא תקין — נשארים עם מה שעל המסך
+      }
+      dbRawRef.current = raw;
+      setDb(parsed.db);
+      if (parsed.filled && !readOnly) {
+        const written = JSON.stringify(parsed.db);
+        dbRawRef.current = written;
+        store.set(DB_KEY, written);
+      }
+    };
+    return subscribeStoreKey(DB_KEY, () => {
+      void adopt();
+    });
   }, [readOnly]);
   const commit = useCallback(
     (n) => {
       if (readOnly) return;
       setDb(n);
-      store.set(DB_KEY, JSON.stringify(n));
+      const written = JSON.stringify(n);
+      dbRawRef.current = written;
+      store.set(DB_KEY, written);
     },
     [readOnly]
   ); // כתיבה רק בפעולת משתמש

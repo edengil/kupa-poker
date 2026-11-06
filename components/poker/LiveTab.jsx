@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { store, flushStore } from "../../lib/store";
+import { store, flushStore, subscribeStoreKey } from "../../lib/store";
 import { buildReport, nightDateParts } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "../../lib/poker/colors";
@@ -140,6 +140,63 @@ export function LiveTab({
   /* שדות שהבוט כותב (applied/pending/closing/מחמאות) — נשמרים כדי לא לדרוס אותם */
   const liveMetaRef = useRef({});
   const cashoutDraftRef = useRef({}); // ערך יצא לפני עריכה — ליומן ביטול
+  const dbRef = useRef(db); // ה־db העדכני לקריאות מתוך מנוי הרקע (ההידרציה חד־פעמית)
+  useEffect(() => {
+    dbRef.current = db;
+  }, [db]);
+  const lastLiveRawRef = useRef(null); // מחרוזת הלייב האחרונה שיושמה מהחנות — דילוג על אימוץ כפול
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    hydratedRef.current = hydrated;
+  }, [hydrated]);
+
+  /* איפוס מלא של מצב הלייב — ערב שהסתיים/נוקה. משותף לגילוי ערב שמור
+     ב־db ולאימוץ מרוחק של לייב ריק. */
+  const resetLiveState = () => {
+    setPlayers([]);
+    setEntriesCount("");
+    setStartedAt(null);
+    setSavings5(true); // הערב הבא מתחיל שוב עם 5% אוטומטי
+    setLiveAnnounced([]);
+    setTips([]);
+    setCoupleFills([]);
+    setActionLog([]);
+    setHandOfNight("");
+    setPlanSnap(null);
+    /* ממצא 22: גם טיוטת הקופה ומטא־הלייב מתאפסים — בלעדיהם טיוטת הערב
+       הקודם הייתה נרשמת שוב בקופת הערב הבא, ו־applied ישן היה רוכב עליו. */
+    setPotDraft("");
+    liveMetaRef.current = {};
+  };
+
+  /* יישום בלוב לייב מהחנות על כל פלחי המצב. ההידרציה בטעינה והאימוץ
+     המרוחק חולקים את אותה דרך בדיוק, כדי שעדכון מהבוט ייראה כמו טעינה. */
+  const applyLiveBlob = (d) => {
+    const liveTips = Array.isArray(d.tips) ? d.tips : [];
+    if (Array.isArray(d.players)) {
+      setPlayers(applyTipTotalsToPlayers(canonLivePlayers(d.players, A), liveTips, A));
+    }
+    if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
+    if (d.addAmt) setAddAmt(d.addAmt);
+    if (d.savings5 !== undefined) setSavings5(d.savings5 !== false);
+    if (typeof d.potDraft === "string") setPotDraft(d.potDraft);
+    if (d.startedAt) setStartedAt(d.startedAt);
+    if (Array.isArray(d.tips)) setTips(liveTips);
+    if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
+    if (Array.isArray(d.actionLog)) setActionLog(d.actionLog);
+    if (typeof d.handOfNight === "string") setHandOfNight(d.handOfNight);
+    if (Array.isArray(d.liveAnnounced)) setLiveAnnounced(d.liveAnnounced);
+    if (d.planSnap && typeof d.planSnap === "object") setPlanSnap(d.planSnap);
+    // מטא־הבוט נשמר כמו שהוא דרך pickLiveMeta — כולל חותמות
+    // התזכורות של הבוט, ששמירת אפליקציה בלי הן הייתה מאפסת (ממצא 5)
+    liveMetaRef.current = pickLiveMeta(d);
+  };
+
+  /* הגרסאות העדכניות של מיישמי הלייב — למנוי הרקע, שרץ פעם אחת בלבד. */
+  const liveApplyRef = useRef(null);
+  useEffect(() => {
+    liveApplyRef.current = { applyLiveBlob, resetLiveState };
+  });
 
   // שחזור משחק פעיל אחרי סגירת האפליקציה
   useEffect(() => {
@@ -147,6 +204,7 @@ export function LiveTab({
     (async () => {
       const raw = await store.get(LIVE_KEY);
       if (alive && raw) {
+        lastLiveRawRef.current = raw;
         try {
           const d = JSON.parse(raw);
           /* שריד של ערב שכבר נסגר ונשמר — לא משחזרים; מנקים את מצב הלייב */
@@ -155,24 +213,7 @@ export function LiveTab({
             if (alive) setHydrated(true);
             return;
           }
-          const liveTips = Array.isArray(d.tips) ? d.tips : [];
-          if (Array.isArray(d.players)) {
-            setPlayers(applyTipTotalsToPlayers(canonLivePlayers(d.players, A), liveTips, A));
-          }
-          if (d.entriesCount !== undefined) setEntriesCount(d.entriesCount);
-          if (d.addAmt) setAddAmt(d.addAmt);
-          if (d.savings5 !== undefined) setSavings5(d.savings5 !== false);
-          if (typeof d.potDraft === "string") setPotDraft(d.potDraft);
-          if (d.startedAt) setStartedAt(d.startedAt);
-          if (Array.isArray(d.tips)) setTips(liveTips);
-          if (Array.isArray(d.coupleFills)) setCoupleFills(d.coupleFills);
-          if (Array.isArray(d.actionLog)) setActionLog(d.actionLog);
-          if (typeof d.handOfNight === "string") setHandOfNight(d.handOfNight);
-          if (Array.isArray(d.liveAnnounced)) setLiveAnnounced(d.liveAnnounced);
-          if (d.planSnap && typeof d.planSnap === "object") setPlanSnap(d.planSnap);
-          // מטא־הבוט נשמר כמו שהוא דרך pickLiveMeta — כולל חותמות
-          // התזכורות של הבוט, ששמירת אפליקציה בלי הן הייתה מאפסת (ממצא 5)
-          liveMetaRef.current = pickLiveMeta(d);
+          applyLiveBlob(d);
         } catch {}
       }
       if (alive) setHydrated(true);
@@ -183,6 +224,40 @@ export function LiveTab({
     // שחזור חד־פעמי בטעינה בלבד: db/A נקראים כצילום של רגע הטעינה. הגעת db
     // מאוחרת מטופלת באפקט הניקוי הייעודי למטה — הוספתם לכאן תשחזר שוב ושוב.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* אימוץ מרוחק שקט של הלייב: checkLive/ה־flush זרעו במטמון החנות לייב
+     ממוזג מהשרת ופרסמו את המפתח — מיישמים את הבלוב על המצב במקום. יציאות
+     שהבוט רשם מופיעות מיד, בלי הרכבה מחדש של הטאב: טיוטות שדות, תפריטים
+     פתוחים ומיקום הגלילה שורדים. */
+  useEffect(() => {
+    const adopt = async () => {
+      if (!hydratedRef.current) return; // לפני ההידרציה — היא קוראת את המטמון העדכני בעצמה
+      const raw = await store.get(LIVE_KEY);
+      if (raw === lastLiveRawRef.current) return;
+      lastLiveRawRef.current = raw;
+      const fns = liveApplyRef.current;
+      if (!fns) return;
+      if (raw == null || raw === "") {
+        fns.resetLiveState(); // המשחק נגמר/נוקה בצד השרת — מנקים גם כאן
+        return;
+      }
+      let d;
+      try {
+        d = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (liveAlreadySaved(d, dbRef.current?.sessions)) {
+        store.set(LIVE_KEY, "");
+        fns.resetLiveState();
+        return;
+      }
+      fns.applyLiveBlob(d);
+    };
+    return subscribeStoreKey(LIVE_KEY, () => {
+      void adopt();
+    });
   }, []);
 
   // שמירה אוטומטית בכל שינוי
@@ -223,20 +298,7 @@ export function LiveTab({
     // ניקוי מצב כשה־db מגלה שהערב כבר שמור — סנכרון מול מקור חיצוני (המסד),
     // לא נגזרת של הרינדור; אין דרך לבצעו בשלב הרינדור בלי לכתוב לחנות באמצעו.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPlayers([]);
-    setEntriesCount("");
-    setStartedAt(null);
-    setSavings5(true); // הערב הבא מתחיל שוב עם 5% אוטומטי
-    setLiveAnnounced([]);
-    setTips([]);
-    setCoupleFills([]);
-    setActionLog([]);
-    setHandOfNight("");
-    setPlanSnap(null);
-    /* ממצא 22: גם טיוטת הקופה ומטא־הלייב מתאפסים — בלעדיהם טיוטת הערב
-       הקודם הייתה נרשמת שוב בקופת הערב הבא, ו־applied ישן היה רוכב עליו. */
-    setPotDraft("");
-    liveMetaRef.current = {};
+    resetLiveState();
   }, [hydrated, startedAt, players.length, db?.sessions]);
 
   // שיא חי נשבר באמצע הערב → הכרזה בקבוצה פעם אחת לכל שיא+שחקן.
