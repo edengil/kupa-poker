@@ -5,7 +5,7 @@ import PokerApp from "./PokerApp";
 import AppErrorBoundary from "./AppErrorBoundary";
 import { reportBeacon } from "../lib/diagReport";
 import { getSupabase } from "../lib/supabaseClient";
-import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, LIVE_KEY, DB_KEY } from "../lib/store";
+import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, publishStoreKey, store, LIVE_KEY, DB_KEY, CONFIG_KEY } from "../lib/store";
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
 import { updateGroupCas } from "../lib/groupCas";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
@@ -17,7 +17,7 @@ import { RsvpList } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
 import { authShell, brassCta } from "../lib/poker/festive";
 import { C as festiveC } from "../lib/poker/colors";
-import { getConfig, onConfig, setConfig } from "../lib/poker/config";
+import { getConfig, onConfig, setConfig, loadConfig } from "../lib/poker/config";
 import { buildPlanInviteText } from "../lib/planInvite";
 import { track } from "../lib/analytics";
 
@@ -30,10 +30,6 @@ const C = {
   dim: festiveC.dim,
   loss: festiveC.loss,
 };
-
-function tabIsVisible() {
-  return typeof document !== "undefined" && document.visibilityState === "visible";
-}
 
 const SESSION_TIMEOUT_MS = 4000;
 
@@ -69,52 +65,17 @@ export default function OwnerApp() {
   const [message, setMessage] = useState("");
   const [saveStatus, setSaveStatus] = useState("saved");
   const [online, setOnline] = useState([]); // מי צופה עכשיו — נוכחות חיה
-  const [generation, setGeneration] = useState(0); // remount רק כשבאמת צריך (רקע / חזרה לדף)
   const [viewerAuth, setViewerAuth] = useState(null);
   const broadcasterRef = useRef(null);
   const groupRef = useRef(null); // גישה יציבה לקבוצה מתוך callbacks
   const lastLiveRef = useRef(undefined); // הלייב האחרון שידוע לדף — להשוואה מול פינגים
   const lastLiveFpRef = useRef(undefined); // טביעה בלי ts
-  const pendingRemountRef = useRef(null); // null | "live" | "soft" — נדחה עד חזרה לדף
-  const tabRef = useRef("table"); // הטאב הפתוח — נשמר בין רענונים
-  const [tabSnapshot, setTabSnapshot] = useState("table"); // צילום הטאב ברגע ה־remount — מועבר כ־initialTab בלי קריאת ref ברינדור
   const checkingLiveRef = useRef(false); // מונע checkLive חופפים שמרעננים פעמיים
-  const lastRemountAtRef = useRef(0); // מגן לולאת remount: חותמת הכפוי האחרון
 
-  /* מגן: לא יותר מ־remount כפוי אחד ב־10 שניות. פינגים חוזרים מ־checkLive או
-     מהערוץ יכולים אחרת לשרשר remount-ים שמרעידים את הדף (ובטלפון חלש —
-     הורגים את תהליך הרינדור). remount שנחסם פשוט מדולג; הבא אחרי החלון יעבור. */
-  const remountApp = useCallback(() => {
-    pendingRemountRef.current = null;
-    const now = Date.now();
-    if (now - lastRemountAtRef.current < 10000) {
-      reportBeacon("remount-blocked", `guard 10s, last ${now - lastRemountAtRef.current}ms ago`);
-      return;
-    }
-    lastRemountAtRef.current = now;
-    reportBeacon("remount", "forced remount executed");
-    setTabSnapshot(tabRef.current);
-    setGeneration((g) => g + 1);
-  }, []);
-
-  /* רענון מלא של PokerApp.
-     עדכון לייב מהבוט (forgetLive) — תמיד מיד, גם כשהדף גלוי: אחרת
-     יציאות בוואטסאפ לא מופיעות והכפתור "סיים" נשאר כבוי.
-     רענון רך (DB/config) עדיין נדחה בזמן שימוש כדי לא לקפוץ באמצע. */
-  const requestRemount = useCallback(
-    (opts = {}) => {
-      const { forgetLive = false, force = false } = opts;
-      reportBeacon("remount-request", `force=${force} forgetLive=${forgetLive}`);
-      if (!force && !forgetLive && tabIsVisible()) {
-        pendingRemountRef.current = "soft";
-        reportBeacon("remount-deferred", "soft remount deferred until visible");
-        return;
-      }
-      if (forgetLive) forgetStoreKey(LIVE_KEY);
-      remountApp();
-    },
-    [remountApp]
-  );
+  /* אין יותר הרכבה מחדש של העץ על עדכון מרוחק: רענוני רקע מפרסמים את מפתח
+     החנות שהשתנה (publishStoreKey), ו־PokerApp/LiveTab מאמצים את הערך החדש
+     למצב במקום. ההרכבה הישנה (key על PokerApp) הבהבה, החזירה מסך טעינה
+     ואיבדה גלילה ומצב חולף על כל סימון שולם של צופה או יציאה מהבוט. */
 
   /* משואת אבחון (fix/diag-capture): כל שינוי פאזה/קבוצה בעליית הבעלים */
   const groupSlug = group?.slug ?? null;
@@ -163,7 +124,8 @@ export default function OwnerApp() {
     };
   }, [supabase]);
 
-  /* האם הלייב במסד שונה ממה שמוצג? אם כן — remount מיידי עם שכחת מטמון.
+  /* האם הלייב במסד שונה ממה שמוצג? אם כן — זורעים את הממוזג במטמון החנות
+     והזריעה מפרסמת את המפתח, וטאב הלייב מאמץ אותו למצב במקום.
      נקרא מפינג של הבוט, מסקר קבוע, ומחזרה לדף. lastLiveRef מתעדכן גם בכל
      כתיבה מקומית, כדי שהשינויים של עצמנו לא ייחשבו "חיצוניים".
 
@@ -236,13 +198,13 @@ export default function OwnerApp() {
       lastLiveRef.current = JSON.stringify(nextLive);
       lastLiveFpRef.current = liveFingerprint(nextLive);
       forgetStoreKey(LIVE_KEY);
+      /* הזריעה מפרסמת את מפתח הלייב — הטאב מאמץ את הממוזג במקום, בלי הרכבה */
       seedStoreLive(nextLive);
-      requestRemount({ forgetLive: false, force: true });
     } catch {
     } finally {
       checkingLiveRef.current = false;
     }
-  }, [supabase, requestRemount]);
+  }, [supabase]);
 
   /* -------------------- איתור או יצירה של הקבוצה --------------------
      שורת הקבוצה נשמרת ב-localStorage: בביקור חוזר האפליקציה עולה מיידית
@@ -260,35 +222,44 @@ export default function OwnerApp() {
             if (patch && "live" in patch) {
               lastLiveRef.current = JSON.stringify(patch.live ?? null);
               lastLiveFpRef.current = liveFingerprint(patch.live ?? null);
-              /* flush אימץ יציאות מהבוט למטמון, אבל React עדיין מציג יצא ריק.
-                 בלי remount lastLiveFp כבר תואם לשרת ו-checkLive לא מרענן. */
+              /* flush אימץ יציאות מהבוט למטמון — הזריעה מפרסמת את המפתח
+                 וטאב הלייב מאמץ אותן למצב במקום. הפרסום הוא מה שמניע את
+                 העדכון עכשיו: lastLiveFp כבר תואם לשרת, ו־checkLive לבדו
+                 לא היה מזהה שינוי. */
               if (meta?.adoptedRemoteLive) {
                 seedStoreLive(patch.live);
-                requestRemount({ forgetLive: false, force: true });
               }
             }
-            /* ערבים שחולצו מהשרת בזמן flush — חובה לרענן את המסך */
+            /* ערבים שחולצו מהשרת בזמן flush כבר במטמון החנות (המיזוג כתב
+               אותו) — פרסום המפתח מאמץ אותם למסך במקום, בלי הרכבה מחדש */
             if (meta?.adoptedRemoteData) {
-              requestRemount({ forgetLive: false, force: true });
+              publishStoreKey(DB_KEY);
             }
             broadcaster.ping();
           },
           // מטמון ישן: לא עושים flush של data ישן לשרת (זה מה שמחק ערבים).
-          // מוחקים את המטמון ומרעננים מהשרת.
+          // החנות כבר החליפה את המטמון בערך הטרי מהשרת לפני הקריאה לכאן —
+          // מפרסמים את המפתח והמסך מאמץ את הטרי במקום.
           onStale: async (key) => {
-            if (key === DB_KEY) {
-              forgetStoreKey(DB_KEY);
-              requestRemount({ forgetLive: false, force: true });
+            if (key === DB_KEY || key === LIVE_KEY) {
+              publishStoreKey(key);
+              return;
+            }
+            if (key === CONFIG_KEY) {
+              await loadConfig(); // טוען מחדש מהמטמון הטרי ומודיע למאזיני הקונפיג
               return;
             }
             await flushStore();
-            requestRemount({ forgetLive: false });
           },
         })
       );
       groupRef.current = row;
       setGroup(row);
       setPhase("ready");
+      /* boot חוזר עם קבוצה שונה מהמטמון (אימות מול המסד החליף שורה):
+         PokerApp כבר מורכב עם החנות הקודמת — פרסום המפתח מאמץ את נתוני
+         הקבוצה הנכונה במקום. ב־boot ראשון אין עוד מנוי, וזה no-op. */
+      publishStoreKey(DB_KEY);
     };
 
     const cacheKey = "poker:cache:group";
@@ -298,9 +269,12 @@ export default function OwnerApp() {
     const mkBroadcaster = (slug) => {
       const b = createBroadcaster(supabase, slug, () => {
         checkLive();
-        /* סימוני תשלום מעדכנים data ולא live — חובה לרענן גם את ההיסטוריה */
+        /* סימוני תשלום מעדכנים data ולא live — מרעננים גם את ההיסטוריה:
+           שוכחים את מטמון ה־DB וקוראים שוב; הקריאה מחזירה מיד את העותק
+           המקומי ומאמתת מול השרת ברקע, ואם השרת זז — onStale מפרסם את
+           המפתח והמסך מאמץ את הטרי במקום, בלי הרכבה מחדש. */
         forgetStoreKey(DB_KEY);
-        requestRemount({ forgetLive: false, force: true });
+        void store.get(DB_KEY);
       });
       broadcasterRef.current = b;
       return b;
@@ -371,7 +345,7 @@ export default function OwnerApp() {
     return () => {
       alive = false;
     };
-  }, [supabase, signedOut, checkLive, requestRemount]);
+  }, [supabase, signedOut, checkLive]);
 
   // ניקוי הערוץ ביציאה
   useEffect(
@@ -385,8 +359,8 @@ export default function OwnerApp() {
   /* גיבוי לפינגים: WebSocket בטלפון נופל כשהמסך ננעל ולא תמיד מתאושש,
      ואז עדכונים מהבוט לא מגיעים עד שיוצאים וחוזרים. סקר קל (שאילתת לייב
      אחת) כל 12 שניות כשהמסך גלוי + בדיקה מיידית בכל חזרה לדף סוגרים את
-     החור — בדיוק כמו אצל הצופים.
-     Remount בזמן שהדף גלוי נדחה; בחזרה מהרקע מריצים remount ממתינים. */
+     החור — בדיוק כמו אצל הצופים. העדכון עצמו נוחת באימוץ־במקום דרך
+     checkLive, בלי הרכבה מחדש גם כשהדף גלוי. */
   useEffect(() => {
     if (phase !== "ready") return;
     let timer = null;
@@ -397,19 +371,11 @@ export default function OwnerApp() {
     };
     const onVis = () => {
       if (document.visibilityState === "visible") {
-        if (pendingRemountRef.current) {
-          if (pendingRemountRef.current === "live") forgetStoreKey(LIVE_KEY);
-          remountApp();
-        }
         checkLive();
         start();
       } else stop();
     };
     const onFocus = () => {
-      if (pendingRemountRef.current) {
-        if (pendingRemountRef.current === "live") forgetStoreKey(LIVE_KEY);
-        remountApp();
-      }
       checkLive();
     };
     onVis();
@@ -420,7 +386,7 @@ export default function OwnerApp() {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onFocus);
     };
-  }, [phase, checkLive, remountApp]);
+  }, [phase, checkLive]);
 
   /* נוכחות חיה — מנוי אחד לכל הדף. גם פאנל "מי צופה" וגם טאב "צפיות"
      מקבלים את אותה רשימה כ-prop. שני מנויים לאותו ערוץ היו מפילים את
@@ -569,11 +535,8 @@ export default function OwnerApp() {
       </div>
       <AppErrorBoundary>
       <PokerApp
-        key={generation}
         viewerAuth={viewerAuth}
-        initialTab={tabSnapshot}
         onTabChange={(t) => {
-          tabRef.current = t;
           if (t === "live") checkLive();
         }}
         statsPanel={
