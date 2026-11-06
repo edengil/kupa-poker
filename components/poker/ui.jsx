@@ -241,7 +241,10 @@ export function Stat({ label, value, color }) {
   );
 }
 
-/** סגנון בסיסי לשדות טקסט (לייב / כינויים). */
+/** סגנון בסיסי לשדות טקסט (לייב / כינויים).
+    fontSize חייב להיות 16 לפחות: מתחת ל־16 אייפון מגדיל אוטומטית את
+    העמוד כשהשדה מקבל מיקוד (זום־פוקוס) — ה"קפיצה" שרואים בהקלדה.
+    הריפוד כווץ מעט כפיצוי, כדי שגובה השדה לא ישתנה. */
 export const inputStyle = {
   flex: 1,
   minWidth: 0,
@@ -249,8 +252,8 @@ export const inputStyle = {
   color: C.cream,
   border: `1px solid ${C.line}`,
   borderRadius: 9,
-  padding: "9px 11px",
-  fontSize: 14,
+  padding: "8px 11px",
+  fontSize: 16,
   fontFamily: "inherit",
 };
 
@@ -277,8 +280,8 @@ export function Select({ value, onChange, options, label, grow }) {
             color: C.cream,
             border: `1px solid ${C.line}`,
             borderRadius: 10,
-            padding: "11px 32px 11px 12px",
-            fontSize: 14.5,
+            padding: "10px 32px 10px 12px",
+            fontSize: 16,
             fontFamily: "inherit",
             cursor: "pointer",
           }}

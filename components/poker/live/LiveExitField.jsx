@@ -27,7 +27,7 @@ export function LiveExitField({ name, cashout, onFocus, onChange, onBlur }) {
           ...inputStyle,
           width: 66,
           textAlign: "center",
-          padding: "7px 4px",
+          padding: "6px 4px",
         }}
       />
     </div>

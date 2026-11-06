@@ -189,9 +189,9 @@ export function PotDashboard({ db, commit, isAdmin }) {
     color: C.cream,
     border: `1px solid ${C.brass}`,
     borderRadius: 8,
-    padding: "4px 8px",
+    padding: "2px 8px",
     fontFamily: "inherit",
-    fontSize: 13,
+    fontSize: 16,
   };
   const saveBtnStyle = {
     background: C.brass,

@@ -30,8 +30,8 @@ export function HeadToHeadSection({ h2h, h2hScope, setH2hScope, h2hYearOptions }
         color: C.cream,
         border: `1px solid ${C.line}`,
         borderRadius: 10,
-        padding: "10px 12px",
-        fontSize: 14,
+        padding: "9px 12px",
+        fontSize: 16,
         fontFamily: "inherit",
       }}
     >

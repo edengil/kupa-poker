@@ -119,12 +119,12 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
             onChange={(e) => setAmount(e.target.value)}
             placeholder="סכום בש״ח"
             style={{
-              padding: "8px 12px",
+              padding: "6px 12px",
               borderRadius: 8,
               border: `1px solid ${C.line}`,
               background: C.felt,
               color: C.cream,
-              fontSize: 14,
+              fontSize: 16,
             }}
           />
           <input
@@ -133,12 +133,12 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
             onChange={(e) => setReason(e.target.value)}
             placeholder="סיבה (למשל: קניית שתייה)"
             style={{
-              padding: "8px 12px",
+              padding: "6px 12px",
               borderRadius: 8,
               border: `1px solid ${C.line}`,
               background: C.felt,
               color: C.cream,
-              fontSize: 14,
+              fontSize: 16,
             }}
           />
           <div style={{ display: "flex", gap: 8 }}>

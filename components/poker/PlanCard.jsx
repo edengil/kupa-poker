@@ -228,8 +228,8 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
     borderRadius: 9,
     color: C.cream,
     fontFamily: "inherit",
-    fontSize: 13.5,
-    padding: "9px 10px",
+    fontSize: 16,
+    padding: "7px 10px",
     colorScheme: "dark",
   };
 
@@ -612,7 +612,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
                             onChange={(e) => setImportText(e.target.value)}
                             placeholder={"אופיר סנה: ofir@example.com\nאיציק תפילין: itzik@example.com"}
                             rows={4}
-                            style={{ width: "100%", boxSizing: "border-box", background: C.feltDeep, color: C.cream, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }}
+                            style={{ width: "100%", boxSizing: "border-box", background: C.feltDeep, color: C.cream, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", fontSize: 16, fontFamily: "inherit" }}
                           />
                           <button
                             type="button"

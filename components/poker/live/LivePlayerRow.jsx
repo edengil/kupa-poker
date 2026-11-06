@@ -306,7 +306,7 @@ export function LivePlayerRow({
               if (e.key === "Enter") addManualTip(i);
             }}
             placeholder="סכום"
-            style={{ ...inputStyle, width: 76, padding: "4px 8px", fontSize: 12.5 }}
+            style={{ ...inputStyle, width: 76, padding: "2px 8px", fontSize: 16 }}
           />
           <button
             type="button"
@@ -506,8 +506,8 @@ export function LivePlayerRow({
                   ...inputStyle,
                   width: 70,
                   textAlign: "center",
-                  padding: "4px 6px",
-                  fontSize: 15,
+                  padding: "3px 6px",
+                  fontSize: 16,
                   fontWeight: 700,
                 }}
               />

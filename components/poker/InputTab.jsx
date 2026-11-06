@@ -128,7 +128,7 @@ export function InputTab({ db, commit, years }) {
           border: `1px solid ${C.line}`,
           borderRadius: 12,
           padding: 14,
-          fontSize: 15,
+          fontSize: 16,
           lineHeight: 1.6,
           fontFamily: "inherit",
         }}

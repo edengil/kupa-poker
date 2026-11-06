@@ -60,8 +60,8 @@ function EmailEditor({ current, onSave }) {
             borderRadius: 9,
             color: C.cream,
             fontFamily: "inherit",
-            fontSize: 13.5,
-            padding: "8px 10px",
+            fontSize: 16,
+            padding: "6px 10px",
           }}
         />
         <button
@@ -131,8 +131,8 @@ function PhoneEditor({ current, onSave }) {
             borderRadius: 9,
             color: C.cream,
             fontFamily: "inherit",
-            fontSize: 13.5,
-            padding: "8px 10px",
+            fontSize: 16,
+            padding: "6px 10px",
           }}
         />
         <button

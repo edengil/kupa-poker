@@ -311,13 +311,13 @@ export function LiveSettlementBuilder({
 
   const sel = {
     width: "100%",
-    padding: "10px 12px",
+    padding: "9px 12px",
     borderRadius: 10,
     border: `1px solid ${C.line}`,
     background: C.feltDeep,
     color: C.cream,
     fontFamily: "inherit",
-    fontSize: 14,
+    fontSize: 16,
   };
 
   return (
