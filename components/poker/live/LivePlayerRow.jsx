@@ -506,7 +506,7 @@ export function LivePlayerRow({
                   ...inputStyle,
                   width: 70,
                   textAlign: "center",
-                  padding: "3px 6px",
+                  padding: "4px 6px",
                   fontSize: 16,
                   fontWeight: 700,
                 }}
