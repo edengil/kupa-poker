@@ -49,6 +49,12 @@ import { track } from "../lib/analytics";
 const safeStorage = () =>
   typeof window !== "undefined" && window.localStorage ? window.localStorage : null;
 
+/* סמן "טרם נטען" למעקב ה־viewerName של ה־id-ים שנצפו: חייב להיות שונה מכל
+   viewerName אפשרי, כולל null — צופה בלי שם מזוהה (למשל במסך הבעלים או
+   ב־preview) נשאר עם viewerName=null מהרינדור הראשון, ועם אתחול null של
+   המעקב ההתאמה לא הייתה נורית לעולם וה"נצפה" השמור לא היה נטען בטעינה. */
+const SEEN_FOR_UNSET = Symbol("seen-for-unset");
+
 const LiveTab = lazy(() =>
   import("./poker/LiveTab").then((m) => ({ default: m.LiveTab }))
 );
@@ -250,7 +256,7 @@ function App({
   const [seenIds, setSeenIds] = useState([]);
   /* טעינת ה־id-ים שנצפו מהאחסון כשהצופה מתחלף — התאמת state בשלב הרינדור
      (הדפוס המתועד של React), במקום אפקט שמסנכרן state אחרי הרינדור. */
-  const [seenFor, setSeenFor] = useState(null);
+  const [seenFor, setSeenFor] = useState(SEEN_FOR_UNSET);
   if (seenFor !== viewerName) {
     setSeenFor(viewerName);
     setSeenIds(loadSeenIds(safeStorage(), viewerName));

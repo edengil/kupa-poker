@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
+
+/* מנוי שאינו משתנה לעולם — לקריאת "האם אנחנו בלקוח אחרי hydration"
+   דרך useSyncExternalStore, כמו ב־PushPrompt וב־PreviewApp. */
+const subscribeNever = () => () => {};
 
 /** נתוני דמה לצופה — בלי Supabase. */
 export function buildViewerFixture({ shareHistory = true, withLive = false } = {}) {
@@ -58,11 +62,12 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
   const cps = viewerCps(viewerSnap, live);
   const pot = (live?.players || []).reduce((s, p) => s + (+p.buyin || 0), 0);
 
-  const [ready] = useState(() => {
-    if (typeof window === "undefined") return false;
-    configureStore(makeReadOnlyStore(viewerSnap));
-    return true;
-  });
+  /* כמו ב־PreviewApp: העץ הראשון זהה בשרת ובלקוח (רק הבאנר) דרך
+     useSyncExternalStore — צילום־שרת false, צילום־לקוח true, והמעבר
+     אחרי ה־hydration בלי שגיאה. הגדרת החנות ברינדור הראשון שבו
+     mounted=true — לפני ש־PokerApp קיים בעץ וטוען נתונים ממנה. */
+  const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
+  if (mounted) configureStore(makeReadOnlyStore(viewerSnap));
   /* הזמן החולף ברגע הטעינה — PokerTable מתקתק ממנו הלאה בעצמו. */
   const [elapsed0] = useState(() => (live?.startedAt ? Date.now() - live.startedAt : 0));
 
@@ -75,7 +80,7 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
       >
         סביבת צופה · היסטוריה {shareHistory ? "גלויה" : "מוסתרת"} · בלי התחברות
       </div>
-      {ready && live?.players?.length > 0 && (
+      {mounted && live?.players?.length > 0 && (
         <div style={{ maxWidth: 640, margin: "0 auto", padding: "13px 13px 0" }} data-testid="preview-viewer-live">
           <h2 style={{ margin: "0 2px 9px", fontSize: 15, fontWeight: 700 }}>♠ משחק עכשיו</h2>
           <PokerTable
@@ -91,7 +96,7 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
           />
         </div>
       )}
-      {ready && <PokerApp readOnly />}
+      {mounted && <PokerApp readOnly />}
     </>
   );
 }
