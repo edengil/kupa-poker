@@ -4,7 +4,8 @@
 --
 -- הקובץ הזה הוא צילום המצב הסופי של שרשרת המיגרציות שבתיקיית migrations:
 -- כל טבלה, מדיניות ופונקציה מופיעים כאן בגרסתם האחרונה בשרשרת (כולל
--- מיגרציות גלים 1–3 וטבלת diag_events של גל 4ב), כך שהתקנה ממנו נותנת את
+-- מיגרציות הגלים המקיפים 1–3: צילומי גיבוי group_snapshots ואינדקס
+-- הצפיות של גל 3, וטבלת diag_events של גל 4ב), כך שהתקנה ממנו נותנת את
 -- מערכת הייצור בדיוק. תיקון עתידי למסד נעשה במיגרציה חדשה — והסכמה כאן
 -- מתעדכנת לאותה גרסה סופית. בדיקת הטעינה test/wave4InfraSql.test.js
 -- מוכיחה שהקובץ נטען נקי ושהמלאי שלו זהה למלאי של "הסכמה + כל השרשרת".
@@ -37,6 +38,9 @@ begin
   new.updated_at = now();
   return new;
 end $$;
+
+-- גל 3 (3.5, G2): פונקציית טריגר — אין לאף תפקיד־לקוח צורך ב־execute.
+revoke all on function public.touch_updated_at() from public, anon, authenticated, service_role;
 
 drop trigger if exists groups_touch on public.groups;
 create trigger groups_touch
@@ -114,6 +118,10 @@ alter table public.group_views add column if not exists left_at timestamptz;
 alter table public.group_views add column if not exists tabs jsonb not null default '[]'::jsonb;
 
 create index if not exists group_views_recent_idx on public.group_views (group_id, at desc);
+
+-- גל 3 (3.3, G7/G5): הנתיב החם של my_last_viewed_group — סינון לפי
+-- user_id וסדר at desc, id desc.
+create index if not exists group_views_user_recent_idx on public.group_views (user_id, at desc, id desc);
 
 alter table public.group_views enable row level security;
 
@@ -282,6 +290,34 @@ alter table public.diag_events enable row level security;
 grant all privileges on table public.diag_events to service_role;
 
 -- ---------------------------------------------------------------------------
+-- צילומי גיבוי של קבוצות (מיגרציה 202611080001, גל 3 מקיף — G10).
+-- גיבוי אפליקטיבי חינמי בתוך המסד: כל שורה היא צילום מלא של קבוצה
+-- (data+config+live) מנקודת צילום יומית / לפני־מחיקה / ידנית. RLS סגור
+-- בלי מדיניות; גישה רק דרך service_role ודרך פונקציות ה־definer שלמטה
+-- (בסוף הקובץ, אחרי write_group_cas). שחזור בונה קבוצה חדשה מהצילום.
+-- ---------------------------------------------------------------------------
+create table if not exists public.group_snapshots (
+  id         uuid primary key default gen_random_uuid(),
+  group_id   uuid not null references public.groups (id) on delete cascade,
+  owner_id   uuid not null references auth.users (id) on delete cascade,
+  slug       text not null,
+  name       text not null,
+  reason     text not null check (reason in ('daily', 'pre-delete', 'manual')),
+  data       jsonb not null,
+  config     jsonb not null default '{}'::jsonb,
+  live       jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists group_snapshots_group_idx
+  on public.group_snapshots (group_id, created_at desc);
+
+alter table public.group_snapshots enable row level security;
+
+revoke all on table public.group_snapshots from public, anon, authenticated;
+grant all privileges on table public.group_snapshots to service_role;
+
+-- ---------------------------------------------------------------------------
 -- קריאה ציבורית לקריאה-בלבד.
 -- security definer עוקף RLS, אבל מחזיר רק את העמודות הבטוחות ורק לפי slug.
 -- מי שאין לו את הלינק לא יכול להגיע לשום דבר, וגם לא לרשימת הקבוצות.
@@ -320,7 +356,7 @@ as $$
   end;
 $$;
 
-revoke all on function public.strip_buyin_event_sids(jsonb) from public, anon;
+revoke all on function public.strip_buyin_event_sids(jsonb) from public, anon, authenticated, service_role;
 
 -- הקרנת תשלומי ערב לצופה: שורת הקופה יוצאת ממחרוזת התוכנית והסימונים
 -- ממופים מחדש לקואורדינטות המוקרנות; potPaid מוסר מהתגובה (באחסון נשמר).
@@ -411,7 +447,7 @@ begin
 end;
 $$;
 
-revoke all on function public.project_payments_for_viewer(jsonb) from public, anon;
+revoke all on function public.project_payments_for_viewer(jsonb) from public, anon, authenticated, service_role;
 
 -- הקרנת ערב בודד לצופה: בלי שדות קופה, בלי coupleFills, בלי סימוני
 -- הקפאה (frozenActual/frozenReal/frozenAuto), עם הסרת sid מאירועי הקנייה.
@@ -441,7 +477,7 @@ begin
 end;
 $$;
 
-revoke all on function public.project_session_for_viewer(jsonb) from public, anon;
+revoke all on function public.project_session_for_viewer(jsonb) from public, anon, authenticated, service_role;
 
 -- סינון נתוני קבוצה לתגובות RPC ציבוריות: shareHistory + הקרנת קופה מלאה
 -- + הסרת סימוני ההקפאה מ־manualSettlement של כל ערב מוקרן, בשני המצבים.
@@ -499,7 +535,7 @@ begin
 end;
 $$;
 
-revoke all on function public.filter_shared_group_data(jsonb, jsonb) from public, anon;
+revoke all on function public.filter_shared_group_data(jsonb, jsonb) from public, anon, authenticated, service_role;
 
 -- שינוי חתימה מחייב drop קודם
 drop function if exists public.public_group(text);
@@ -876,5 +912,134 @@ $$;
 
 revoke all on function public.write_group_cas(uuid, timestamptz, jsonb) from public, anon;
 grant execute on function public.write_group_cas(uuid, timestamptz, jsonb) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- צילומי גיבוי (מיגרציה 202611080001, גל 3 מקיף — G10): פונקציית הצילום
+-- האחת, מחיקה־עם־צילום־חובה, שחזור כקבוצה חדשה, ורשימת צילומים לבעלים.
+-- כולן security definer עם בדיקת בעלות בפנים (מתקשר שרת בלי סשן מותר).
+-- ---------------------------------------------------------------------------
+create or replace function public.snapshot_group(p_group_id uuid, p_reason text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  g public.groups%rowtype;
+  snap_id uuid;
+begin
+  if p_reason is null or p_reason not in ('daily', 'pre-delete', 'manual') then
+    raise exception 'invalid snapshot reason: %', coalesce(p_reason, '(null)');
+  end if;
+
+  select * into g from public.groups where id = p_group_id;
+  if not found then
+    raise exception 'group not found: %', p_group_id;
+  end if;
+
+  if auth.uid() is not null and auth.uid() <> g.owner_id then
+    raise exception 'forbidden: not the group owner';
+  end if;
+
+  insert into public.group_snapshots
+    (group_id, owner_id, slug, name, reason, data, config, live)
+  values
+    (g.id, g.owner_id, g.slug, g.name, p_reason, g.data, g.config, g.live)
+  returning id into snap_id;
+
+  return snap_id;
+end;
+$$;
+
+revoke all on function public.snapshot_group(uuid, text) from public, anon;
+grant execute on function public.snapshot_group(uuid, text) to authenticated, service_role;
+
+create or replace function public.delete_group_with_snapshot(p_group_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  snap_id uuid;
+begin
+  snap_id := public.snapshot_group(p_group_id, 'pre-delete');
+
+  delete from public.groups where id = p_group_id;
+
+  return snap_id;
+end;
+$$;
+
+revoke all on function public.delete_group_with_snapshot(uuid) from public, anon;
+grant execute on function public.delete_group_with_snapshot(uuid) to authenticated, service_role;
+
+create or replace function public.restore_group_snapshot(p_snapshot_id uuid, p_new_slug text default null)
+returns table (id uuid, slug text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  s public.group_snapshots%rowtype;
+  chosen_slug text;
+  new_id uuid;
+begin
+  select * into s from public.group_snapshots where group_snapshots.id = p_snapshot_id;
+  if not found then
+    raise exception 'snapshot not found: %', p_snapshot_id;
+  end if;
+
+  if auth.uid() is not null and auth.uid() <> s.owner_id then
+    raise exception 'forbidden: not the snapshot owner';
+  end if;
+
+  chosen_slug := coalesce(nullif(btrim(p_new_slug), ''), s.slug);
+  while exists (select 1 from public.groups g where g.slug = chosen_slug) loop
+    chosen_slug := coalesce(nullif(btrim(p_new_slug), ''), s.slug)
+      || '-' || substr(md5(random()::text || clock_timestamp()::text), 1, 6);
+  end loop;
+
+  insert into public.groups (owner_id, slug, name, data, config, live)
+  values (s.owner_id, chosen_slug, s.name, s.data, s.config, s.live)
+  returning groups.id into new_id;
+
+  return query select new_id, chosen_slug;
+end;
+$$;
+
+revoke all on function public.restore_group_snapshot(uuid, text) from public, anon;
+grant execute on function public.restore_group_snapshot(uuid, text) to authenticated, service_role;
+
+create or replace function public.list_group_snapshots(p_group_id uuid)
+returns table (id uuid, reason text, created_at timestamptz)
+language plpgsql
+security definer
+set search_path = public
+stable
+as $$
+declare
+  g_owner uuid;
+begin
+  select owner_id into g_owner from public.groups where groups.id = p_group_id;
+  if g_owner is null then
+    raise exception 'group not found: %', p_group_id;
+  end if;
+
+  if auth.uid() is not null and auth.uid() <> g_owner then
+    raise exception 'forbidden: not the group owner';
+  end if;
+
+  return query
+    select gs.id, gs.reason, gs.created_at
+    from public.group_snapshots gs
+    where gs.group_id = p_group_id
+    order by gs.created_at desc
+    limit 20;
+end;
+$$;
+
+revoke all on function public.list_group_snapshots(uuid) from public, anon;
+grant execute on function public.list_group_snapshots(uuid) to authenticated, service_role;
 
 notify pgrst, 'reload schema';

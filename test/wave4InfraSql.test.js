@@ -107,6 +107,7 @@ describe("wave4 consolidated schema load", () => {
       "calendar_credentials",
       "diag_events",
       "game_rsvps",
+      "group_snapshots",
       "group_views",
       "groups",
       "push_subscriptions",
@@ -127,6 +128,10 @@ describe("wave4 consolidated schema load", () => {
       "mark_group_payment",
       "vote_player_of_night",
       "write_group_cas",
+      "snapshot_group",
+      "delete_group_with_snapshot",
+      "restore_group_snapshot",
+      "list_group_snapshots",
     ]) {
       expect(fns).toContain(name);
     }
