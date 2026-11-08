@@ -86,25 +86,13 @@ function parseBotControl(text) {
   return null;
 }
 
-/* אבחון בלי לדלוף את הסוד עצמו: אומר רק אם המשתנה קיים בכלל ומה אורכו.
-   configured:false פירושו שהבנייה רצה לפני שהמשתנים נוספו. */
-function why(request) {
-  const secret = envValue("WHATSAPP_WEBHOOK_SECRET");
-  const given = new URL(request.url).searchParams.get("secret");
-  return {
-    error: "forbidden",
-    configured: Boolean(secret),
-    expectedLength: secret ? secret.length : 0,
-    receivedLength: given ? given.length : 0,
-    hasSupabaseKey: hasEnv("SUPABASE_SECRET_KEY"),
-    hasWhapiToken: hasEnv("WHAPI_TOKEN"),
-    hasSlug: hasEnv("KUPA_GROUP_SLUG"),
-  };
-}
+/* תשובת סירוב גנרית (גל 2, פריט 2.4): לא מחזירה שום מידע אבחוני —
+   לא אורך הסוד הצפוי, לא אורך הניחוש, לא אילו משתני סביבה קיימים.
+   האבחון הפנימי מתבצע מול הלוגים והבהייקונים, לא מהממשק הציבורי. */
 
 /* עזר חד-פעמי: מאתר את מזהה הקבוצה בהתקנה הראשונה. */
 export async function GET(request) {
-  if (!guard(request)) return NextResponse.json(why(request), { status: 403 });
+  if (!guard(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   try {
     const groups = await listGroups(envValue("WHAPI_TOKEN"));
     const list = (groups?.groups || []).map((g) => ({ id: g.id, name: g.name || g.subject }));
