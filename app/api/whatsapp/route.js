@@ -10,7 +10,7 @@ import {
 } from "@/lib/whatsapp";
 import { knownPlayerNames } from "@/lib/poker/personalHighlights";
 import { appendAction } from "@/lib/liveActionLog";
-import { trackWaSend } from "@/lib/wa/healthServer";
+import { trackWaSend, recordGateSwallow } from "@/lib/wa/healthServer";
 import { casWriteGroup, updateGroupCas } from "@/lib/groupCas";
 import { reminderKind, writeReminderStamp } from "@/lib/wa/reminderWrite";
 import { AL, canon } from "@/lib/poker/helpers";
@@ -299,6 +299,11 @@ export async function POST(request) {
       nextLive = applied.live;
       reply = applied.reply;
       ownerDm = applied.ownerDm;
+      /* גל 5, פריט 5.5 (E9): שער המסירה המאוחרת בלע את ההודעה — רושמים
+         משואת diag (+שורת בריאות על פקודת כסף) לפני שיוצאים בשקט. */
+      if (applied.gate) {
+        await recordGateSwallow({ supabase, groupId: row.id, gate: applied.gate });
+      }
       if (!reply) return ok({ skipped: "nothing to do" });
 
       changed = nextLive !== attemptLive;

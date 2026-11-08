@@ -52,6 +52,11 @@ export interface WaApplyOpts {
   [k: string]: unknown;
 }
 
+/* סוגי פקודות שמזיזות כסף/ג'יטונים — לזיהוי בליעת־כסף בשער המסירה
+   המאוחרת (גל 5, פריט 5.5): רק בליעת פקודה כזו מקבלת שורת בריאות
+   גלויה לבעלים; כל בליעה מקבלת משואת diag. */
+export const WA_MONEY_KINDS = new Set(["add", "tip", "tipNoName", "cashout", "answer"]);
+
 /* קובי מקבל פתיח משלו לפני משפט המחמאה על כל טיפ */
 const KOBI = "קובי סעדה";
 const KOBI_TIP_OPENER = "יא חאלייה";
@@ -119,7 +124,22 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     state.players.length === 0 &&
     (state.pendingApprovals || []).length === 0
   ) {
-    return { live, reply: null };
+    /* גל 5, פריט 5.5 (E9): השער נשאר בדיוק כמות שהוא — אבל הבליעה כבר
+       לא שקטה. התוצאה נושאת סימון gate, והנתיב (route) רושם ממנו משואת
+       diag_events + שורת בריאות לבעלים כשנבלעה פקודת כסף. הסימון נושא
+       רק מטא־נתונים: סוגי הפקודות, מזהה ההודעה והסיבה — בלי תוכן. */
+    return {
+      live,
+      reply: null,
+      gate: {
+        reason: "late-delivery",
+        kinds: cmds.map((c) => c.kind),
+        money: cmds.some((c) => WA_MONEY_KINDS.has(c.kind)),
+        msgId: msgId ?? null,
+        msgTs,
+        lastEndedAt,
+      },
+    };
   }
 
   const report = () =>

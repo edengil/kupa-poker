@@ -53,6 +53,11 @@ export function BotToggle({ on, onChange, health = null }) {
             הערוץ חי · שליחה אחרונה {formatAgoHe(view.lastOkAt)}
           </div>
         )}
+        {view?.lastGateAt ? (
+          <div style={{ fontSize: 11.5, color: C.loss, marginTop: 3 }}>
+            ⚠️ פקודת כסף נבלעה בשער המסירה המאוחרת {formatAgoHe(view.lastGateAt)} — הודעה ישנה מערב שכבר נסגר, לא הוחלה
+          </div>
+        ) : null}
       </div>
       <button
         onClick={() => onChange(!on)}
