@@ -462,12 +462,16 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       }
       const tipsGiven = r2((+p.tipsGiven || 0) + amount);
       let next = { ...p, tipsGiven };
-      /* צילום־לפני של היציאה כשהטיפ מוריד ממנה — הביטול ישחזר אותו
-         בדיוק (ממצא 4); בלי הצילום כל מסירה חוזרת הורידה מהיציאה שוב. */
-      let cashoutBefore: string | number | undefined;
+      /* דלתא של היציאה כשהטיפ מוריד ממנה (כמו cashDelta באפליקציה,
+         lib/manualTips.js): הביטול מחזיר את הדלתא על הערך הנוכחי, לא
+         צילום — תיקון cashout מאוחר יותר לא נדרס. נרשמת רק כשהטיפ באמת
+         הוריד מהערימה (קלאמפ ב־0 מקטין את הדלתא). */
+      let cashDelta: number | undefined;
       if (p.cashout !== "" && p.cashout != null) {
-        cashoutBefore = p.cashout;
-        next.cashout = String(Math.max(0, (+p.cashout || 0) - amount));
+        const before = +p.cashout || 0;
+        const after = Math.max(0, before - amount);
+        next.cashout = String(after);
+        cashDelta = r2(before - after);
       }
       state.players[found.index] = next;
       state.tips = [...(state.tips || []), { id: tipId, name: p.name, amount, at: Date.now() }];
@@ -479,7 +483,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         bagBefore,
         lastBefore,
         female,
-        ...(cashoutBefore !== undefined ? { cashoutBefore } : {}),
+        ...(cashDelta !== undefined ? { cashDelta } : {}),
       });
       // BOT_MARK מתווסף אוטומטית על כל ack
       if (resolveAlias(p.name, aliases) === KOBI) acks.push(KOBI_TIP_OPENER);

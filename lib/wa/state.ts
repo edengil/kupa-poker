@@ -76,9 +76,12 @@ export interface UndoEntry {
   before?: string | number;
   amount?: number;
   tipId?: string | number;
-  /* צילום־לפני של סכום היציאה כשהטיפ הוריד ממנו (השחקן כבר היה סגור) —
-     הביטול מחזיר אותו בדיוק; בלעדיו הטיפ "אכל" מהיציאה שוב בכל מסירה
-     חוזרת (ממצא 4). רשומות ישנות בלי השדה: הביטול לא נוגע ביציאה, כמקודם. */
+  /* דלתא של סכום היציאה שהטיפ הוריד בפועל (כמו cashDelta באפליקציה) —
+     הביטול מחזיר אותה על הערך הנוכחי, כך שתיקון יציאה מאוחר לא נדרס
+     (שער 0.3). רשומות חדשות נושאות את השדה הזה בלבד. */
+  cashDelta?: number;
+  /* צילום־לפני של סכום היציאה — נשמר רק לרשומות ישנות שנכתבו לפני מעבר
+     הדלתא; הביטול משחזר אותן בדיוק כמו קודם. */
   cashoutBefore?: string | number;
   /* צילום־לפני של פריט הממתין שפעולת "pending" שינתה: null = הפעולה
      יצרה את הפריט (הביטול מסיר אותו); אובייקט = הפעולה הגדילה פריט קיים
@@ -465,9 +468,20 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
       state.players[i] = {
         ...state.players[i],
         tipsGiven,
-        /* הטיפ הוריד מסכום היציאה — הביטול מחזיר את היציאה לצילום־לפני
-           בדיוק (ממצא 4). רשומות ישנות בלי צילום: לא נוגעים ביציאה. */
-        ...(e.cashoutBefore !== undefined ? { cashout: e.cashoutBefore } : {}),
+        /* הטיפ הוריד מהיציאה — הביטול מחזיר את הדלתא על הערך הנוכחי
+           (כמו באפליקציה, lib/manualTips.js): תיקון יציאה שנעשה אחרי
+           הטיפ לא נדרס. רשומות ישנות שנשמרו עם צילום־מוחלט (cashoutBefore)
+           עדיין משוחזרות בדיוק כמו קודם; רשומה בלי אף אחד מהם: לא נוגעים. */
+        ...(e.cashDelta !== undefined
+          ? {
+              cashout:
+                state.players[i].cashout !== "" && state.players[i].cashout != null
+                  ? String((+state.players[i].cashout || 0) + (e.cashDelta as number))
+                  : state.players[i].cashout,
+            }
+          : e.cashoutBefore !== undefined
+            ? { cashout: e.cashoutBefore }
+            : {}),
       };
       if (e.tipId != null) {
         state.tips = (state.tips || []).filter((t) => t.id !== e.tipId);

@@ -274,12 +274,16 @@ export default function OwnerApp({ hosts } = {}) {
     const mkBroadcaster = (slug) => {
       const b = createBroadcaster(supabase, slug, () => {
         checkLive();
-        /* סימוני תשלום מעדכנים data ולא live — מרעננים גם את ההיסטוריה:
-           שוכחים את מטמון ה־DB וקוראים שוב; הקריאה מחזירה מיד את העותק
-           המקומי ומאמתת מול השרת ברקע, ואם השרת זז — onStale מפרסם את
-           המפתח והמסך מאמץ את הטרי במקום, בלי הרכבה מחדש. */
-        forgetStoreKey(DB_KEY);
-        void store.get(DB_KEY);
+        /* סימוני תשלום מעדכנים data ולא live — מרעננים גם את ההיסטוריה.
+           רגרסיית B2/C8: קודם שוטפים כתיבות ממתינות לשרת (ה־flush ממזג תחת
+           CAS ולא דורס כתיבות שרת), ורק אז שוכחים את המטמון וקוראים שוב —
+           forget לפני flush היה זורק סימון תשלום שעוד לא נכתב, בשקט.
+           ה־flush רץ גם כשאין ממתין (no-op מהיר), כדי שהסדר יישמר תמיד. */
+        void (async () => {
+          await flushStore();
+          forgetStoreKey(DB_KEY);
+          void store.get(DB_KEY);
+        })();
       });
       broadcasterRef.current = b;
       return b;
