@@ -57,6 +57,12 @@ export interface WaLiveState {
      ההצלחה (RemindedAt) נכתבת רק אחרי שליחה שהצליחה בפועל. */
   pendingRemindAttemptAt?: number | null;
   bitIdleRemindAttemptAt?: number | null;
+  /* חותמות רגל ה־DM של התזכורות (גל 5, פריט 5.6): הצלחה/ניסיון נפרדים
+     מרגל הקבוצה, כדי שהצלחה חלקית לא תשלח שוב את הרגל שכבר עברה. */
+  pendingDmRemindedAt?: number | null;
+  bitIdleDmRemindedAt?: number | null;
+  pendingDmRemindAttemptAt?: number | null;
+  bitIdleDmRemindAttemptAt?: number | null;
   ts?: number;
   tips: WaTip[];
   tipComplimentBag: number[];
@@ -384,6 +390,11 @@ export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
      ולא ישנה צורה. חותמת אמיתית עוברת כמו שהיא. */
   if (out.pendingRemindAttemptAt == null) delete out.pendingRemindAttemptAt;
   if (out.bitIdleRemindAttemptAt == null) delete out.bitIdleRemindAttemptAt;
+  /* אותו חוזה צורה לחותמות רגל ה־DM (גל 5, פריט 5.6). */
+  if (out.pendingDmRemindedAt == null) delete out.pendingDmRemindedAt;
+  if (out.bitIdleDmRemindedAt == null) delete out.bitIdleDmRemindedAt;
+  if (out.pendingDmRemindAttemptAt == null) delete out.pendingDmRemindAttemptAt;
+  if (out.bitIdleDmRemindAttemptAt == null) delete out.bitIdleDmRemindAttemptAt;
   return out;
 }
 

@@ -78,9 +78,9 @@ export async function POST(request) {
   });
   try {
     await sendToGroup(text, { token, groupId });
-    await recordWaSend({ supabase, groupId: row.id, ok: true, where: "settlement-closed" });
+    await recordWaSend({ supabase, groupId: row.id, ok: true, where: "settlement-closed", quotaChat: "group" });
   } catch (e) {
-    await recordWaSend({ supabase, groupId: row.id, ok: false, error: e, where: "settlement-closed" });
+    await recordWaSend({ supabase, groupId: row.id, ok: false, error: e, where: "settlement-closed", quotaChat: "group" });
     await reportError(e, `settlement-closed/${sessionId}`);
     return NextResponse.json({ error: "send failed" }, { status: 502 });
   }

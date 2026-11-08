@@ -11,6 +11,7 @@ import {
 import { knownPlayerNames } from "@/lib/poker/personalHighlights";
 import { appendAction } from "@/lib/liveActionLog";
 import { trackWaSend, recordGateSwallow } from "@/lib/wa/healthServer";
+import { shouldSkipNudge } from "@/lib/wa/quota";
 import { casWriteGroup, updateGroupCas } from "@/lib/groupCas";
 import { reminderKind, writeReminderStamp } from "@/lib/wa/reminderWrite";
 import { AL, canon } from "@/lib/poker/helpers";
@@ -178,7 +179,12 @@ export async function POST(request) {
     }
     try {
       await trackWaSend(
-        { supabase, groupId: row.id, where: "whatsapp/bot-control" },
+        {
+          supabase,
+          groupId: row.id,
+          where: "whatsapp/bot-control",
+          quotaChat: groupId && msg.chatId === groupId ? "group" : "dm",
+        },
         () => sendToGroup(reply, { token: envValue("WHAPI_TOKEN"), groupId: msg.chatId })
       );
     } catch (e) {
@@ -207,35 +213,61 @@ export async function POST(request) {
     if (!reminded) return null;
     const kind = reminderKind(reminded, now);
     /* גל 3ב (ממצא 10): שולחים קודם, חותמים אחר כך — חותמת "נשלח" נכתבת רק
-       על שליחה שהצליחה; כשל חותם ניסיון בלבד ומדווח ככשל, לא כהצלחה. */
-    let sendFailed = false;
-    try {
-      if (reminded.ownerDm && ownerPhone) {
+       על שליחה שהצליחה; כשל חותם ניסיון בלבד ומדווח ככשל, לא כהצלחה.
+       גל 5 (5.6): פר־רגל — הצלחה חלקית לא שולחת שוב את הרגל שעברה. */
+    const dmDue = reminded.legs ? reminded.legs.dm : Boolean(reminded.ownerDm);
+    const groupDue = reminded.legs ? reminded.legs.group : Boolean(reminded.reply);
+    let dmOutcome = null;
+    let groupOutcome = null;
+    if (dmDue && reminded.ownerDm && ownerPhone) {
+      try {
         await trackWaSend(
-          { supabase, groupId: row.id, where: `whatsapp/${kind}-remind` },
+          { supabase, groupId: row.id, where: `whatsapp/${kind}-remind`, quotaChat: "dm" },
           () =>
             sendToGroup(reminded.ownerDm, {
               token: envValue("WHAPI_TOKEN"),
               groupId: ownerPhone,
             })
         );
+        dmOutcome = true;
+      } catch (e) {
+        dmOutcome = false;
+        console.warn(`${kind} remind dm failed:`, e.message);
       }
-      /* נדנוד קצר לקבוצה — רק כשהפונקציה החזירה reply (ביט שקט). */
-      if (reminded.reply && groupId) {
+    }
+    /* נדנוד קצר לקבוצה — רק כשהפונקציה החזירה reply (ביט שקט).
+       גל 5 (5.6): כשהמכסה קרובה לקיר הנדנוד מדלג (לא נחתם — ייבדק שוב
+       בהמשך), כדי לשמור מכסה לתזכורות כסף. */
+    const nudgeQuotaBlocked = groupDue && shouldSkipNudge(row.config?.waQuota);
+    if (groupDue && !nudgeQuotaBlocked && reminded.reply && groupId) {
+      try {
         await trackWaSend(
-          { supabase, groupId: row.id, where: `whatsapp/${kind}-remind` },
+          { supabase, groupId: row.id, where: `whatsapp/${kind}-remind`, quotaChat: "group" },
           () =>
             sendToGroup(reminded.reply, {
               token: envValue("WHAPI_TOKEN"),
               groupId,
             })
         );
+        groupOutcome = true;
+      } catch (e) {
+        groupOutcome = false;
+        console.warn(`${kind} remind group failed:`, e.message);
       }
-    } catch (e) {
-      sendFailed = true;
-      console.warn(`${kind} remind failed:`, e.message);
     }
-    await writeReminderStamp(supabase, row.id, reminded, now, { sent: !sendFailed });
+    const sendFailed = dmOutcome === false || groupOutcome === false;
+    if (nudgeQuotaBlocked) {
+      /* נדנוד שחסמה המכסה לא נחתם — לא "נשלח" ולא "נכשל". */
+      await writeReminderStamp(supabase, row.id, reminded, now, {
+        legs: { group: null, dm: dmOutcome },
+      });
+    } else if (dmOutcome == null && groupOutcome == null) {
+      await writeReminderStamp(supabase, row.id, reminded, now, { sent: true });
+    } else {
+      await writeReminderStamp(supabase, row.id, reminded, now, {
+        legs: { group: groupOutcome, dm: dmOutcome },
+      });
+    }
     return sendFailed ? "send-failed" : "sent";
   };
 
@@ -356,7 +388,7 @@ export async function POST(request) {
   if (ownerDm && ownerPhone) {
     try {
       await trackWaSend(
-        { supabase, groupId: row.id, where: "whatsapp/owner-dm" },
+        { supabase, groupId: row.id, where: "whatsapp/owner-dm", quotaChat: "dm" },
         () => sendToGroup(ownerDm, { token, groupId: ownerPhone })
       );
     } catch (e) {
@@ -367,7 +399,7 @@ export async function POST(request) {
   if (reply) {
     try {
       sent = await trackWaSend(
-        { supabase, groupId: row.id, where: "whatsapp/reply" },
+        { supabase, groupId: row.id, where: "whatsapp/reply", quotaChat: isOwnerDm ? "dm" : "group" },
         () => sendToGroup(reply, { token, groupId: msg.chatId })
       );
     } catch (e) {
@@ -379,7 +411,7 @@ export async function POST(request) {
     if (sent && isOwnerDm && groupId && groupId !== msg.chatId) {
       try {
         await trackWaSend(
-          { supabase, groupId: row.id, where: "whatsapp/group-echo" },
+          { supabase, groupId: row.id, where: "whatsapp/group-echo", quotaChat: "group" },
           () => sendToGroup(reply, { token, groupId })
         );
       } catch (e) {

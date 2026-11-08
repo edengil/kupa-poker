@@ -3,14 +3,17 @@
 import React from "react";
 import { C } from "../../lib/poker/colors";
 import { botHealthView, formatAgoHe } from "../../lib/wa/health.js";
+import { waQuotaView } from "../../lib/wa/quota.js";
 
 /* מתג בוט וואטסאפ — חולץ מ-PokerApp.jsx.
    שורת הסטטוס התחתונה היא אינדיקטור בריאות הערוץ (config.botHealth,
    נכתב מהשרת על כל שליחה דרך lib/wa/healthServer): אם הערוץ נפל —
    רואים כאן מתי נרשם הכשל האחרון ומה הייתה השגיאה, במקום לגלות
-   בדיעבד שהבוט שתק. */
-export function BotToggle({ on, onChange, health = null }) {
+   בדיעבד שהבוט שתק. שורת המכסה (config.waQuota, גל 5) מציגה את מד
+   שליחות ה־Sandbox כדי שהקיר ייראה לפני שנתקלים בו. */
+export function BotToggle({ on, onChange, health = null, quota = null }) {
   const view = health ? botHealthView(health) : null;
+  const q = quota ? waQuotaView(quota) : null;
   return (
     <div
       style={{
@@ -56,6 +59,24 @@ export function BotToggle({ on, onChange, health = null }) {
         {view?.lastGateAt ? (
           <div style={{ fontSize: 11.5, color: C.loss, marginTop: 3 }}>
             ⚠️ פקודת כסף נבלעה בשער המסירה המאוחרת {formatAgoHe(view.lastGateAt)} — הודעה ישנה מערב שכבר נסגר, לא הוחלה
+          </div>
+        ) : null}
+        {q ? (
+          <div
+            style={{
+              fontSize: 11.5,
+              color: q.level === "ok" ? C.dim : C.loss,
+              marginTop: 3,
+            }}
+          >
+            מכסת Whapi היום: {q.sendsToday}/{q.sendsLimit} הודעות · החודש:{" "}
+            {q.conversationsMonth}/{q.conversationsLimit} שיחות, {q.requestsMonth}/
+            {q.requestsLimit} בקשות
+            {q.level === "full"
+              ? " · ⚠️ המכסה מלאה — שליחות ייכשלו עד ההתאפסות"
+              : q.level === "near"
+                ? " · מתקרב לתקרה — נדנודים לא־חיוניים ידלגו כדי לשמור מכסה לתזכורות כסף"
+                : ""}
           </div>
         ) : null}
       </div>

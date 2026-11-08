@@ -148,7 +148,7 @@ export async function POST(request) {
   try {
     const body = text.trim();
     const sent = await sendToGroup(body, { token, groupId });
-    await recordWaSend({ groupId: group.id, ok: true, where: "send/manual" });
+    await recordWaSend({ groupId: group.id, ok: true, where: "send/manual", quotaChat: "group" });
     if (isNightShareText(body)) {
       try {
         await pinAfterSend(
@@ -175,7 +175,7 @@ export async function POST(request) {
     }
     return NextResponse.json({ ok: true });
   } catch (e) {
-    await recordWaSend({ groupId: group.id, ok: false, error: e, where: "send/manual" });
+    await recordWaSend({ groupId: group.id, ok: false, error: e, where: "send/manual", quotaChat: "group" });
     await reportError(e, "send");
     const raw = e instanceof Error ? e.message : String(e);
     const { code, hint } = classifyWhapiSendFailure(raw);

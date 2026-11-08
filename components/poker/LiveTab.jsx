@@ -741,7 +741,7 @@ export function LiveTab({
 
   return (
     <div style={{ marginTop: 4 }}>
-      <BotToggle on={!!cfg.botOn} onChange={(v) => setConfig({ botOn: v })} health={cfg.botHealth || null} />
+      <BotToggle on={!!cfg.botOn} onChange={(v) => setConfig({ botOn: v })} health={cfg.botHealth || null} quota={cfg.waQuota || null} />
       {/* הזמנה לקבוצה (תאריך / מיקום / אישורי הגעה) — תמיד זמינה בלייב, לא תלויה בשולחן */}
       <PlanCard
         db={db}

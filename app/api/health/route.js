@@ -3,6 +3,7 @@ import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { envValue, hasEnv } from "@/lib/env";
 import { authorizedAdmin } from "@/lib/cronAuth";
 import { botHealthView } from "@/lib/wa/health.js";
+import { waQuotaView } from "@/lib/wa/quota.js";
 
 /* ============================================================================
    עמוד מצב מרוכז — מבט אחד על בריאות הבוט וההגדרות.
@@ -89,6 +90,8 @@ async function groupState() {
          בדיקת ה־Whapi החיה למעלה: גם אם הבדיקה החיה עברה, כאן רואים מתי
          נרשם כשל השליחה האחרון ומה הייתה השגיאה. */
       botHealth: botHealthView(data.config?.botHealth),
+      /* מד מכסת Whapi (גל 5, פריט 5.6) — אותה תצוגה כמו במתג הבוט. */
+      waQuota: waQuotaView(data.config?.waQuota),
       gameActive: (data.live?.players?.length || 0) > 0,
       sessions,
       lastReports: data.config?.sentReports || {},

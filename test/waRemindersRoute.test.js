@@ -146,4 +146,37 @@ describe("wa-reminders route", () => {
     expect(h.sendToGroup).toHaveBeenCalledTimes(2);
     nowSpy.mockRestore();
   });
+
+  it("גל 5 (5.6): מכסה קרובה לקיר — הנדנוד מדלג בלי חותמת, ה־DM עדיין נשלח", async () => {
+    /* מד מכסה של היום: 130/150 הודעות — מעל סף הרזרבה לנדנודים. */
+    const day = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jerusalem",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    h.row = {
+      ...h.row,
+      config: {
+        botOn: true,
+        waQuota: { day, sends: 130, month: day.slice(0, 7), requests: 20, chats: ["group"] },
+      },
+    };
+    h.maybeRemindBitIdle.mockImplementation((_live, now) => ({
+      live: { players: [{ name: "אבי" }], bitIdleRemindedAt: now, bitIdleDmRemindedAt: now },
+      attemptLive: { players: [{ name: "אבי" }], bitIdleRemindAttemptAt: now },
+      ownerDm: "שקט פה",
+      reply: "נדנוד",
+      legs: { group: true, dm: true },
+    }));
+    const res = await GET(makeReq(true));
+    expect(res.body).toMatchObject({ ok: true, reminded: "bit-idle", nudgeSkipped: "quota" });
+    /* רק ה־DM נשלח — הנדנוד לא יצא, ולא נחתמה לו חותמת הצלחה. */
+    expect(h.sendToGroup).toHaveBeenCalledTimes(1);
+    expect(h.sendToGroup.mock.calls[0][0]).toBe("שקט פה");
+    const liveWrites = h.writes.filter((w) => w.live);
+    expect(liveWrites).toHaveLength(1);
+    expect(liveWrites[0].live.bitIdleDmRemindedAt).toEqual(expect.any(Number));
+    expect(liveWrites[0].live.bitIdleRemindedAt).toBeUndefined();
+  });
 });
