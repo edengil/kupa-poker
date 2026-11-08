@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { C } from "../lib/poker/colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "../lib/poker/festive";
 import { wazeShortUrl } from "../lib/poker/hosts";
+import { castRsvpVote } from "../lib/rsvpVote";
 
 /* ============================================================================
    אישורי הגעה לערב מתוכנן.
@@ -143,6 +144,7 @@ export function RsvpCard({ supabase, groupId, plan }) {
   const [me, setMe] = useState(null);
   const [busy, setBusy] = useState(false);
   const [justVoted, setJustVoted] = useState(null);
+  const [voteError, setVoteError] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -161,23 +163,26 @@ export function RsvpCard({ supabase, groupId, plan }) {
   const wazeUrl = wazeShortUrl(location);
   const confirmed = mine === "yes";
 
+  /* הצלחה מוצגת רק כשההצבעה נחתה במסד ואומתה בקריאה חוזרת
+     (castRsvpVote) — עד גל 5 גם כתיבה שנכשלה הפכה ל"נתראה בשולחן!"
+     (ממצא ביקורת 25). */
   const vote = async (status) => {
     if (!me || busy) return;
     setBusy(true);
-    await supabase.from("game_rsvps").upsert(
-      {
-        group_id: groupId,
-        user_id: me.id,
-        plan_iso: plan.iso,
-        status,
-        name: me.user_metadata?.full_name ?? me.user_metadata?.name ?? null,
-        email: me.email ?? null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "group_id,user_id" }
-    );
+    setVoteError(false);
+    const res = await castRsvpVote(supabase, {
+      groupId,
+      planIso: plan.iso,
+      user: me,
+      status,
+    });
     await refresh();
-    setJustVoted(status);
+    if (res.ok) {
+      setJustVoted(status);
+    } else {
+      setJustVoted(null);
+      setVoteError(true);
+    }
     setBusy(false);
   };
 
@@ -310,6 +315,21 @@ export function RsvpCard({ supabase, groupId, plan }) {
             marginBottom: 10,
           }}>
             ♠ מעולה — נתראה בערב!
+          </div>
+        )}
+
+        {voteError && (
+          <div
+            data-testid="rsvp-vote-error"
+            style={{
+              textAlign: "center",
+              fontSize: 13,
+              fontWeight: 700,
+              color: C.loss,
+              marginBottom: 10,
+            }}
+          >
+            ההצבעה לא נשמרה — בדקו חיבור ונסו שוב
           </div>
         )}
 

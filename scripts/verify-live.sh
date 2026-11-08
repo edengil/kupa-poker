@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# אימות אתר חי אחרי פריסה — שימוש: scripts/verify-live.sh [מחרוזת-סמן-בבאנדל]
+# אימות אתר חי אחרי פריסה.
+# שימוש: KUPA_VERIFY_GROUP_SLUG=<slug> scripts/verify-live.sh [מחרוזת-סמן-בבאנדל]
+# מזהה הקבוצה הוא בפועל מפתח הגישה ללינק הציבורי, ולכן הוא לא חי בסקריפט
+# (גל 4ב, ממצא 17) — מעבירים אותו במשתנה סביבה. בסיס האתר ניתן לשינוי
+# ב־KUPA_VERIFY_BASE_URL (ברירת המחדל היא כתובת הייצור הציבורית).
 set -u
-BASE="https://kupa-poker.vercel.app"
-GROUP="502329063a21"
+BASE="${KUPA_VERIFY_BASE_URL:-https://kupa-poker.vercel.app}"
+GROUP="${KUPA_VERIFY_GROUP_SLUG:-}"
+if [ -z "$GROUP" ]; then
+  echo "KUPA_VERIFY_GROUP_SLUG is not set — export the group slug first" >&2
+  exit 2
+fi
 fail=0
 
 code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$BASE/g/$GROUP")

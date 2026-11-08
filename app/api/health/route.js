@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { envValue, hasEnv } from "@/lib/env";
+import { authorizedAdmin } from "@/lib/cronAuth";
 import { botHealthView } from "@/lib/wa/health.js";
 
 /* ============================================================================
@@ -10,7 +11,9 @@ import { botHealthView } from "@/lib/wa/health.js";
    קיימים, האם ערוץ ה-Whapi מחובר, לאיזו כתובת רשום ה-webhook, והאם הבוט
    דלוק ומתי נשלח כל דוח לאחרונה.
 
-   שימוש:  GET /api/health?secret=<WHATSAPP_WEBHOOK_SECRET>
+   שימוש:  GET /api/health?secret=<ADMIN_SECRET>
+   (עד להשלמת רוטציית הסודות של גל 4ב מתקבל גם סוד ה־webhook — ראו
+   authorizedAdmin ב־lib/cronAuth.js.)
 
    מוגן בסוד ולא דולף ערכים רגישים: הטוקן לא מוחזר, והסוד בכתובת ה-webhook
    מוסתר. מה שכן מוחזר הוא רק "קיים / לא קיים" ומצב תפעולי.
@@ -19,12 +22,6 @@ import { botHealthView } from "@/lib/wa/health.js";
 export const dynamic = "force-dynamic";
 
 const WHAPI_BASE = "https://gate.whapi.cloud";
-
-function authorized(request) {
-  const secret = envValue("WHATSAPP_WEBHOOK_SECRET");
-  const given = new URL(request.url).searchParams.get("secret");
-  return Boolean(secret) && given === secret;
-}
 
 /* מסתיר את ערך ה-secret שבתוך כתובת ה-webhook, שהעמוד לא ידליף אותו. */
 function maskWebhookUrl(url) {
@@ -103,12 +100,13 @@ async function groupState() {
 }
 
 export async function GET(request) {
-  if (!authorized(request)) {
+  if (!authorizedAdmin(request)) {
     // אבחון מינימלי גם כשהסוד שגוי — בלי לדלוף שום ערך
     return NextResponse.json(
       {
         error: "forbidden",
         env: {
+          hasAdminSecret: hasEnv("ADMIN_SECRET"),
           hasWebhookSecret: hasEnv("WHATSAPP_WEBHOOK_SECRET"),
           hasWhapiToken: hasEnv("WHAPI_TOKEN"),
         },
@@ -133,6 +131,8 @@ export async function GET(request) {
       hasWhapiToken: hasEnv("WHAPI_TOKEN"),
       hasWhapiGroupId: hasEnv("WHAPI_GROUP_ID"),
       hasWebhookSecret: hasEnv("WHATSAPP_WEBHOOK_SECRET"),
+      hasAdminSecret: hasEnv("ADMIN_SECRET"),
+      hasCronSecret: hasEnv("CRON_SECRET"),
       hasSupabaseKey: hasEnv("SUPABASE_SECRET_KEY"),
       hasKupaSlug: hasEnv("KUPA_GROUP_SLUG"),
       hasOwner: hasEnv("WHATSAPP_OWNER"),

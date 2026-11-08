@@ -20,6 +20,7 @@ import { authShell, brassCta } from "../lib/poker/festive";
 import { C as festiveC } from "../lib/poker/colors";
 import { getConfig, onConfig, setConfig, loadConfig } from "../lib/poker/config";
 import { buildPlanInviteText } from "../lib/planInvite";
+import { setHosts } from "../lib/poker/hosts";
 import { track } from "../lib/analytics";
 
 const C = {
@@ -59,7 +60,10 @@ function newSlug() {
   return Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 12);
 }
 
-export default function OwnerApp() {
+export default function OwnerApp({ hosts } = {}) {
+  /* רשימת המארחים מגיעה מהשרת (מקור ההגדרות KUPA_HOSTS_JSON) — מוזרקת
+     למודול המארחים לפני שרינדור הילדים קורא אותה (גל 4ב, ממצא 17). */
+  if (Array.isArray(hosts)) setHosts(hosts);
   const supabase = getSupabase();
   const [phase, setPhase] = useState("loading"); // loading | signedOut | ready | error
   const [group, setGroup] = useState(null);

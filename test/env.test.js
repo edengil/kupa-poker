@@ -30,4 +30,15 @@ describe("server env reader", () => {
     process.env.NEXT_PUBLIC_SITE_URL = "https://poker.example";
     expect(serverSiteUrl()).toBe("https://poker.example");
   });
+
+  it("registers ADMIN_SECRET and drops the never-read legacy anon key name (wave 4b)", () => {
+    delete process.env.ADMIN_SECRET;
+    expect(envValue("ADMIN_SECRET")).toBe("");
+    expect(hasEnv("ADMIN_SECRET")).toBe(false);
+    process.env.ADMIN_SECRET = "configured";
+    expect(envValue("ADMIN_SECRET")).toBe("configured");
+    // ממצא 16: אף נתיב לא קרא את שם ה־anon הישן — הרישום הוסר בגל 4ב
+    expect(() => envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY")).toThrow(TypeError);
+    expect(envValue("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")).toBe("");
+  });
 });

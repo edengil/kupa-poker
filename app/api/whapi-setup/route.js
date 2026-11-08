@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { setPresenceOffline } from "@/lib/whatsapp";
+import { authorizedAdmin } from "@/lib/cronAuth";
+import { envValue } from "@/lib/env";
 
 /* ============================================================================
    תיקון חד-פעמי לבעיית ההתראות בטלפון.
@@ -11,7 +13,9 @@ import { setPresenceOffline } from "@/lib/whatsapp";
    online. ההגדרה נטענת רק אחרי חיבור מחדש של הערוץ (Stop ואז Start בפאנל
    של Whapi — בלי סריקת QR מחדש).
 
-   הפעלה:  GET /api/whapi-setup?secret=<WHATSAPP_WEBHOOK_SECRET>
+   הפעלה:  GET /api/whapi-setup?secret=<ADMIN_SECRET>
+   (עד להשלמת רוטציית הסודות של גל 4ב מתקבל גם סוד ה־webhook — ראו
+   authorizedAdmin ב־lib/cronAuth.js.)
    ============================================================================ */
 
 export const dynamic = "force-dynamic";
@@ -19,12 +23,11 @@ export const dynamic = "force-dynamic";
 const WHAPI_BASE = "https://gate.whapi.cloud";
 
 export async function GET(request) {
-  const secret = new URL(request.url).searchParams.get("secret");
-  if (!process.env.WHATSAPP_WEBHOOK_SECRET || secret !== process.env.WHATSAPP_WEBHOOK_SECRET) {
+  if (!authorizedAdmin(request)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const token = process.env.WHAPI_TOKEN;
+  const token = envValue("WHAPI_TOKEN");
   if (!token) return NextResponse.json({ error: "WHAPI_TOKEN not set" }, { status: 500 });
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

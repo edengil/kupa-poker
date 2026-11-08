@@ -7,6 +7,7 @@ import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeReadOnlyStore, publishStoreKey, DB_KEY } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
+import { DEFAULT_BUYIN } from "../lib/report";
 import { PushPrompt } from "./PushPrompt";
 import { markPaymentViaRpc, rpcMarkTarget } from "../lib/paymentTracking";
 import { votePlayerViaRpc } from "../lib/poker/playerOfNight";
@@ -351,7 +352,7 @@ export default function PublicApp({ slug, nightId = null }) {
           </h2>
           <PokerTable
             readOnly
-            players={live.players} cps={cps} addAmt={live.addAmt || 50}
+            players={live.players} cps={cps} addAmt={live.addAmt || DEFAULT_BUYIN}
             pot={pot} potChips={pot * cps} onSeat={() => {}}
             startedAt={live.startedAt}
             elapsed={live.startedAt ? now - live.startedAt : 0}

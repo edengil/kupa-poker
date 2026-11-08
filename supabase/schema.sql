@@ -1,6 +1,13 @@
 -- ============================================================================
--- קופה — פוקר · סכימת Supabase
+-- קופה — פוקר · סכימת Supabase (מאוחדת, גל 4ב — ממצא ביקורת 15)
 -- להריץ ב-Supabase → SQL Editor → New query → Run
+--
+-- הקובץ הזה הוא צילום המצב הסופי של שרשרת המיגרציות שבתיקיית migrations:
+-- כל טבלה, מדיניות ופונקציה מופיעים כאן בגרסתם האחרונה בשרשרת (כולל
+-- מיגרציות גלים 1–3 וטבלת diag_events של גל 4ב), כך שהתקנה ממנו נותנת את
+-- מערכת הייצור בדיוק. תיקון עתידי למסד נעשה במיגרציה חדשה — והסכמה כאן
+-- מתעדכנת לאותה גרסה סופית. בדיקת הטעינה test/wave4InfraSql.test.js
+-- מוכיחה שהקובץ נטען נקי ושהמלאי שלו זהה למלאי של "הסכמה + כל השרשרת".
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
@@ -86,17 +93,237 @@ grant usage on schema public to service_role;
 grant all privileges on table public.groups to service_role;
 
 -- ---------------------------------------------------------------------------
+-- יומן צפיות.
+--
+-- כל כניסה של צופה נרשמת כאן: מי, מתי, ומאיזה חשבון. זה מה שמאפשר לראות
+-- אחר כך מי פתח את הלינק ומתי — כולל מי שנכנס באמצע היום סתם להציץ.
+-- ---------------------------------------------------------------------------
+create table if not exists public.group_views (
+  id        bigserial primary key,
+  group_id  uuid not null references public.groups (id) on delete cascade,
+  user_id   uuid references auth.users (id) on delete set null,
+  email     text,
+  name      text,
+  at        timestamptz not null default now(),
+  left_at   timestamptz,                      -- "נראה לאחרונה" — מתעדכן כל דקה וביציאה
+  tabs      jsonb not null default '[]'::jsonb -- [{tab, at}] — במה הצופה הסתכל ומתי
+);
+
+-- שדרוג להתקנות קיימות (בטוח להריץ שוב)
+alter table public.group_views add column if not exists left_at timestamptz;
+alter table public.group_views add column if not exists tabs jsonb not null default '[]'::jsonb;
+
+create index if not exists group_views_recent_idx on public.group_views (group_id, at desc);
+
+alter table public.group_views enable row level security;
+
+drop policy if exists "owner reads views"      on public.group_views;
+drop policy if exists "viewer reads own views"  on public.group_views;
+drop policy if exists "viewer logs own view"   on public.group_views;
+drop policy if exists "viewer updates own view" on public.group_views;
+
+-- הבעלים רואה את היומן של הקבוצה שלו בלבד
+create policy "owner reads views"
+  on public.group_views for select
+  using (exists (
+    select 1 from public.groups g
+    where g.id = group_id and g.owner_id = auth.uid()
+  ));
+
+-- הצופה חייב לראות את השורה של עצמו: הרישום מחזיר את מזהה השורה
+-- (insert ... returning), וב-RLS זה נכשל בלי הרשאת select על השורה.
+create policy "viewer reads own views"
+  on public.group_views for select
+  using (auth.uid() = user_id);
+
+-- כל מחובר רושם את הכניסה של עצמו, ולא של אף אחד אחר
+create policy "viewer logs own view"
+  on public.group_views for insert
+  with check (auth.uid() = user_id);
+
+-- הצופה מעדכן רק את השורות של עצמו: זמן יציאה ורשימת הטאבים שנצפו
+create policy "viewer updates own view"
+  on public.group_views for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update on table public.group_views to authenticated;
+grant usage, select on sequence public.group_views_id_seq to authenticated;
+grant all privileges on table public.group_views to service_role;
+
+-- ---------------------------------------------------------------------------
+-- מנויי התראות פוש.
+--
+-- כל צופה שביקש "עדכן אותי כשמתחיל משחק" נשמר כאן עם פרטי המנוי של הדפדפן
+-- שלו. השליחה עצמה נעשית בצד השרת עם המפתח הסודי, ולכן service_role מקבל הכל.
+-- ---------------------------------------------------------------------------
+create table if not exists public.push_subscriptions (
+  id         bigserial primary key,
+  group_id   uuid not null references public.groups (id) on delete cascade,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  name       text,
+  email      text,
+  player_name text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists push_subs_group_idx on public.push_subscriptions (group_id);
+
+alter table public.push_subscriptions add column if not exists email text;
+alter table public.push_subscriptions add column if not exists player_name text;
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "viewer manages own subscription" on public.push_subscriptions;
+
+create policy "viewer manages own subscription"
+  on public.push_subscriptions for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on table public.push_subscriptions to authenticated;
+grant usage, select on sequence public.push_subscriptions_id_seq to authenticated;
+grant all privileges on table public.push_subscriptions to service_role;
+
+-- ---------------------------------------------------------------------------
+-- אישורי הגעה לערב מתוכנן.
+--
+-- המנהל קובע תאריך באפליקציה (נשמר בתוך data.plan), והצופים עונים כאן.
+-- שורה אחת לאדם בקבוצה; plan_iso מציין לאיזה ערב התשובה שייכת, כך שתכנון
+-- חדש מאפס אוטומטית את התשובות הישנות.
+-- ---------------------------------------------------------------------------
+create table if not exists public.game_rsvps (
+  group_id   uuid not null references public.groups (id) on delete cascade,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  plan_iso   text not null,
+  status     text not null check (status in ('yes', 'no', 'maybe')),
+  name       text,
+  email      text,
+  updated_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+
+alter table public.game_rsvps enable row level security;
+
+drop policy if exists "rsvp read"  on public.game_rsvps;
+drop policy if exists "rsvp write" on public.game_rsvps;
+
+-- מי קורא את ההיענויות — נוסח סופי ממיגרציה 202610310001 (גל 5):
+-- בעל הקבוצה (הרשימה באפליקציית המנהל), מי שביקר בקבוצה (שער
+-- 202610080002 נגד קריאה חוצת־קבוצות), והשורה של המשתמש עצמו.
+-- לפני 202610080002 הקריאה הייתה פתוחה לכל מחובר, כולל מיילים.
+create policy "rsvp read"
+  on public.game_rsvps for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.groups g
+      where g.id = game_rsvps.group_id
+        and g.owner_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.group_views gv
+      where gv.group_id = game_rsvps.group_id
+        and gv.user_id = auth.uid()
+    )
+    or auth.uid() = user_id
+  );
+
+create policy "rsvp write"
+  on public.game_rsvps for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on table public.game_rsvps to authenticated;
+grant all privileges on table public.game_rsvps to service_role;
+
+-- ---------------------------------------------------------------------------
+-- אישורי Google Calendar (מיגרציה 202610060001). טוקן הרענון של חיבור
+-- היומן נשמר כאן, בצד השרת בלבד: RLS בלי שום מדיניות = אין גישה
+-- ל־anon/authenticated, ו־service_role עוקף.
+-- ---------------------------------------------------------------------------
+create table if not exists public.calendar_credentials (
+  group_id uuid primary key references public.groups(id) on delete cascade,
+  refresh_token text not null,
+  connected_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.calendar_credentials enable row level security;
+
+-- תור ההתראות (push_queue, מיגרציה 202610080003) הוסר בגל 5
+-- (מיגרציה 202610310002): המנגנון מעולם לא חווט — לא היה יצרן, לא היה
+-- תזמון לעיבוד, והטבלה עמדה ריקה בייצור. ההתראות יוצאות בנתיבים ישירים.
+
+-- ---------------------------------------------------------------------------
+-- יומן אבחון (מיגרציה 202610300006, גל 4ב). שורות מ־/api/diag ומרישום
+-- אירועי השליחה של הבוט (lib/wa/healthServer.js). הטבלה חיה בייצור מאז
+-- 24.10.2026; כאן היא נכנסת לסכמה במבנה זהה לייצור. RLS בלי מדיניות —
+-- כתיבה וקריאה רק דרך service_role בצד השרת.
+-- ---------------------------------------------------------------------------
+create table if not exists public.diag_events (
+  id         bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  kind       text,
+  message    text,
+  stack      text,
+  url        text,
+  ua         text,
+  phase      integer,
+  payload    jsonb
+);
+
+alter table public.diag_events enable row level security;
+
+grant all privileges on table public.diag_events to service_role;
+
+-- ---------------------------------------------------------------------------
 -- קריאה ציבורית לקריאה-בלבד.
 -- security definer עוקף RLS, אבל מחזיר רק את העמודות הבטוחות ורק לפי slug.
 -- מי שאין לו את הלינק לא יכול להגיע לשום דבר, וגם לא לרשימת הקבוצות.
 -- live נכלל כדי שהצופים יראו משחק פעיל. owner_id ו-slug לעולם לא יוצאים החוצה.
+-- הצפייה דורשת התחברות: ה-slug נשאר מפתח הגישה, אבל בנוסף אליו צריך
+-- חשבון Google — אחרת אין דרך לדעת מי צופה. לכן execute רק ל-authenticated.
 -- ---------------------------------------------------------------------------
+-- פרטיות קופה (גלים 1–2): הקרנת צופה אחת לכל הפונקציות הציבוריות.
+-- הגדרות הפונקציות בבלוק הזה הן הגרסאות הסופיות בשרשרת המיגרציות:
+-- project_payments_for_viewer — 202610300001; ‏strip_buyin_event_sids —
+-- 202610300002; ‏public_group — 202610300003; ‏project_session_for_viewer
+-- ו־filter_shared_group_data — 202610300004.
 -- ---------------------------------------------------------------------------
--- פרטיות קופה (גל 1, 30.10): הקרנת צופה אחת לכל הפונקציות הציבוריות.
--- הגדרות זהות למיגרציה 202610300001_wave1_pot_privacy.sql.
--- project_payments_for_viewer: שורת הקופה יוצאת ממחרוזת התוכנית והסימונים
+
+-- עזר הקרנה: מערך שחקנים/שורות־ערב → אותו מערך כשמכל אירוע קנייה הוסר
+-- מפתח ה־sid (מזהה הודעת הוואטסאפ — שדה פנימי של הבוט, לא לצופה).
+create or replace function public.strip_buyin_event_sids(p_rows jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = public
+as $$
+  select case
+    when p_rows is null or jsonb_typeof(p_rows) <> 'array' then p_rows
+    else coalesce((
+      select jsonb_agg(
+        case when jsonb_typeof(elem) = 'object' and jsonb_typeof(elem->'buyinEvents') = 'array' then
+          jsonb_set(elem, '{buyinEvents}', coalesce((
+            select jsonb_agg(case when jsonb_typeof(ev) = 'object' then ev - 'sid' else ev end order by eord)
+            from jsonb_array_elements(elem->'buyinEvents') with ordinality as t(ev, eord)
+          ), '[]'::jsonb), true)
+        else elem end
+        order by ord)
+      from jsonb_array_elements(p_rows) with ordinality as t(elem, ord)
+    ), '[]'::jsonb)
+  end;
+$$;
+
+revoke all on function public.strip_buyin_event_sids(jsonb) from public, anon;
+
+-- הקרנת תשלומי ערב לצופה: שורת הקופה יוצאת ממחרוזת התוכנית והסימונים
 -- ממופים מחדש לקואורדינטות המוקרנות; potPaid מוסר מהתגובה (באחסון נשמר).
--- ---------------------------------------------------------------------------
 create or replace function public.project_payments_for_viewer(p_payments jsonb)
 returns jsonb
 language plpgsql
@@ -186,7 +413,8 @@ $$;
 
 revoke all on function public.project_payments_for_viewer(jsonb) from public, anon;
 
--- הקרנת ערב בודד לצופה: בלי שדות קופה, בלי coupleFills, בלי frozenActual.
+-- הקרנת ערב בודד לצופה: בלי שדות קופה, בלי coupleFills, בלי סימוני
+-- הקפאה (frozenActual/frozenReal/frozenAuto), עם הסרת sid מאירועי הקנייה.
 create or replace function public.project_session_for_viewer(p_sess jsonb)
 returns jsonb
 language plpgsql
@@ -201,10 +429,13 @@ begin
   end if;
   out := p_sess - 'savingsPot' - 'savingsPotActual' - 'coupleFills';
   if out ? 'manualSettlement' and jsonb_typeof(out->'manualSettlement') = 'object' then
-    out := jsonb_set(out, '{manualSettlement}', (out->'manualSettlement') - 'frozenActual', true);
+    out := jsonb_set(out, '{manualSettlement}', (out->'manualSettlement') - 'frozenActual' - 'frozenReal' - 'frozenAuto', true);
   end if;
   if out ? 'payments' then
     out := jsonb_set(out, '{payments}', public.project_payments_for_viewer(out->'payments'), true);
+  end if;
+  if out ? 'entries' and jsonb_typeof(out->'entries') = 'array' then
+    out := jsonb_set(out, '{entries}', public.strip_buyin_event_sids(out->'entries'), true);
   end if;
   return out;
 end;
@@ -212,7 +443,8 @@ $$;
 
 revoke all on function public.project_session_for_viewer(jsonb) from public, anon;
 
--- סינון נתוני קבוצה לתגובות RPC ציבוריות: shareHistory + הקרנת קופה מלאה.
+-- סינון נתוני קבוצה לתגובות RPC ציבוריות: shareHistory + הקרנת קופה מלאה
+-- + הסרת סימוני ההקפאה מ־manualSettlement של כל ערב מוקרן, בשני המצבים.
 create or replace function public.filter_shared_group_data(p_data jsonb, p_config jsonb)
 returns jsonb
 language plpgsql
@@ -235,6 +467,11 @@ begin
       order by coalesce((elem->>'endedAt')::numeric, 0) desc,
                coalesce(elem->>'iso', '') desc
       limit 1;
+    -- גל 2: גם סימוני ההקפאה יוצאים מ־manualSettlement של הערב המוקרן
+    if last_sess is not null and jsonb_typeof(last_sess->'manualSettlement') = 'object' then
+      last_sess := jsonb_set(last_sess, '{manualSettlement}',
+        (last_sess->'manualSettlement') - 'frozenReal' - 'frozenAuto' - 'frozenActual', true);
+    end if;
     return jsonb_build_object(
       'sessions', case when last_sess is null then '[]'::jsonb
                        else jsonb_build_array(last_sess) end,
@@ -248,6 +485,15 @@ begin
   select coalesce(jsonb_agg(public.project_session_for_viewer(elem) order by ord), '[]'::jsonb)
     into projected
     from jsonb_array_elements(sessions) with ordinality as t(elem, ord);
+  -- גל 2: גם סימוני ההקפאה יוצאים מ־manualSettlement של כל ערב מוקרן
+  select coalesce(jsonb_agg(
+      case when jsonb_typeof(elem->'manualSettlement') = 'object'
+        then jsonb_set(elem, '{manualSettlement}',
+               (elem->'manualSettlement') - 'frozenReal' - 'frozenAuto' - 'frozenActual', true)
+        else elem
+      end order by ord), '[]'::jsonb)
+    into projected
+    from jsonb_array_elements(projected) with ordinality as t(elem, ord);
   return (p_data - 'savingsPot' - 'savingsWithdrawals')
     || jsonb_build_object('sessions', projected);
 end;
@@ -294,168 +540,41 @@ as $$
                '[]'::jsonb))
     end,
     case when g.live is null then null
-         else g.live - 'savingsPot' - 'savingsPotActual' - 'savingsWithdrawals'
-                    - 'potDraft' - 'frozenActual' - 'potPaid' - 'coupleFills' end,
+         else
+           case when jsonb_typeof(g.live->'players') = 'array' then
+             jsonb_set(
+               g.live - 'savingsPot' - 'savingsPotActual' - 'savingsWithdrawals'
+                      - 'potDraft' - 'frozenActual' - 'potPaid' - 'coupleFills'
+                      - 'applied',
+               '{players}',
+               public.strip_buyin_event_sids(g.live->'players'),
+               true)
+           else g.live - 'savingsPot' - 'savingsPotActual' - 'savingsWithdrawals'
+                      - 'potDraft' - 'frozenActual' - 'potPaid' - 'coupleFills'
+                      - 'applied' end
+         end,
     g.updated_at
-  from public.groups g
-  where g.slug = p_slug
-  limit 1;
+  from public.groups g where g.slug = p_slug limit 1;
 $$;
 
 revoke all on function public.public_group(text) from public, anon;
 grant execute on function public.public_group(text) to authenticated;
 
--- ---------------------------------------------------------------------------
--- יומן צפיות.
---
--- כל כניסה של צופה נרשמת כאן: מי, מתי, ומאיזה חשבון. זה מה שמאפשר לראות
--- אחר כך מי פתח את הלינק ומתי — כולל מי שנכנס באמצע היום סתם להציץ.
--- ---------------------------------------------------------------------------
-create table if not exists public.group_views (
-  id        bigserial primary key,
-  group_id  uuid not null references public.groups (id) on delete cascade,
-  user_id   uuid references auth.users (id) on delete set null,
-  email     text,
-  name      text,
-  at        timestamptz not null default now(),
-  left_at   timestamptz,                      -- "נראה לאחרונה" — מתעדכן כל דקה וביציאה
-  tabs      jsonb not null default '[]'::jsonb -- [{tab, at}] — במה הצופה הסתכל ומתי
-);
-
--- שדרוג להתקנות קיימות (בטוח להריץ שוב)
-alter table public.group_views add column if not exists left_at timestamptz;
-alter table public.group_views add column if not exists tabs jsonb not null default '[]'::jsonb;
-
-create index if not exists group_views_recent_idx on public.group_views (group_id, at desc);
-
-alter table public.group_views enable row level security;
-
-drop policy if exists "owner reads views"      on public.group_views;
-drop policy if exists "viewer reads own views"  on public.group_views;
-drop policy if exists "viewer logs own view"   on public.group_views;
-drop policy if exists "viewer updates own view" on public.group_views;
-
--- הבעלים רואה את היומן של הקבוצה שלו בלבד
-create policy "owner reads views"
-  on public.group_views for select
-  using (exists (
-    select 1 from public.groups g
-    where g.id = group_id and g.owner_id = auth.uid()
-  ));
-
--- הצופה חייב לראות את השורה של עצמו: הרישום מחזיר את מזהה השורה
--- (insert ... returning), וב-RLS זה נכשל בלי הרשאת select על השורה.
-create policy "viewer reads own views"
-  on public.group_views for select
-  using (auth.uid() = user_id);
-
--- כל מחובר רושם את הכניסה של עצמו, ולא של אף אחד אחר
-create policy "viewer logs own view"
-  on public.group_views for insert
-  with check (auth.uid() = user_id);
-
--- הצופה מעדכן רק את השורות של עצמו: זמן יציאה ורשימת הטאבים שנצפו
-create policy "viewer updates own view"
-  on public.group_views for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-grant select, insert, update on table public.group_views to authenticated;
-grant usage, select on sequence public.group_views_id_seq to authenticated;
-grant all privileges on table public.group_views to service_role;
-
--- ---------------------------------------------------------------------------
--- הצפייה דורשת עכשיו התחברות. ה-slug נשאר מפתח הגישה, אבל בנוסף אליו
--- צריך חשבון Google — אחרת אין דרך לדעת מי צופה.
--- ---------------------------------------------------------------------------
-revoke execute on function public.public_group(text) from anon;
-grant execute on function public.public_group(text) to authenticated;
-
--- ---------------------------------------------------------------------------
--- מנויי התראות פוש.
---
--- כל צופה שביקש "עדכן אותי כשמתחיל משחק" נשמר כאן עם פרטי המנוי של הדפדפן
--- שלו. השליחה עצמה נעשית בצד השרת עם המפתח הסודי, ולכן service_role מקבל הכל.
--- ---------------------------------------------------------------------------
-create table if not exists public.push_subscriptions (
-  id         bigserial primary key,
-  group_id   uuid not null references public.groups (id) on delete cascade,
-  user_id    uuid not null references auth.users (id) on delete cascade,
-  endpoint   text not null unique,
-  p256dh     text not null,
-  auth       text not null,
-  name       text,
-  email      text,
-  player_name text,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists push_subs_group_idx on public.push_subscriptions (group_id);
-
-alter table public.push_subscriptions add column if not exists email text;
-alter table public.push_subscriptions add column if not exists player_name text;
-
-alter table public.push_subscriptions enable row level security;
-
-drop policy if exists "viewer manages own subscription" on public.push_subscriptions;
-
-create policy "viewer manages own subscription"
-  on public.push_subscriptions for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-grant select, insert, update, delete on table public.push_subscriptions to authenticated;
-grant usage, select on sequence public.push_subscriptions_id_seq to authenticated;
-grant all privileges on table public.push_subscriptions to service_role;
-
--- ---------------------------------------------------------------------------
--- אישורי הגעה לערב מתוכנן.
---
--- המנהל קובע תאריך באפליקציה (נשמר בתוך data.plan), והצופים עונים כאן.
--- שורה אחת לאדם בקבוצה; plan_iso מציין לאיזה ערב התשובה שייכת, כך שתכנון
--- חדש מאפס אוטומטית את התשובות הישנות.
--- ---------------------------------------------------------------------------
-create table if not exists public.game_rsvps (
-  group_id   uuid not null references public.groups (id) on delete cascade,
-  user_id    uuid not null references auth.users (id) on delete cascade,
-  plan_iso   text not null,
-  status     text not null check (status in ('yes', 'no', 'maybe')),
-  name       text,
-  email      text,
-  updated_at timestamptz not null default now(),
-  primary key (group_id, user_id)
-);
-
-alter table public.game_rsvps enable row level security;
-
-drop policy if exists "rsvp read"  on public.game_rsvps;
-drop policy if exists "rsvp write" on public.game_rsvps;
-
--- כל מי שמחובר ומחזיק את מזהה הקבוצה (שמגיע רק מהלינק) רואה מי מגיע —
--- זו בדיוק המטרה: שהחברים יראו אחד את השני
-create policy "rsvp read"
-  on public.game_rsvps for select
-  to authenticated
-  using (true);
-
-create policy "rsvp write"
-  on public.game_rsvps for all
-  to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-grant select, insert, update, delete on table public.game_rsvps to authenticated;
-grant all privileges on table public.game_rsvps to service_role;
-
 -- Versioned signature keeps older clients compatible. Only public settings are returned.
 create or replace function public.public_group_v2(p_slug text)
 returns table (id uuid, name text, data jsonb, live jsonb, updated_at timestamptz, config jsonb)
-language sql security definer stable set search_path = public
+language sql
+security definer
+stable
+set search_path = public
 as $$
   select p.id, p.name, p.data, p.live, p.updated_at,
-    jsonb_build_object('shareHistory', coalesce(g.config->'shareHistory', 'true'::jsonb),
-      'chipsPerShekel', coalesce(g.config->'chipsPerShekel', '2'::jsonb))
-  from public.public_group(p_slug) p join public.groups g on g.id = p.id;
+    jsonb_build_object(
+      'shareHistory', coalesce(g.config->'shareHistory', 'true'::jsonb),
+      'chipsPerShekel', coalesce(g.config->'chipsPerShekel', '2'::jsonb)
+    )
+  from public.public_group(p_slug) p
+  join public.groups g on g.id = p.id;
 $$;
 revoke all on function public.public_group_v2(text) from public, anon;
 grant execute on function public.public_group_v2(text) to authenticated;
@@ -482,7 +601,11 @@ $$;
 revoke all on function public.my_last_viewed_group() from public, anon;
 grant execute on function public.my_last_viewed_group() to authenticated;
 
--- Viewers mark settlement transfers paid without full group write access.
+-- ---------------------------------------------------------------------------
+-- צופים מסמנים העברות כ"שולם/התקבל" בלי גישת כתיבה מלאה לקבוצה
+-- (הגרסה הסופית בשרשרת: 202610300001 — זיהוי הקרנת הצופה מול התוכנית
+-- הגולמית, תרגום אינדקס, מיזוג שמרני, ותגובה מסוננת לצופה).
+-- ---------------------------------------------------------------------------
 drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text);
 drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text, text);
 create or replace function public.mark_group_payment(
@@ -622,9 +745,13 @@ $$;
 revoke all on function public.mark_group_payment(text, text, text, integer, boolean, text, text) from public, anon;
 grant execute on function public.mark_group_payment(text, text, text, integer, boolean, text, text) to authenticated;
 
--- Viewers vote for "player of the night" without full group write access.
--- Votes live on the session: session.playerOfNightVotes = { voter: candidate }.
--- התגובה מסוננת כמו במיגרציה 202610080001 (ולא כהגדרה הגולמית ב־202610010001).
+-- ---------------------------------------------------------------------------
+-- צופים מצביעים ל"שחקן הערב" בלי גישת כתיבה מלאה. ההצבעות נשמרות על
+-- הערב: session.playerOfNightVotes = { voter: candidate }.
+-- הגרסה הסופית בשרשרת: 202610080001 — כולל נוסח השגיאה
+-- 'candidate not in session' והחזרת נתונים מסוננים (הסכמה הישנה נשאה
+-- נוסח אחר, 'candidate did not sit this night' — תוקן בגל 4ב).
+-- ---------------------------------------------------------------------------
 create or replace function public.vote_player_of_night(
   p_slug text,
   p_session_id text,
@@ -673,7 +800,7 @@ begin
         end if;
       end loop;
       if not candidate_ok then
-        raise exception 'candidate did not sit this night';
+        raise exception 'candidate not in session';
       end if;
       votes := coalesce(sess->'playerOfNightVotes', '{}'::jsonb);
       votes := jsonb_set(votes, array[btrim(p_voter)], to_jsonb(btrim(p_candidate)), true);
@@ -690,12 +817,64 @@ begin
   set data = jsonb_set(coalesce(g.data, '{}'::jsonb), '{sessions}', out_sessions, true),
       updated_at = now()
   where id = g.id
-  returning data into g.data;
+  returning data, config into g.data, g.config;
 
-  -- גל 1: התגובה לצופה מסוננת ומוקרנת־קופה, כמו public_group
+  -- תיקון אבטחה: להחזיר מסונן, לא את ה-blob המלא
   return public.filter_shared_group_data(g.data, g.config);
 end;
 $$;
 
 revoke all on function public.vote_player_of_night(text, text, text, text) from public, anon;
 grant execute on function public.vote_player_of_night(text, text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- כתיבת קבוצה עם הגנת גרסאות (מיגרציה 202610300005, גל 3ב — ממצא 9).
+-- הטריגר groups_touch מעדכן את updated_at בכל כתיבה; הפונקציה הופכת
+-- אותו לתנאי: כתיבה מתקבלת רק אם updated_at עדיין שווה לערך שהכותב
+-- קרא, והכותב מקבל את updated_at החדש — או null כשיש התנגשות.
+-- security invoker בכוונה: ה־UPDATE כפוף ל־RLS של המתקשר כמו כתיבת
+-- טבלה ישירה. p_patch: תת־קבוצה של data/config/live; מפתח חסר = העמודה
+-- לא נגעת; null על live מנקה, על data/config מתפרש כ־{}.
+-- ---------------------------------------------------------------------------
+create or replace function public.write_group_cas(
+  p_id uuid,
+  p_expected_updated_at timestamptz,
+  p_patch jsonb
+)
+returns timestamptz
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  new_updated_at timestamptz;
+begin
+  if p_id is null or p_patch is null or jsonb_typeof(p_patch) <> 'object' then
+    return null;
+  end if;
+
+  update public.groups g set
+    data = case
+      when p_patch ? 'data' then
+        case when p_patch->'data' = 'null'::jsonb then '{}'::jsonb else p_patch->'data' end
+      else g.data end,
+    config = case
+      when p_patch ? 'config' then
+        case when p_patch->'config' = 'null'::jsonb then '{}'::jsonb else p_patch->'config' end
+      else g.config end,
+    live = case
+      when p_patch ? 'live' then
+        case when p_patch->'live' = 'null'::jsonb then null else p_patch->'live' end
+      else g.live end
+  where g.id = p_id
+    and (p_expected_updated_at is null or g.updated_at = p_expected_updated_at)
+  returning g.updated_at into new_updated_at;
+
+  return new_updated_at;
+end;
+$$;
+
+revoke all on function public.write_group_cas(uuid, timestamptz, jsonb) from public, anon;
+grant execute on function public.write_group_cas(uuid, timestamptz, jsonb) to authenticated, service_role;
+
+notify pgrst, 'reload schema';

@@ -2,11 +2,11 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store, flushStore, subscribeStoreKey } from "../../lib/store";
-import { buildReport, nightDateParts } from "../../lib/report";
+import { buildReport, nightDateParts, DEFAULT_BUYIN, ENTRY } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
-import { r2, AL, canon, waSend } from "../../lib/poker/helpers";
+import { r2, AL, canon, waSend, potForBuyin } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, liveAlreadySaved } from "../../lib/liveMerge";
 import { pickLiveMeta } from "../../lib/liveMeta";
 import { applyManualTip, removeManualTip } from "../../lib/manualTips";
@@ -109,7 +109,7 @@ export function LiveTab({
     [players, activity, db, anyCash, cps]
   );
   const [name, setName] = useState("");
-  const [addAmt, setAddAmt] = useState(50);
+  const [addAmt, setAddAmt] = useState(() => cfg.defaultBuyin || DEFAULT_BUYIN);
   const [savings5, setSavings5] = useState(true); // 5% לקופת החיסכון — דלוק אוטומטית בכל משחק (עדן, 2026-10-14); הכפתור מכבה לערב ספציפי
   const [potDraft, setPotDraft] = useState(""); // עריכת המנהל לסכום קופת הערב — ריק = המחושב האוטומטי (עדן, 19.10)
   const [entriesCount, setEntriesCount] = useState(""); // כניסות שהכנתי (מלאי כולל)
@@ -371,8 +371,8 @@ export function LiveTab({
       if (p.length === 0 && !startedAt) {
         setStartedAt(Date.now());
       }
-      // 5% לקופת החיסכון — החוב נשאר מלא, הקופה מחושבת כ-5% מסך הקניות
-      const toPot = savings5 ? r2(addAmt * 0.05) : 0;
+      // 5% לקופת החיסכון — החוב נשאר מלא, הקופה בנוסחה האחת (potForBuyin)
+      const toPot = savings5 ? potForBuyin(addAmt) : 0;
       return [
         ...p,
         {
@@ -391,7 +391,7 @@ export function LiveTab({
     const at = Date.now();
     const nm = players[i] && players[i].name;
     // 5% לקופת החיסכון (רק בקנייה חיובית) — החוב נשאר מלא
-    const toPot = savings5 && amt > 0 ? r2(amt * 0.05) : 0;
+    const toPot = savings5 && amt > 0 ? potForBuyin(amt) : 0;
     setPlayers((p) =>
       p.map((x, j) => {
         if (j !== i) return x;
@@ -480,8 +480,9 @@ export function LiveTab({
     setActionLog(out.actionLog);
   };
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
-  // קופת החיסכון = 5% מסך הקופה כשהמתג דלוק — חישוב ישיר
-  const savingsPot = savings5 ? r2(pot * 0.05) : 0;
+  // קופת החיסכון כשהמתג דלוק — נוסחת הקופה האחת (גל 4, ממצא 14):
+  // סכום potForBuyin על קניית כל שחקן, כמו בצבירת הבוט והלייב.
+  const savingsPot = savings5 ? r2(players.reduce((s, p) => s + potForBuyin(+p.buyin || 0), 0)) : 0;
   const rebuyBoard = useMemo(() => computeLiveRebuys(players, A), [players, A]);
   const potChips = players.reduce((s, p) => s + playerChips(p, cps), 0);
   const nets = players.map((p) => ({
@@ -496,8 +497,7 @@ export function LiveTab({
     0
   );
 
-  // מונה כניסות: כניסה אחת = 50₪. בשימוש = הקופה חלקי 50. נותרו = שהכנתי פחות בשימוש.
-  const ENTRY = 50;
+  // מונה כניסות: כניסה אחת = ENTRY₪ (הקבוע האחד מ־report). בשימוש = הקופה חלקי ENTRY. נותרו = שהכנתי פחות בשימוש.
   const entriesUsed = r2(pot / ENTRY);
   const entriesPrepared = entriesCount === "" ? null : +entriesCount || 0;
   const entriesLeft = entriesPrepared === null ? null : r2(entriesPrepared - entriesUsed);
@@ -671,6 +671,8 @@ export function LiveTab({
     if (!res.ok) {
       if (res.reason === "missing_partner") {
         alert("בן/בת הזוג לא בשולחן — אי אפשר לרשום מילוי.");
+      } else if (res.reason === "partner_cashed") {
+        alert("אחד מבני הזוג כבר יצא והשני עדיין במשחק — מילוי זוגי אפשרי רק כששניהם באותו מצב.");
       }
       return;
     }

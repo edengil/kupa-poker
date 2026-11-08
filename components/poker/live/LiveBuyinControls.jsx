@@ -2,6 +2,7 @@
 
 import React from "react";
 import { C } from "../../../lib/poker/colors";
+import { potForBuyin } from "../../../lib/poker/helpers";
 
 /**
  * פקדי קנייה בלייב — חולצו מ־LiveTab.jsx (פיצול 2026-10-16):
@@ -38,7 +39,7 @@ export function LiveBuyinControls({ savings5, onToggleSavings, addAmt, onAddAmt,
         </button>
         {savings5 && (
           <span style={{ color: C.brass, fontSize: 12 }}>
-            השחקן מקבל {Math.round(addAmt * 0.95 * cps)} ג&apos;יטונים
+            השחקן מקבל {Math.round((addAmt - potForBuyin(addAmt)) * cps)} ג&apos;יטונים
           </span>
         )}
       </div>

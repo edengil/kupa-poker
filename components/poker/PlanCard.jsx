@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { planLabel } from "../Rsvp";
 import { C } from "../../lib/poker/colors";
 import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "../../lib/poker/festive";
-import { HOSTS, wazeShortUrl } from "../../lib/poker/hosts";
+import { getHosts, wazeShortUrl } from "../../lib/poker/hosts";
 import { isPlanStale, planTodayIso } from "../../lib/planTiming";
 import { computeNightHype } from "../../lib/poker/nightHype";
 import { requestEmailInvites } from "../../lib/sendEmailInvites";
@@ -16,7 +16,7 @@ import { flushStore } from "../../lib/store";
 import { waShare } from "../../lib/poker/helpers";
 import { CheckCircle2, Copy, Share2 } from "./icons";
 
-/* תכנון ערב + בחירת מארח. הכתובות עצמן ב-hosts.js. */
+/* תכנון ערב + בחירת מארח. הכתובות עצמן מגיעות ממקור ההגדרות (hosts.js). */
 
 function splitPlanFields(plan) {
   if (!plan) return { location: "", note: "" };
@@ -24,7 +24,7 @@ function splitPlanFields(plan) {
     return { location: plan.location || "", note: plan.note || "" };
   }
   /* תוכניות ישנות: note שימש גם למיקום וגם להערות */
-  if (plan.note && (HOSTS.some((h) => h.text === plan.note) || /^אצל\s/.test(plan.note))) {
+  if (plan.note && (getHosts().some((h) => h.text === plan.note) || /^אצל\s/.test(plan.note))) {
     return { location: plan.note || "", note: "" };
   }
   return { location: "", note: plan.note || "" };
@@ -291,7 +291,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               מיקום
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-              {HOSTS.map((h) => (
+              {getHosts().map((h) => (
                 <button
                   key={h.label}
                   onClick={() => setLocation(h.text)}

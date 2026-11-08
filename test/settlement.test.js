@@ -166,7 +166,11 @@ describe("settle — real-night shaped split (Eden preferred)", () => {
   /* נגזר מהעברות בפועל:
        אורן→עדן 80, נתנאל→דן 50, איציק→דן 100,
        דור+עדן לירז→עדן 160 / אופיר 35 / דן 30
-     נטו: עדן +240, דן +180, אופיר +35, אורן -80, נתנאל -50, איציק -100, לירז -225 */
+     נטו: עדן +240, דן +180, אופיר +35, אורן -80, נתנאל -50, איציק -100, לירז -225
+     הערה (גל 4, ממצא 12): ההעברות בפועל באותו ערב שיקפו את הבאג —
+     הזוג אופיר↔נתנאל לא זוהה כי "אופיר" היה שם קצר. עם התיקון
+     התוכנית לאותם נטו שונה: נתנאל מכסה את אופיר קודם (35) ואז
+     דן (15), והזוג לירז משלם לדן 65 במקום 30+35. */
   const nightPlayers = [
     { name: "עדן גיל", buyin: 0, cashout: "240" },
     { name: "דן", buyin: 0, cashout: "180" },
@@ -178,14 +182,19 @@ describe("settle — real-night shaped split (Eden preferred)", () => {
     { name: "עדן לירז", buyin: 113, cashout: "0" },
   ];
 
-  it("keeps Netanel off Eden/Oren when Dan (Bit) can absorb", () => {
+  it("keeps Netanel off Eden/Oren: partner Ofir first (couple), rest to Dan (Bit)", () => {
     const { transfers } = settle(nightPlayers, 1);
     const netanel = transfers.filter((t) => String(t.from).includes("נתנאל"));
     expect(netanel.length).toBeGreaterThan(0);
     for (const t of netanel) {
       expect(isCashOnly(t.to)).toBe(false);
     }
-    expect(netanel.some((t) => t.to === "דן" && t.amount === 50)).toBe(true);
+    /* גל 4 (ממצא 12): "אופיר" מזוהה כעת כבן־הזוג של נתנאל גם בשם קצר,
+       ולכן הכיסוי הזוגי קודם — נתנאל מכסה את אופיר (35) ורק השארית
+       (15) הולכת לדן בביט. לפני התיקון הזוג לא זוהה ונתנאל שילם
+       את כל ה־50 לדן. */
+    expect(netanel.some((t) => t.to === "אופיר" && t.amount === 35 && t.pair)).toBe(true);
+    expect(netanel.some((t) => t.to === "דן" && t.amount === 15)).toBe(true);
   });
 
   it("allows Oren→Eden cash/PayBox path", () => {
@@ -210,8 +219,10 @@ describe("settle — real-night shaped split (Eden preferred)", () => {
     }
     const byTo = Object.fromEntries(joint.map((t) => [t.to, t.amount]));
     expect(byTo["עדן גיל"]).toBe(160);
-    expect(byTo["אופיר"]).toBe(35);
-    expect(byTo["דן"]).toBe(30);
+    /* גל 4 (ממצא 12): אופיר כבר לא מקבל מהזוג לירז — בן־זוגו נתנאל
+       כיסה אותו בכיסוי הזוגי; חלקו של דן מהזוג גדל בהתאם (65). */
+    expect(byTo["אופיר"]).toBeUndefined();
+    expect(byTo["דן"]).toBe(65);
   });
 });
 
@@ -263,7 +274,9 @@ describe("helpers", () => {
   it("transferVerb uses feminine form for configured names", () => {
     expect(transferVerb("אורן")).toBe("מעבירה");
     expect(transferVerb("אורן גיל")).toBe("מעבירה");
-    expect(transferVerb("עדן לירז")).toBe("מעבירה");
+    /* עדן לירז הוא זכר — עד גל 4 (ממצא 12) הרשימות סתרו זו את זו
+       והוא קיבל לשון נקבה; הרשימה האחת מתקנת לזכר. */
+    expect(transferVerb("עדן לירז")).toBe("מעביר");
     expect(transferVerb("דן")).toBe("מעביר");
     expect(transferVerb("דור לירז ועדן לירז")).toBe("מעבירים");
   });

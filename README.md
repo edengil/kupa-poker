@@ -38,7 +38,7 @@
    צריך Client ID ו-Client Secret מ-Google Cloud Console
    (APIs & Services → Credentials → OAuth client ID → Web application).
    ב-*Authorized redirect URIs* בגוגל, הדבק את ה-Callback URL ש-Supabase מציג במסך.
-4. **Project Settings → API** — משם ה-URL וה-anon key.
+4. **Project Settings → API** — משם ה-URL וה-publishable key.
 
 ### 2. מקומית
 
@@ -55,7 +55,7 @@ Import מ-GitHub, ואז **Settings → Environment Variables**:
 | שם | ערך |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | ה-URL מ-Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ה-anon key |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ה-publishable key (מתחיל ב־sb_publishable_) |
 | `NEXT_PUBLIC_SITE_URL` | הדומיין הסופי, למשל `https://kupa.vercel.app` |
 
 אחרי הדיפלוי, שתי פעולות שקל לשכוח:
@@ -85,7 +85,6 @@ app/
   page.jsx              האפליקציה של הבעלים
   g/[slug]/page.jsx     הלינק הציבורי לצפייה
   auth/callback/route.js  חזרה מגוגל
-  api/keep-alive/route.js מונע השהיה של הפרויקט
 components/
   PokerApp.jsx          הקוד המקורי, מועבר כמעט כלשונו
   OwnerApp.jsx          שער התחברות, יצירת הקבוצה, רצועת השיתוף, שידור
@@ -227,10 +226,13 @@ supabase/schema.sql     טבלה, RLS, ופונקציית הקריאה הציב�
 לפני יציאה מהדף וביציאה מהחשבון.
 
 **הפרויקט לא נרדם.** Supabase משהה פרויקטים חינמיים אחרי 7 ימים בלי פעילות —
-מלכודת אמיתית לקבוצה שמשחקת פעם בחודש. `vercel.json` מגדיר cron שבועי שפונה
-ל-`/api/keep-alive`, ושם שאילתה זולה אחת מאפסת את השעון.
+מלכודת אמיתית לקבוצה שמשחקת פעם בחודש. מה שמאפס את השעון בפועל הוא ה-cron
+היומי (`/api/cron-daily`, מתוזמן ב-`vercel.json`): שני המריצים שלו קוראים את
+טבלת הקבוצות בכל ריצה, כך שהמסד רואה פעילות כל יום. נתיב `/api/keep-alive`
+ייעודי הוסר בגל 5 — מעולם לא היה לו תזמון, והקריאה האנונימית ל-public_group
+שעשה נדחתה בהרשאות מאז מיגרציית הפרטיות של ספטמבר 2025.
 
-**Realtime לא דורש הגדרה.** ערוצי Broadcast עובדים עם ה-anon key כברירת מחדל,
+**Realtime לא דורש הגדרה.** ערוצי Broadcast עובדים עם המפתח הפומבי (publishable) כברירת מחדל,
 בלי להוסיף טבלאות ל-replication ובלי לגעת בהגדרות הפרויקט.
 
 **קבוצה אחת לחשבון.** `OwnerApp` לוקח את השורה הראשונה שלך או יוצר אחת. אם תרצה

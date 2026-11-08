@@ -26,7 +26,7 @@ describe("classifyWhapiSendFailure", () => {
 describe("buildPlanInviteText", () => {
   it("builds invite with link and location", () => {
     const text = buildPlanInviteText(
-      { iso: "2026-09-23", time: "21:00", location: "אצל עדן · לויתן 4, נתניה · קומה 23, דירה 2303 · קוד בניין #4770#", note: "חניה" },
+      { iso: "2026-09-23", time: "21:00", location: "אצל דני · הפרחים 3, עיר הדוגמה · קומה 4, דירה 12 · קוד בניין #1234#", note: "חניה" },
       { isUpdate: false, baseUrl: "https://kupa-poker.vercel.app", slug: "kupa" }
     );
     expect(text).toContain("ערב פוקר מתוכנן");

@@ -17,6 +17,11 @@ import { jerusalemHour } from "@/lib/paymentReminder";
 
    ידני: /api/cron-daily?secret=<סוד>
          /api/cron-daily?secret=<סוד>&forcePay=1
+
+   הריצה היומית הזו היא גם מנגנון ההשארה־חיה של הפרויקט: runNoticeEmails
+   ו־runNoticePushes קוראים את טבלת הקבוצות בכל ריצה, כך שהמסד רואה פעילות
+   כל יום ושעון ההשהיה של Supabase (7 ימים) מתאפס. נתיב keep-alive ייעודי
+   הוסר בגל 5 — לא היה לו תזמון והקריאה האנונימית שלו נדחתה בהרשאות.
    ============================================================================ */
 
 export const dynamic = "force-dynamic";

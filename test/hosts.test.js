@@ -1,7 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
-  HOSTS,
+  parseHosts,
+  hostsFromEnv,
+  setHosts,
+  getHosts,
   hostBySlug,
+  hostFromLocation,
+  hostPlayerFromLocation,
   siteBaseUrl,
   wazeQueryFromLocation,
   wazeNavigateUrl,
@@ -9,106 +14,163 @@ import {
   planShareLocationLines,
 } from "../lib/poker/hosts.js";
 
-describe("HOSTS", () => {
-  it("includes Netanel with street and door code", () => {
-    const h = HOSTS.find((x) => x.label === "נתנאל כהן");
-    expect(h.text).toContain("נורוק 6");
-    expect(h.text).toContain("06060");
+/* גל 4ב (ממצא 17): המארחים מגיעים ממקור ההגדרות (KUPA_HOSTS_JSON), לא
+   מקבוע בקוד. הבדיקות כאן עובדות על נתוני דוגמה בדיוניים בלבד — כתובות
+   וקודים אמיתיים לא חיים יותר בריפו, גם לא בבדיקות. */
+const FIXTURE_HOSTS = [
+  { slug: "dani", label: "דני", text: "אצל דני · הפרחים 3, עיר הדוגמה · קומה 4, דירה 12 · קוד בניין #1234#" },
+  { slug: "noa", label: "נועה לוי", text: "אצל נועה לוי · הים 8, עיר הדוגמה · קומת קרקע" },
+  { slug: "omer", label: "עומר", text: "אצל עומר · ההר 21, מושב לדוגמה · קומה 1, דירה 2 · קוד בניין 98765" },
+];
+
+const originalEnv = process.env.KUPA_HOSTS_JSON;
+afterEach(() => {
+  if (originalEnv === undefined) delete process.env.KUPA_HOSTS_JSON;
+  else process.env.KUPA_HOSTS_JSON = originalEnv;
+});
+
+describe("parseHosts / hostsFromEnv — מקור ההגדרות", () => {
+  it("parses a JSON string and a plain array identically", () => {
+    expect(parseHosts(JSON.stringify(FIXTURE_HOSTS))).toEqual(FIXTURE_HOSTS);
+    expect(parseHosts(FIXTURE_HOSTS)).toEqual(FIXTURE_HOSTS);
   });
 
-  it("includes Shapak from chat and does not duplicate Netanel", () => {
-    expect(HOSTS.filter((h) => h.label === "נתנאל כהן")).toHaveLength(1);
-    expect(HOSTS.some((h) => h.label === "עדן שפאק")).toBe(true);
+  it("reads KUPA_HOSTS_JSON from the environment", () => {
+    process.env.KUPA_HOSTS_JSON = JSON.stringify(FIXTURE_HOSTS);
+    expect(hostsFromEnv()).toEqual(FIXTURE_HOSTS);
   });
 
-  it("puts Shapak in Netanya so Waze gets street+city", () => {
-    const h = HOSTS.find((x) => x.label === "עדן שפאק");
-    expect(h.text).toBe("אצל עדן שפאק · קרל פופר 6, נתניה · קומה 5, דירה 20");
-    expect(wazeQueryFromLocation(h.text)).toBe("קרל פופר 6, נתניה");
+  it("returns [] for unset, malformed or non-array sources", () => {
+    delete process.env.KUPA_HOSTS_JSON;
+    expect(hostsFromEnv()).toEqual([]);
+    expect(parseHosts("{not json")).toEqual([]);
+    expect(parseHosts("42")).toEqual([]);
+    expect(parseHosts(undefined)).toEqual([]);
+    expect(parseHosts(null)).toEqual([]);
   });
 
-  it("marks Dor as ground floor without a building code", () => {
-    const h = HOSTS.find((x) => x.label === "דור ועדן לירז");
-    expect(h.text).toBe("אצל דור ועדן לירז · תותחנים 16, כפר יונה · קומת קרקע");
-    expect(h.text).not.toMatch(/קוד/);
-    expect(wazeQueryFromLocation(h.text)).toBe("תותחנים 16, כפר יונה");
+  it("drops malformed entries and duplicate slugs (first wins)", () => {
+    const messy = [
+      { slug: "dani", label: "דני", text: "אצל דני · הפרחים 3, עיר הדוגמה" },
+      { slug: "DANI", label: "כפול", text: "אצל כפול · אחר 1, עיר" },
+      { slug: "", label: "בלי slug", text: "אצל בלי · אחר 2, עיר" },
+      { slug: "x", label: "בלי טקסט" },
+      "not-an-object",
+      null,
+    ];
+    expect(parseHosts(messy)).toEqual([
+      { slug: "dani", label: "דני", text: "אצל דני · הפרחים 3, עיר הדוגמה" },
+    ]);
   });
+});
 
-  it("gives every host a unique short slug", () => {
-    const slugs = HOSTS.map((h) => h.slug);
+describe("hosts from the settings source — identical behavior when defined", () => {
+  beforeEach(() => setHosts(FIXTURE_HOSTS));
+
+  it("exposes the injected list via getHosts with unique slugs", () => {
+    const hosts = getHosts();
+    expect(hosts).toHaveLength(3);
+    const slugs = hosts.map((h) => h.slug);
     expect(slugs.every(Boolean)).toBe(true);
     expect(new Set(slugs).size).toBe(slugs.length);
-    expect(slugs).toEqual(
-      expect.arrayContaining(["eden", "ofir", "dor", "sagi", "itzik", "netanel", "shpak"])
-    );
-  });
-});
-
-describe("hostBySlug → waze", () => {
-  it("maps itzik to Yosef Burg street", () => {
-    const h = hostBySlug("itzik");
-    expect(h).toBeTruthy();
-    expect(wazeQueryFromLocation(h.text)).toBe("יוסף בורג 10, נתניה");
-    expect(wazeNavigateUrl(h.text)).toBe(
-      "https://waze.com/ul?q=" + encodeURIComponent("יוסף בורג 10, נתניה") + "&navigate=yes"
-    );
   });
 
-  it("is case-insensitive and rejects unknown slugs", () => {
-    expect(hostBySlug("ITZIK")?.slug).toBe("itzik");
+  it("keeps street and door code on the host text", () => {
+    const h = getHosts().find((x) => x.label === "עומר");
+    expect(h.text).toContain("ההר 21");
+    expect(h.text).toContain("98765");
+  });
+
+  it("marks a ground-floor host without a building code", () => {
+    const h = getHosts().find((x) => x.label === "נועה לוי");
+    expect(h.text).not.toMatch(/קוד/);
+    expect(wazeQueryFromLocation(h.text)).toBe("הים 8, עיר הדוגמה");
+  });
+
+  it("hostBySlug is case-insensitive and rejects unknown slugs", () => {
+    expect(hostBySlug("DANI")?.slug).toBe("dani");
     expect(hostBySlug("nobody")).toBeNull();
+    expect(hostBySlug("")).toBeNull();
+  });
+
+  it("hostBySlug → waze strips floor and code from the query", () => {
+    const h = hostBySlug("dani");
+    expect(wazeQueryFromLocation(h.text)).toBe("הפרחים 3, עיר הדוגמה");
+    expect(wazeNavigateUrl(h.text)).toBe(
+      "https://waze.com/ul?q=" + encodeURIComponent("הפרחים 3, עיר הדוגמה") + "&navigate=yes"
+    );
+  });
+
+  it("hostFromLocation matches the full text and the אצל-head", () => {
+    expect(hostFromLocation(FIXTURE_HOSTS[0].text)?.slug).toBe("dani");
+    expect(hostFromLocation("אצל דני · משהו אחר לגמרי")?.slug).toBe("dani");
+    expect(hostFromLocation("אצל זר · רחוב 1, עיר")).toBeNull();
+    expect(hostFromLocation("")).toBeNull();
+  });
+
+  it("hostPlayerFromLocation resolves through the label map", () => {
+    setHosts([{ slug: "pal", label: "איציק", text: "אצל איציק · הרחוב 1, עיר הדוגמה · קוד בניין 1111" }]);
+    expect(hostPlayerFromLocation("אצל איציק · הרחוב 1, עיר הדוגמה · קוד בניין 1111")).toBe("איציק תפילין");
+  });
+
+  it("emits a short site URL for known hosts", () => {
+    const url = wazeShortUrl(FIXTURE_HOSTS[0].text);
+    expect(url).toBe(`${siteBaseUrl()}/w/dani`);
+    expect(url.length).toBeLessThan(50);
+  });
+
+  it("puts the short Waze URL on its own line in share text", () => {
+    const lines = planShareLocationLines(FIXTURE_HOSTS[2].text);
+    expect(lines[0]).toMatch(/^📍 /);
+    expect(lines[1]).toBe("ניווט בווייז:");
+    expect(lines[2]).toBe(`${siteBaseUrl()}/w/omer`);
+    expect(lines[2]).not.toMatch(/waze\.com/);
   });
 });
 
-describe("wazeQueryFromLocation", () => {
+describe("no hosts configured — graceful fallback", () => {
+  beforeEach(() => setHosts([]));
+
+  it("no known hosts: slug lookup fails, buttons list is empty", () => {
+    expect(getHosts()).toEqual([]);
+    expect(hostBySlug("dani")).toBeNull();
+    expect(hostFromLocation(FIXTURE_HOSTS[0].text)).toBeNull();
+  });
+
+  it("waze links fall back to the free-text /w?q= form", () => {
+    const url = wazeShortUrl(FIXTURE_HOSTS[0].text);
+    expect(url).toBe(
+      `${siteBaseUrl()}/w?q=` + encodeURIComponent("הפרחים 3, עיר הדוגמה")
+    );
+    const lines = planShareLocationLines(FIXTURE_HOSTS[0].text);
+    expect(lines[0]).toMatch(/^📍 /);
+    expect(lines[1]).toBe("ניווט בווייז:");
+    expect(lines[2]).toBe(url);
+  });
+});
+
+describe("wazeQueryFromLocation (pure, host-list independent)", () => {
   it("takes street+city and drops floor/code", () => {
     expect(
-      wazeQueryFromLocation("אצל נתנאל כהן · נורוק 6, נתניה · קומה 1, דירה 1 · קוד בניין 06060")
-    ).toBe("נורוק 6, נתניה");
-    expect(
-      wazeQueryFromLocation("אצל עדן · לויתן 4, נתניה · קומה 23, דירה 2303 · קוד בניין #4770#")
-    ).toBe("לויתן 4, נתניה");
+      wazeQueryFromLocation("אצל דני · הפרחים 3, עיר הדוגמה · קומה 4, דירה 12 · קוד בניין #1234#")
+    ).toBe("הפרחים 3, עיר הדוגמה");
   });
 
   it("returns null without a street", () => {
-    expect(wazeQueryFromLocation("אצל נתנאל כהן")).toBeNull();
+    expect(wazeQueryFromLocation("אצל דני")).toBeNull();
     expect(wazeQueryFromLocation("")).toBeNull();
   });
 
   it("accepts a free-typed street", () => {
-    expect(wazeQueryFromLocation("תותחנים 16 כפר יונה")).toBe("תותחנים 16 כפר יונה");
+    expect(wazeQueryFromLocation("הפרחים 3 עיר הדוגמה")).toBe("הפרחים 3 עיר הדוגמה");
+    const url = wazeShortUrl("הפרחים 3 עיר הדוגמה");
+    expect(url).toBe(`${siteBaseUrl()}/w?q=` + encodeURIComponent("הפרחים 3 עיר הדוגמה"));
   });
-});
 
-describe("wazeNavigateUrl / wazeShortUrl / planShareLocationLines", () => {
   it("builds a direct Waze query link without coordinates", () => {
-    const url = wazeNavigateUrl("אצל שגיא גיל · יהדות הדממה 11, הרצליה");
+    const url = wazeNavigateUrl("אצל נועה לוי · הים 8, עיר הדוגמה · קומת קרקע");
     expect(url).toBe(
-      "https://waze.com/ul?q=" + encodeURIComponent("יהדות הדממה 11, הרצליה") + "&navigate=yes"
-    );
-  });
-
-  it("emits a short site URL for known hosts", () => {
-    const itzikLoc = "אצל איציק · יוסף בורג 10, נתניה · קומה 2, דירה 6 · קוד בניין #7140";
-    expect(wazeShortUrl(itzikLoc)).toBe(`${siteBaseUrl()}/w/itzik`);
-    expect(wazeShortUrl(itzikLoc).length).toBeLessThan(50);
-  });
-
-  it("puts a short Waze URL on its own line in share text", () => {
-    const lines = planShareLocationLines(
-      "אצל איציק · יוסף בורג 10, נתניה · קומה 2, דירה 6 · קוד בניין #7140"
-    );
-    expect(lines[0]).toMatch(/^📍 /);
-    expect(lines[1]).toBe("ניווט בווייז:");
-    expect(lines[2]).toBe(`${siteBaseUrl()}/w/itzik`);
-    expect(lines[2]).not.toMatch(/waze\.com/);
-    expect(lines[2].length).toBeLessThan(50);
-  });
-
-  it("uses /w?q= for free-typed streets", () => {
-    const url = wazeShortUrl("תותחנים 16 כפר יונה");
-    expect(url).toBe(
-      `${siteBaseUrl()}/w?q=` + encodeURIComponent("תותחנים 16 כפר יונה")
+      "https://waze.com/ul?q=" + encodeURIComponent("הים 8, עיר הדוגמה") + "&navigate=yes"
     );
   });
 });

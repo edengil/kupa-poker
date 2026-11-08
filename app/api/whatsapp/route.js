@@ -14,6 +14,7 @@ import { trackWaSend } from "@/lib/wa/healthServer";
 import { casWriteGroup, updateGroupCas } from "@/lib/groupCas";
 import { reminderKind, writeReminderStamp } from "@/lib/wa/reminderWrite";
 import { AL, canon } from "@/lib/poker/helpers";
+import { resolveCps, DEFAULT_BUYIN } from "@/lib/report";
 import { normalize } from "@/lib/poker/db";
 import { latestSession } from "@/lib/lastSession";
 import {
@@ -204,7 +205,10 @@ export async function POST(request) {
 
   const live = row.live || null;
   const gameActive = (live?.players?.length || 0) > 0 || (live?.pendingApprovals?.length || 0) > 0;
-  const cmds = parseCommands(msg.text, live?.addAmt || 50, gameActive);
+  /* סכום כניסת ברירת־המחדל לפקודות בלי סכום: addAmt של הלייב ←
+     defaultBuyin של ההגדרות ← הקבוע האחד (גל 4). עד הגל ההגדרה
+     הייתה מתה והנתיב נפל ישר ל־50 קשיח. */
+  const cmds = parseCommands(msg.text, live?.addAmt || row.config?.defaultBuyin || DEFAULT_BUYIN, gameActive);
 
   const remindIfDue = async () => {
     const now = Date.now();
@@ -295,7 +299,10 @@ export async function POST(request) {
       // מזהה ההודעה הוא מה שמאפשר לזהות עריכה או שליחה כפולה.
       // msgTs (חותמת ההודעה מ־Whapi, לא זמן העיבוד) מזין את שער המסירה
       // המאוחרת — הודעה מערב שכבר נסגר ונשמר לא פותחת לייב רפאים (ממצא 21).
-      const applied = applyCommands(attemptLive, cmds, msg.id, undefined, {
+      /* שער הג׳יטונים מהמקור האחד (גל 4, ממצא 13): הלייב של הניסיון
+         הנוכחי ← הגדרות הקבוצה ← ברירת המחדל. עד הגל הועבר undefined
+         והבוט היה תקוע על 2 גם כשהאפליקציה שיחקה על 4. */
+      const applied = applyCommands(attemptLive, cmds, msg.id, resolveCps(attemptLive, attemptRow.config), {
         knownNames,
         aliases,
         lastSession: latestSession(db.sessions),

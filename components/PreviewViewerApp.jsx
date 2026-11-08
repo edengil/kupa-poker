@@ -4,6 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
 import { configureStore, makeReadOnlyStore } from "../lib/store";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
+import { DEFAULT_BUYIN } from "../lib/report";
 
 /* מנוי שאינו משתנה לעולם — לקריאת "האם אנחנו בלקוח אחרי hydration"
    דרך useSyncExternalStore, כמו ב־PushPrompt וב־PreviewApp. */
@@ -28,6 +29,8 @@ export function buildViewerFixture({ shareHistory = true, withLive = false } = {
     yearly: [{ id: "pv_y", y: 2026, official: true, entries: [{ name: "אלפא צופה", amount: 120 }] }],
     monthly: [],
     aliases: {},
+    emails: {},
+    phones: {},
     roster: ["אלפא צופה", "בטה צופה"],
     plan: null,
   };
@@ -87,7 +90,7 @@ export default function PreviewViewerApp({ shareHistory = true, withLive = false
             readOnly
             players={live.players}
             cps={cps}
-            addAmt={live.addAmt || 50}
+            addAmt={live.addAmt || DEFAULT_BUYIN}
             pot={pot}
             potChips={pot * cps}
             onSeat={() => {}}

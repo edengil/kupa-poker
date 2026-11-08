@@ -1,6 +1,8 @@
 /* עזרי מצב טהורים לערב חי: יצירת מצב, ביטול פעולות ושינוי שמות. */
 
 import { ALIASES, findPlayer, resolveAlias } from "./parse.js";
+import { potForBuyin } from "../poker/helpers.js";
+import { DEFAULT_BUYIN } from "../report.js";
 
 export const r2 = (v: number): number => Math.round(v * 100) / 100;
 
@@ -95,7 +97,7 @@ export interface UndoEntry {
 
 type AliasTable = typeof ALIASES;
 
-export function knownSetOf(list: Set<string> | string[] | null | undefined): Set<string> | null {
+function knownSetOf(list: Set<string> | string[] | null | undefined): Set<string> | null {
   if (!list) return null;
   if (list instanceof Set) return list.size ? list : null;
   if (Array.isArray(list)) return list.length ? new Set(list) : null;
@@ -183,7 +185,7 @@ export function stampBuyin(
   const buyin = Math.max(0, r2(prev + delta));
   const applied = r2(buyin - prev);
   if (!(applied > 0)) return { ...player, buyin };
-  const toPot = state.savings5 ? r2(applied * 0.05) : 0;
+  const toPot = state.savings5 ? potForBuyin(applied) : 0;
   if (toPot > 0) state.savingsPot = r2((Number(state.savingsPot) || 0) + toPot);
   const ev: WaBuyinEvent = { amount: applied, at, total: buyin, pot: toPot || undefined };
   if (sid) ev.sid = sid;
@@ -345,7 +347,7 @@ export function blank(live?: Partial<WaLiveState> | null): WaLiveState {
   const out = {
     ...src,
     entriesCount: src.entriesCount ?? "",
-    addAmt: src.addAmt || 50,
+    addAmt: src.addAmt || DEFAULT_BUYIN,
     startedAt: src.startedAt || null,
     players: [...(src.players || [])],
     applied: { ...(src.applied || {}) },
@@ -542,10 +544,16 @@ export function renameEverywhere(state: WaLiveState, from: string, to: string): 
   state.tips = (state.tips || []).map((t) => (t.name === from ? { ...t, name: to } : t));
   state.coupleFills = (state.coupleFills || []).map((c) => {
     if (!c || typeof c !== "object") return c;
+    /* הצורה האמיתית של אירוע מילוי (lib/poker/coupleFills.js):
+       { couple: [שם, שם], from, to, chips, at } — אין name/a/b. הגרסה
+       הקודמת שכתבה את המפתחות הלא־קיימים האלה, כך ששינוי־שם בבוט השאיר
+       את המילויים על השם הישן והם הפסיקו להיספר לזוג (ביקורת O2). */
     const next = { ...c };
-    if (next.name === from) next.name = to;
-    if (next.a === from) next.a = to;
-    if (next.b === from) next.b = to;
+    if (Array.isArray(next.couple)) {
+      next.couple = next.couple.map((n) => (n === from ? to : n));
+    }
+    if (next.from === from) next.from = to;
+    if (next.to === from) next.to = to;
     return next;
   });
 }

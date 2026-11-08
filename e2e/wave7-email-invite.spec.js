@@ -178,11 +178,11 @@ test.describe("גל 7 · זימוני אימייל", () => {
   });
 
   // טוקן חתום אמיתי: חותמים באותו אלגוריתם של lib/rsvpToken.js.
-  // רץ רק כששרת הפיתוח עלה עם RSVP_TOKEN_SECRET של בדיקה — אז האימות
-  // עובר והנתיב מגיע לשלב כתיבת המסד (שאין בסביבה הזאת) ונכשל בעדינות.
+  // playwright.config קובע RSVP_TOKEN_SECRET קבוע של בדיקות ומעביר
+  // אותו לשרת הפיתוח, כך שהאימות עובר תמיד (גם ב־CI — בלי דילוג)
+  // והנתיב מגיע לשלב כתיבת המסד (שאין בסביבה הזאת) ונכשל בעדינות.
   test("טוקן חתום תקין עובר אימות ומגיע לשלב הכתיבה", async ({ request }) => {
     const secret = process.env.RSVP_TOKEN_SECRET;
-    test.skip(!secret, "אין RSVP_TOKEN_SECRET בסביבת ההרצה");
     const b64url = (buf) =>
       Buffer.from(buf)
         .toString("base64")
