@@ -4,7 +4,10 @@ import { runPeriodReports } from "@/lib/runPeriodReports";
 import { runPaymentReminders } from "@/lib/runPaymentReminders";
 import { runNoticeEmails } from "@/lib/runNoticeEmails";
 import { runNoticePushes } from "@/lib/runNoticePushes";
+import { runGroupSnapshots } from "@/lib/groupSnapshots";
 import { jerusalemHour } from "@/lib/paymentReminder";
+import { getAdminSupabase } from "@/lib/supabaseAdmin";
+import { reportError } from "@/lib/monitor";
 
 /* ============================================================================
    משימה יומית אחת (Hobby מאפשר cron פעם ביום לכל ביטוי).
@@ -42,5 +45,24 @@ export async function GET(request) {
   const notices = await runNoticeEmails();
   const pushes = await runNoticePushes();
 
-  return NextResponse.json({ ok: true, reports, payments, notices, pushes });
+  /* גל 3 (3.1 + 3.4): צילום גיבוי יומי לכל קבוצה + גיזום צילומים
+     (30 יום) ו־diag_events (90 יום). כשל גיבוי מתריע — reportError,
+     לא שקט — אבל לא מפיל את שאר תוצאת הריצה. */
+  let backups = null;
+  try {
+    backups = await runGroupSnapshots(getAdminSupabase());
+    if (backups.failed > 0 || backups.errors.length > 0) {
+      await reportError(
+        new Error(
+          `גיבוי יומי חלקי: ${backups.snapshotted}/${backups.groups} צולמו; שגיאות: ${backups.errors.join(" | ")}`
+        ),
+        "cron-daily/snapshots"
+      );
+    }
+  } catch (e) {
+    await reportError(e, "cron-daily/snapshots");
+    backups = { error: e instanceof Error ? e.message : String(e) };
+  }
+
+  return NextResponse.json({ ok: true, reports, payments, notices, pushes, backups });
 }
