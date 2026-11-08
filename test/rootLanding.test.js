@@ -3,10 +3,10 @@
    האפליקציה המותקנת (start_url="/") וקיבל מסך מנהלים של קבוצה חדשה
    וריקה — כי נתיב ה־boot בשורש יצר קבוצה בשקט לכל מחובר בלי קבוצה
    בבעלותו. הנעילה המרכזית: למשתמש עם שיוך צפייה לעולם לא נוצרת קבוצה. */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolveRootLanding } from "../lib/rootLanding.js";
-import { fetchLastViewedGroup } from "../lib/realtime.js";
+import { fetchLastViewedGroup, fetchLastViewedGroupResult } from "../lib/realtime.js";
 
 const USER = "user-1";
 const OWNED_ROW = { id: "g-owned", slug: "owned-slug", name: "הקבוצה שלי" };
@@ -102,11 +102,41 @@ describe("resolveRootLanding — הכרעת נחיתה בשורש", () => {
     expect(sb.calls.inserts).toEqual([]);
   });
 
-  it("כשל ב־RPC של הצפייה האחרונה: נופל להתנהגות הקיימת (יצירת קבוצה), לא נתקע", async () => {
+  it("כשל ב־RPC של הצפייה האחרונה: שגיאה (מסך נסה־שוב) — לעולם לא יצירת קבוצה (פריט 1.4)", async () => {
+    /* הבדיקה הישנה קידדה את ההתנהגות הפגומה כ"מכוונת": כשל RPC חולף
+       יצר קבוצת־זבל והצופה נתקע עליה כ"בעלים". ההתנהגות הנכונה: כשל ≠
+       "אין צפיות" — שגיאה מדווחת, אפס יצירות. */
     const sb = fakeSupabase({ owned: [], rpcError: { message: "function missing" } });
     const out = await resolveRootLanding(sb, USER, makeSlug);
+    expect(out).toEqual({ kind: "error", message: "function missing" });
+    expect(sb.calls.inserts).toEqual([]);
+  });
+
+  it("צופה שהקבוצה שלו נמחקה (cascade מחק את הצפיות): תשובה חיובית ריקה — נוחת כמשתמש חדש, לא תקוע", async () => {
+    const sb = fakeSupabase({ owned: [], viewedRows: [] });
+    const out = await resolveRootLanding(sb, USER, makeSlug);
     expect(out.kind).toBe("owner");
+    expect(out.created).toBe(true);
     expect(sb.calls.inserts).toHaveLength(1);
+  });
+
+  it("boot כפול מקבילי למשתמש חדש: ריצה אחת משותפת — insert אחד בלבד (שומר in-flight)", async () => {
+    const sb = fakeSupabase({ owned: [], viewedRows: [] });
+    const [a, b] = await Promise.all([
+      resolveRootLanding(sb, "user-double-boot", makeSlug),
+      resolveRootLanding(sb, "user-double-boot", makeSlug),
+    ]);
+    expect(a).toEqual({ kind: "owner", row: CREATED_ROW, created: true });
+    expect(b).toEqual(a);
+    expect(sb.calls.inserts).toHaveLength(1);
+    expect(sb.calls.rpc).toBe(1);
+  });
+
+  it("הכרעה חוזרת אחרי שהראשונה הסתיימה רצה מחדש (השומר מתנקה)", async () => {
+    const sb = fakeSupabase({ owned: [OWNED_ROW] });
+    await resolveRootLanding(sb, "user-seq", makeSlug);
+    await resolveRootLanding(sb, "user-seq", makeSlug);
+    expect(sb.calls.selects).toBe(2);
   });
 
   it("שגיאה ביצירת הקבוצה: שגיאה מדווחת", async () => {
@@ -137,6 +167,30 @@ describe("fetchLastViewedGroup — עטיפת ה־RPC", () => {
   });
 });
 
+describe("fetchLastViewedGroupResult — הבחנת כשל מ״אין צפיות״ (פריט 1.4)", () => {
+  const sbWith = (result) => ({ rpc: () => Promise.resolve(result) });
+
+  it("יש צפייה → { ok: true, group }", async () => {
+    const out = await fetchLastViewedGroupResult(
+      sbWith({ data: [{ slug: "s1", name: "קבוצה" }], error: null })
+    );
+    expect(out).toEqual({ ok: true, group: { slug: "s1", name: "קבוצה" } });
+  });
+
+  it("אין צפיות → { ok: true, group: null } — תשובה חיובית, לא כשל", async () => {
+    const out = await fetchLastViewedGroupResult(sbWith({ data: [], error: null }));
+    expect(out).toEqual({ ok: true, group: null });
+  });
+
+  it("שגיאת שרת → { ok: false } — כשל, לא ״אין צפיות״", async () => {
+    const out = await fetchLastViewedGroupResult(
+      sbWith({ data: null, error: { message: "boom" } })
+    );
+    expect(out.ok).toBe(false);
+    expect(out.error).toBeTruthy();
+  });
+});
+
 describe("חיווט OwnerApp — נעילות סטטיות", () => {
   const src = readFileSync(new URL("../components/OwnerApp.jsx", import.meta.url), "utf8");
 
@@ -151,5 +205,10 @@ describe("חיווט OwnerApp — נעילות סטטיות", () => {
 
   it("ב־OwnerApp עצמו אין יותר יצירת קבוצה — היצירה רק בתוך resolveRootLanding", () => {
     expect(src).not.toContain(".insert(");
+  });
+
+  it("מסך השגיאה מציע ניסיון־חוזר — כשל חולף לא תוקע את המשתמש (פריט 1.4)", () => {
+    expect(src).toContain("window.location.reload()");
+    expect(src).toContain("נסה שוב");
   });
 });

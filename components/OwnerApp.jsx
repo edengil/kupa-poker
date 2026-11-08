@@ -502,7 +502,29 @@ export default function OwnerApp({ hosts } = {}) {
   }, [supabase]);
 
   if (phase === "loading") return <EGSplash />;
-  if (phase === "error") return <Splash tone="error">{message || "משהו השתבש"}</Splash>;
+  if (phase === "error")
+    return (
+      <Splash tone="error">
+        {message || "משהו השתבש"}
+        {/* פריט 1.4: מסך השגיאה הוא מסך נסה־שוב — כשל חולף בנחיתת השורש
+            לא יוצר קבוצה ולא תוקע את המשתמש; רענון מנסה את ההכרעה מחדש. */}
+        <div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              ...brassCta,
+              marginTop: 18,
+              padding: "12px 22px",
+              borderRadius: 12,
+              fontSize: 15,
+            }}
+          >
+            נסה שוב
+          </button>
+        </div>
+      </Splash>
+    );
   if (phase === "signedOut") return <SignIn onSignIn={signIn} />;
 
   return (
