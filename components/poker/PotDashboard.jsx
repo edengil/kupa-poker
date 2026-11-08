@@ -104,7 +104,7 @@ export function PotDashboard({ db, commit, isAdmin }) {
   const overview = useMemo(() => potOverview(db), [db]);
   if (!isAdmin) return null;
 
-  const savePot = (sessionId) => {
+  const savePot = async (sessionId) => {
     const v = Number(potValue);
     if (!Number.isFinite(v) || v < 0) {
       alert("סכום לא תקין");
@@ -122,7 +122,13 @@ export function PotDashboard({ db, commit, isAdmin }) {
       ),
       savingsPot: newTotal > 0 ? newTotal : undefined,
     });
-    void flushStore().catch(() => {});
+    /* בודקים את תוצאת השטיפה (גל 4, 4.6 — בדפוס signOut של OwnerApp):
+       שמירה שלא הגיעה לענן לא סוגרת את העורך כאילו הכול תקין. הערך
+       נשמר מקומית ויישטף בכתיבה הבאה, אבל המנהל חייב לדעת. */
+    if ((await flushStore().catch(() => false)) === false) {
+      alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+      return;
+    }
     setEditingId(null);
     setPotValue("");
   };
@@ -137,7 +143,7 @@ export function PotDashboard({ db, commit, isAdmin }) {
      חלוקה (frozenReal, ממצא ביקורת 8) — כך מנהל וצופה מקבלים אותם
      סכומי שחקנים בדיוק. מחיקת הבפועל משחררת את ההקפאה: מפה אוטומטית
      נמחקת כולה, וחלוקה אמיתית נשארת עם המפה הקפואה (אותם סכומים). */
-  const savePotActual = (sessionId) => {
+  const savePotActual = async (sessionId) => {
     const v = Number(actualValue);
     if (!Number.isFinite(v) || v < 0) {
       alert("סכום לא תקין");
@@ -148,7 +154,11 @@ export function PotDashboard({ db, commit, isAdmin }) {
       ...db,
       sessions: db.sessions.map((s) => (s.id === sessionId ? withActual(s, v) : s)),
     });
-    void flushStore().catch(() => {});
+    // כמו savePot (4.6): כשל שטיפה = העורך נשאר פתוח עם הודעה
+    if ((await flushStore().catch(() => false)) === false) {
+      alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+      return;
+    }
     setEditingActualId(null);
     setActualValue("");
   };
