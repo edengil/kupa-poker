@@ -12,7 +12,7 @@ import { pickLiveMeta } from "../../lib/liveMeta";
 import { applyManualTip, removeManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
-import { parseBuyinEditInput, applyBuyinEdit } from "../../lib/liveBuyinEdit";
+import { parseBuyinEditInput, applyBuyinEdit, applyBuyinEditWithChanges } from "../../lib/liveBuyinEdit";
 import { buildPlayersView, playerChips, effectivePot } from "../../lib/liveView";
 import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/livePace";
 import { notifyTransfersSettlement } from "../../lib/poker/notifyTransfersClient";
@@ -392,6 +392,24 @@ export function LiveTab({
     const nm = players[i] && players[i].name;
     // 5% לקופת החיסכון (רק בקנייה חיובית) — החוב נשאר מלא
     const toPot = savings5 && amt > 0 ? potForBuyin(amt) : 0;
+    if (amt < 0) {
+      /* מינוס הוא תיקון רישום, לא "קנייה שלילית": מנותב דרך מנגנון עריכת
+         הקנייה (גל 4, 4.3) — האירועים מתכווצים יחד עם ה־buyin, כך
+         ש־Σevents = buyin תמיד, ולוח הריבאיים ובדיקת האיזון מדויקים.
+         שינויי האירועים נרשמים ביומן, והביטול ישחזר לפי זהות (4.4). */
+      const p = players[i];
+      if (!p) return;
+      const target = Math.max(0, r2((+p.buyin || 0) + amt));
+      const { player: nextP, changes } = applyBuyinEditWithChanges(p, target, { savings5 });
+      if (nextP === p) return;
+      setPlayers((list) => list.map((x, j) => (j === i ? nextP : x)));
+      if (nm) {
+        setActionLog((log) =>
+          appendAction(log, { t: "buyin", name: nm, amount: amt, eventChanges: changes })
+        );
+      }
+      return;
+    }
     setPlayers((p) =>
       p.map((x, j) => {
         if (j !== i) return x;
@@ -405,7 +423,8 @@ export function LiveTab({
         return next;
       })
     );
-    if (nm && amt) setActionLog((log) => appendAction(log, { t: "buyin", name: nm, amount: amt }));
+    // eventAt = חותמת האירוע שנוצר — הביטול מסיר לפי זהות, לא לפי מיקום (4.4)
+    if (nm && amt) setActionLog((log) => appendAction(log, { t: "buyin", name: nm, amount: amt, ...(amt > 0 ? { eventAt: at } : {}) }));
     if (amt > 0 && startedAt && Date.now() - startedAt > GRACE_MS) {
       setPrompt({
         name: nm,
@@ -478,6 +497,8 @@ export function LiveTab({
     setTips(out.tips);
     setCoupleFills(out.coupleFills);
     setActionLog(out.actionLog);
+    // ביטול שאינו שינוי מצב (התראת כשל וואטסאפ) עדיין חייב להיראות (4.4)
+    if (out.notice) alert(out.notice);
   };
   const pot = r2(players.reduce((s, p) => s + (+p.buyin || 0), 0));
   // קופת החיסכון כשהמתג דלוק — נוסחת הקופה האחת (גל 4, ממצא 14):
@@ -684,6 +705,8 @@ export function LiveTab({
         from: res.event.from,
         to: res.event.to,
         chips: res.event.chips,
+        // זהות האירוע — הביטול מסיר את המילוי הזה בדיוק (גל 4, 4.4)
+        fillAt: res.event.at,
       })
     );
     setMenuIdx(null);
@@ -898,18 +921,16 @@ export function LiveTab({
             onUndo={undoAction}
             onCancelGame={() => {
               if (confirm("לבטל את המשחק הפעיל? הנתונים שלו יימחקו.")) {
-                setPlayers([]);
-                setTips([]);
-                setCoupleFills([]);
-                setActionLog([]);
-                setHandOfNight("");
-                setPotDraft("");
-                setLiveAnnounced([]);
-                setPlanSnap(null);
+                /* איפוס מרשימה אחת (גל 4, 4.3): resetLiveState הוא מקור
+                   האמת היחיד לאיפוס ערב — הרשימה הידנית שהייתה כאן פספסה
+                   את startedAt/entriesCount/savings5/liveMetaRef, וערב חדש
+                   ירש תאריך ו־5% ישנים. */
+                resetLiveState();
                 setMenuIdx(null);
                 setTipPickerIdx(null);
                 setTipAmt("");
                 setTipListName(null);
+                setTipDelConfirm(null);
               }
             }}
           />
