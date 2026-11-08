@@ -6,7 +6,7 @@ import { SendSettlementLink } from "./SendSettlementLink";
 import { C } from "../../lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
 import { settlementTextForSession, potActualFor } from "../../lib/nightShare";
-import { paymentPlan, markTransfer, markPotPaid } from "../../lib/paymentTracking";
+import { paymentPlan, markTransfer, markReceipt, markPotPaid } from "../../lib/paymentTracking";
 import { r2 } from "../../lib/poker/helpers";
 import { settlementVersionLabel } from "../../lib/savedSettlement";
 import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "../../lib/nightConfirmations";
@@ -261,6 +261,37 @@ export function LastSettlementCard({
     return canMarkTransfer({ viewerName, transfer, isAdmin, aliases: A });
   };
 
+  /* גל 5 (החלטת עדן 6, ממצא 32): ביטול סימון «התקבל» — החזרת הצד של
+     המקבל ל־pending. אותם כללי הרשאה כמו סימון ה־received עצמו:
+     המקבל, בן/בת זוגו, או המנהל (ובמסך הבעלים — כמו mayToggle). */
+  const mayUnmarkReceived = (transfer) => {
+    if (!canMark) return false;
+    if (!readOnly && commit) return true;
+    if (isAdmin) return true;
+    if (!me || !transfer?.to) return false;
+    const to = canon(transfer.to, A);
+    return me === to || (partner != null && partner === to);
+  };
+
+  const unmarkReceived = async (index) => {
+    if (!mayUnmarkReceived(transfers[index]) || busy != null) return;
+    setBusy(index);
+    try {
+      const next = markReceipt(session, index, false, viewerName);
+      if (typeof onMarkPayment === "function") {
+        await onMarkPayment(session, index, false, "received", viewerName);
+      } else if (commit && next !== session) {
+        commit({
+          ...db,
+          sessions: db.sessions.map((s) => (s.id === session.id ? next : s)),
+        });
+        await flushStore();
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const mark = async (index, value) => {
     if (!mayToggle(transfers[index]) || busy != null) return;
     setBusy(index);
@@ -395,6 +426,31 @@ export function LastSettlementCard({
           <span style={{ color: C.brass, fontSize: 11 }}>(חלקך: {edenShare}₪)</span>
         )}
         <StatusChip closed={closed}>{confirmationStatusText(statusRow)}</StatusChip>
+        {statusRow?.received && mayUnmarkReceived(transfer) && (
+          <button
+            type="button"
+            data-testid={`unmark-received-${index}`}
+            disabled={busy === index}
+            aria-label={`בטל סימון התקבל: ${transfer.from} אל ${transfer.to}, ${transfer.amount} שקלים`}
+            onClick={(e) => {
+              e.preventDefault();
+              unmarkReceived(index);
+            }}
+            style={{
+              fontSize: 11,
+              padding: "3px 8px",
+              borderRadius: 6,
+              cursor: "pointer",
+              border: `1px solid ${C.line}`,
+              background: "transparent",
+              color: C.dim,
+              fontFamily: "inherit",
+              whiteSpace: "nowrap",
+            }}
+          >
+            בטל «התקבל»
+          </button>
+        )}
       </label>
     );
   };

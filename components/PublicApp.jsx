@@ -12,6 +12,7 @@ import { snapshotForViewer, viewerCps } from "../lib/publicShare";
 import { DEFAULT_BUYIN } from "../lib/report";
 import { PushPrompt } from "./PushPrompt";
 import { markPaymentViaRpc, rpcMarkTarget } from "../lib/paymentTracking";
+import { reportDiag } from "../lib/diagReport";
 import { votePlayerViaRpc } from "../lib/poker/playerOfNight";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
@@ -32,6 +33,10 @@ const C = {
 
 // גיבוי ל-WebSocket. בטלפון הערוץ נופל כשהמסך ננעל, ולא תמיד מתאושש.
 const POLL_MS = 12000;
+
+/* גל 5, פריט 5.3: כשל אימוץ מקומי אחרי סימון תשלום מדווח ל־diag פעם
+   אחת בטעינת דף — לא בכל ניסיון. */
+let markAdoptReported = false;
 
 function bootViewerStore(snap) {
   configureStore(makeReadOnlyStore(snapshotForViewer(snap)));
@@ -135,20 +140,35 @@ export default function PublicApp({ slug, nightId = null }) {
         alert("לא הצלחתי לשמור את הסימון. רענן ונסה שוב.");
         return false;
       }
-      const snap = snapshotForViewer({
-        id: groupId,
-        data,
-        live,
-        config: pubConfig,
-      });
-      bootViewerStore(snap);
-      dataRef.current = JSON.stringify([snap.data, pubConfig]);
-      /* הסימון נחת בשרת — מאמצים את התמונה החדשה למסך במקום; המסך לא
-         מתרענן בגלוי והצופה נשאר בדיוק איפה שהיה */
-      adoptInPlace();
+      /* גל 5, פריט 5.3: הסימון כבר נחת בשרת (ה־RPC אטומי). אם האימוץ
+         המקומי נכשל, עד היום החריגה עלתה בשקט והצופה פשוט לא ראה את
+         הסימון שלו — ולחץ שוב (וה־retry הכפיל אירועי confirmation,
+         עד שהידוק ה־RPC של אותו פריט סגר גם את זה). עכשיו: האימוץ
+         עטוף, הכשל מדווח ל־diag פעם אחת בטעינת הדף, והפונקציה עדיין
+         מחזירה true — הסקר של 12 השניות מרפא את התצוגה המקומית. */
       try {
-        localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap }));
-      } catch {}
+        const snap = snapshotForViewer({
+          id: groupId,
+          data,
+          live,
+          config: pubConfig,
+        });
+        bootViewerStore(snap);
+        dataRef.current = JSON.stringify([snap.data, pubConfig]);
+        /* הסימון נחת בשרת — מאמצים את התמונה החדשה למסך במקום; המסך לא
+           מתרענן בגלוי והצופה נשאר בדיוק איפה שהיה */
+        adoptInPlace();
+        try {
+          localStorage.setItem(`poker:cache:pub:${slug}`, JSON.stringify({ v2: true, snap }));
+        } catch {}
+      } catch (e) {
+        if (!markAdoptReported) {
+          markAdoptReported = true;
+          reportDiag("mark-adopt-failed", e, {
+            detail: `session=${session.id} index=${target.index} field=${field}`,
+          });
+        }
+      }
       try {
         const ch = supabase.channel(`group:${slug}`);
         await ch.subscribe();

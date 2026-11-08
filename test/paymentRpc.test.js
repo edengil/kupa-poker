@@ -23,8 +23,15 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
   let db;
   beforeAll(async () => {
     db = new PGlite();
+    /* גל 5 (5.4): הפונקציה קוראת ל־auth.uid() ול־groups.owner_id —
+       shim כמו ב־viewerLandingSql (uid מבוקר־בדיקה, ברירת מחדל null). */
     await db.exec(`create role anon; create role authenticated;
-      create table public.groups (id uuid primary key, name text, slug text,
+      create schema auth;
+      create function auth.uid() returns uuid language sql stable as
+        $$ select nullif(current_setting('app.test_uid', true), '')::uuid $$;
+      grant usage on schema auth to anon, authenticated;
+      grant execute on function auth.uid() to anon, authenticated;
+      create table public.groups (id uuid primary key, owner_id uuid, name text, slug text,
         data jsonb, live jsonb, config jsonb, updated_at timestamptz default now());
       grant usage on schema public to anon, authenticated;`);
     await db.query(`insert into groups(id,name,slug,data,live,config) values
@@ -42,6 +49,7 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
       "202610190001_pot_privacy.sql",
       "202610250001_mark_payment_projection_potpaid.sql",
       "202610300001_wave1_pot_privacy.sql",
+      "202611080002_wave5_mark_payment_guard.sql",
     ]) {
       await db.exec(migration(file));
       await db.exec(migration(file)); // Safe to apply twice.
@@ -108,7 +116,10 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
         snapshotForViewer({ id: "g", data: { sessions: [storedSession] }, config: { shareHistory: true } })
           .data.sessions[0].payments.plan
       );
-      await callMark(JSON.stringify(projected), 2, "received", "אופיר סנה");
+      /* גל 5 (5.4): ה־by חייב להיות צד להעברה — אינדקס 2 הוא
+         קובי סעדה→אורן גיל, והמקבלת אורן גיל מאשרת קבלה. (קודם נכתב
+         כאן צד שלישי, אופיר סנה — בדיוק הזיוף שהמיגרציה חוסמת.) */
+      await callMark(JSON.stringify(projected), 2, "received", "אורן גיל");
       /* התגובה מוקרנת לצופה (גל 1) — השמירה נבדקת באחסון עצמו */
       const afterProjected = sessionOf(await storedData());
       expect(afterProjected.payments.received["2"]).toBe(true);

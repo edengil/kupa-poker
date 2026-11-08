@@ -642,8 +642,10 @@ grant execute on function public.my_last_viewed_group() to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- צופים מסמנים העברות כ"שולם/התקבל" בלי גישת כתיבה מלאה לקבוצה
--- (הגרסה הסופית בשרשרת: 202610300001 — זיהוי הקרנת הצופה מול התוכנית
--- הגולמית, תרגום אינדקס, מיזוג שמרני, ותגובה מסוננת לצופה).
+-- (הגרסה הסופית בשרשרת: 202611080002 — זיהוי הקרנת הצופה מול התוכנית
+-- הגולמית, תרגום אינדקס, מיזוג שמרני, ותגובה מסוננת לצופה; גל 5:
+-- ‏p_by חייב להיות צד להעברה/בן־זוג/בעלים, ואירוע confirmation
+-- אידמפוטנטי מול retry של אותה קריאה).
 -- ---------------------------------------------------------------------------
 drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text);
 drop function if exists public.mark_group_payment(text, text, text, integer, boolean, text, text);
@@ -667,6 +669,7 @@ declare
   sess jsonb;
   i integer;
   j integer;
+  k integer;
   sid text;
   payments jsonb;
   stored_plan text;
@@ -681,6 +684,14 @@ declare
   conf jsonb;
   out_sessions jsonb := '[]'::jsonb;
   session_found boolean := false;
+  actor text;
+  is_owner boolean;
+  mark_elem jsonb;
+  mark_from text;
+  mark_to text;
+  side_was boolean;
+  last_by text;
+  ev jsonb;
 begin
   if p_slug is null or p_session_id is null or p_fingerprint is null or p_index is null then
     raise exception 'missing arguments';
@@ -696,6 +707,11 @@ begin
   if not found then
     raise exception 'group not found';
   end if;
+
+  actor := nullif(btrim(coalesce(p_by, '')), '');
+  -- coalesce חובה: auth.uid() יכול להיות null, ואז ההשוואה כולה null
+  -- ו־not is_owner היה מדלג על האימות במקום להפעיל אותו.
+  is_owner := coalesce(g.owner_id is not null and auth.uid() = g.owner_id, false);
 
   sessions := coalesce(g.data->'sessions', '[]'::jsonb);
 
@@ -745,16 +761,59 @@ begin
         end if;
         plan_to_store := stored_plan;
       end if;
+      -- גל 5, פריט 5.4: טענת זהות (p_by) חייבת להיות צד להעברה — אחרת
+      -- דחייה לפני כל כתיבה. ההשוואה מול התוכנית הגולמית שב־
+      -- plan_to_store, באינדקס המתורגם mark_index.
+      if actor is not null and not is_owner then
+        begin
+          mark_elem := (plan_to_store::jsonb) -> mark_index;
+        exception when others then
+          raise exception 'fingerprint mismatch';
+        end;
+        mark_from := mark_elem ->> 'from';
+        mark_to := mark_elem ->> 'to';
+        if actor is distinct from mark_from
+           and actor is distinct from mark_to
+           and not exists (
+             select 1
+             from (values
+               ('עדן גיל', 'אורן גיל'),
+               ('דור לירז', 'עדן לירז'),
+               ('שגיא גיל', 'דוד בני גיל'),
+               ('אופיר סנה', 'נתנאל כהן'),
+               ('איציק תפילין', 'ירדן תפילין')
+             ) as couple(a, b)
+             where (couple.a = actor and (couple.b = mark_from or couple.b = mark_to))
+                or (couple.b = actor and (couple.a = mark_from or couple.a = mark_to))
+           ) then
+          raise exception 'marker is not a party to this transfer';
+        end if;
+      end if;
       side_map := coalesce(payments->p_field, '{}'::jsonb);
+      side_was := coalesce(side_map ->> mark_index::text, 'false') = 'true';
       side_map := jsonb_set(side_map, array[mark_index::text], to_jsonb(p_paid), true);
       conf := coalesce(payments->'confirmations', '[]'::jsonb);
       if p_paid is true and coalesce(btrim(p_by), '') <> '' then
-        conf := conf || jsonb_build_array(jsonb_build_object(
-          'index', mark_index,
-          'action', p_field,
-          'by', btrim(p_by),
-          'at', to_char(clock_timestamp() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-        ));
+        -- גל 5, פריט 5.3: ‏retry של אותה קריאה לא מכפיל את האירוע —
+        -- הדגל כבר true והאירוע האחרון לאותו (index, action) הוא
+        -- מאותו by. כל מקרה אחר (סימון ראשון, חזרה אחרי ביטול,
+        -- מאשר אחר) מוסיף אירוע כרגיל.
+        last_by := null;
+        for k in 0 .. jsonb_array_length(conf) - 1 loop
+          ev := conf -> k;
+          if (case when (ev ->> 'index') ~ '^-?[0-9]+$' then (ev ->> 'index')::integer end) = mark_index
+             and (ev ->> 'action') = p_field then
+            last_by := ev ->> 'by';
+          end if;
+        end loop;
+        if not (side_was and last_by is not distinct from actor) then
+          conf := conf || jsonb_build_array(jsonb_build_object(
+            'index', mark_index,
+            'action', p_field,
+            'by', btrim(p_by),
+            'at', to_char(clock_timestamp() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+          ));
+        end if;
       end if;
       -- Conservative merge: update only the three marking keys inside the
       -- stored payments object — potPaid and any future keys survive.
