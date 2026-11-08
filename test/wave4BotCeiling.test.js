@@ -8,7 +8,9 @@ import {
 /* ============================================================================
    גל 4 · פריט 4.5 — תקרת שפיות לפקודות כסף של הבוט (החלטת עדן 7).
    קנייה מעל תקרה נגזרת־היסטוריה לא חלה ומנותבת לתור אישור עדן (אותו
-   תור של שחקן לא־מוכר); טיפ/יציאה חריגים נחסמים עם הודעה מפורשת.
+   תור של שחקן לא־מוכר). גל 4ב (החלטת עדן, המשך 4.5): גם טיפ ויציאה
+   חריגים מנותבים לאותו תור במקום החסימה־עם־הודעה — מחזור החיים המלא
+   שלהם נמצא ב־test/wave45bOpQueue.test.js.
    ============================================================================ */
 
 const known = ["עדן גיל", "קובי סעדה", "אורן גיל", "דוד בני גיל"];
@@ -121,23 +123,30 @@ describe("סכומי גבול לגיטימיים עוברים", () => {
   });
 });
 
-describe("טיפ ויציאה חריגים — נחסמים עם הודעה, לא מוחלים", () => {
-  it("טיפ ענק נחסם; טיפ רגיל עובר", () => {
+describe("טיפ ויציאה חריגים — מנותבים לתור האישור (גל 4ב)", () => {
+  it("טיפ ענק לא מוחל — נכנס לתור כממתין־טיפ; טיפ רגיל עובר מיד", () => {
     let live = apply(null, [{ kind: "add", name: "קובי סעדה", amount: 100 }], "s6").live;
     const out = apply(live, [{ kind: "tip", name: "קובי סעדה", chips: 99999 }], "tipbig");
     expect(P(out.live).tipsGiven || 0).toBe(0);
-    expect(out.reply).toContain("חורג מתקרת השפיות");
+    expect(out.live.pendingApprovals).toEqual([
+      expect.objectContaining({ name: "קובי סעדה", amount: 99999, op: "tip" }),
+    ]);
+    expect(out.reply).toContain("ממתין לאישור עדן");
+    expect(out.ownerDm).toBeTruthy();
     const ok = apply(out.live, [{ kind: "tip", name: "קובי סעדה", chips: 50 }], "tipok");
     expect(P(ok.live).tipsGiven).toBe(50);
   });
 
-  it("יציאה לגיטימית (ערימה מצטברת) עוברת; יציאה אבסורדית נחסמת", () => {
+  it("יציאה לגיטימית (ערימה מצטברת) עוברת; יציאה אבסורדית נכנסת לתור כממתין־יציאה", () => {
     let live = apply(null, [{ kind: "add", name: "קובי סעדה", amount: 500 }], "s7").live;
     // 1,400 ג'יטונים = 700₪ ≤ תקרה 1,000 + קניות 500
     const ok = apply(live, [{ kind: "cashout", name: "קובי סעדה", chips: 1400 }], "co1");
     expect(P(ok.live).cashout).toBe("1400");
     const bad = apply(live, [{ kind: "cashout", name: "קובי סעדה", chips: 999999 }], "co2");
     expect(P(bad.live).cashout).toBe("");
-    expect(bad.reply).toContain("חורגת מתקרת השפיות");
+    expect(bad.live.pendingApprovals).toEqual([
+      expect.objectContaining({ name: "קובי סעדה", amount: 999999, op: "cashout" }),
+    ]);
+    expect(bad.reply).toContain("ממתין לאישור עדן");
   });
 });
