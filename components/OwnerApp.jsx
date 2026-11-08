@@ -205,7 +205,11 @@ export default function OwnerApp({ hosts } = {}) {
       forgetStoreKey(LIVE_KEY);
       /* הזריעה מפרסמת את מפתח הלייב — הטאב מאמץ את הממוזג במקום, בלי הרכבה */
       seedStoreLive(nextLive);
-    } catch {
+    } catch (e) {
+      /* פריט 1.6: כשל ב־checkLive לא נבלע בשקט — warn + משואת אבחון, כדי
+         שכשל עתידי בנתיב הזה (אותו נתיב של 1.1/1.2) לא יהיה בלתי־נראה. */
+      console.warn("checkLive failed:", e?.message || e);
+      reportBeacon("checklive-failed", String(e?.message || e));
     } finally {
       checkingLiveRef.current = false;
     }
