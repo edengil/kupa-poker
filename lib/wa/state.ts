@@ -38,6 +38,19 @@ export interface WaPendingApproval {
   name: string;
   amount: number;
   at: number;
+  /* סוג הפעולה הממתינה. חסר = קנייה (הצורה ההיסטורית היחידה עד גל 4ב —
+     רשומות ישנות בלי השדה הן קניות, והביטול/האישור קוראים אותו כך).
+     "tip": amount = ג'יטוני הטיפ (לא שקלים). "cashout": amount = ג'יטוני
+     היציאה. טיפ/יציאה ממתינים נושאים גם את צילום־הלפני של כל מה שההחלה
+     תיגע בו, כדי שעריכה־למטה/דחייה יחזירו את המצב בדיוק, והאישור יחיל
+     את הפעולה פעם אחת בדיוק מהצילום (לא חישוב מחדש על מצב שזז). */
+  op?: "tip" | "cashout";
+  /* צילום־לפני (טיפ): מצב השקית/אחרון של המגדר שממנו תישלף המחמאה. */
+  tipBagBefore?: number[];
+  tipLastBefore?: number | null;
+  tipFemale?: boolean;
+  /* צילום־לפני (יציאה): האם השחקן היה הממתין של הסגירה המודרכת. */
+  wasPending?: boolean;
 }
 
 export interface WaLiveState {
@@ -93,7 +106,24 @@ export interface UndoEntry {
      יצרה את הפריט (הביטול מסיר אותו); אובייקט = הפעולה הגדילה פריט קיים
      (הביטול מחזיר amount/at לערכי הצילום). רשומות ישנות בלי השדה נופלות
      להתאמת name+amount+at ההיסטורית (ממצא 4). */
-  pendingBefore?: { amount: number; at: number } | null;
+  /* לרשומות "pending" הצילום הוא {amount, at} של פריט הקנייה; לרשומות
+     "pendingOp" (גל 4ב) הוא פריט הממתין המלא, כי שחזורו דורש גם את
+     שדות הפעולה (op/צילומי הטיפ/היציאה). */
+  pendingBefore?: { amount: number; at: number } | WaPendingApproval | null;
+  /* רשומות גל 4ב (טיפ/יציאה חריגים בתור האישור):
+     "pendingOp" — הודעת הפקודה יצרה/החליפה ממתין מסוג op; הביטול
+     מסיר/משיב את הממתין כמו ב־"pending" של הקניות, ואם הממתין כבר נצרך
+     (אושר/נדחה) זה no-op — שוב, כמו בקנייה.
+     "approveOp" — הודעת האישור החילה את הממתין; רק ביטולה הופך את
+     ההחלה, דרך השדות שלמטה, ומשיב את הממתין מהצילום שבשדה pending.
+     tipRevert = צילום שורת השחקן לפני החלת הטיפ (tipsGiven + cashout);
+     הביטול מחזיר את השדות האלה ומסיר את רשומת הטיפ לפי tipId.
+     cashoutRevert = ה־cashout שלפני החלת היציאה (מחרוזת, "" = היה
+     פתוח). wasPending = השחקן היה ממתין־הסגירה לפני היציאה. */
+  op?: "tip" | "cashout";
+  tipRevert?: { tipsGiven: number; cashout: string | number | null | undefined; tipId: string | number };
+  cashoutRevert?: string | number | null;
+  wasPending?: boolean;
   bagBefore?: number[];
   lastBefore?: number | null;
   female?: boolean;
@@ -346,6 +376,124 @@ function undoCreatedStamp(
   }
 }
 
+/* ----------------- החלה/ביטול של פעולות־ממתין (גל 4ב) -----------------
+   טיפ ויציאה חריגים מעל תקרת השפיות לא נחסמים יותר (גל 4) אלא ממתינים
+   לאישור, כמו קנייה חריגה. ההחלה חיה כאן, משותפת לשני הכיוונים: נתיב
+   האישור ב־apply (החלה על הממתין החי) והביטול של הודעת־הממתין אחרי
+   שהממתין כבר אושר (החלה על הצילום שנשמר בפריט). */
+
+/** האם הממתין הוא פעולת טיפ/יציאה (גל 4ב) ולא קנייה. */
+export function isOpPending(item?: WaPendingApproval | null): boolean {
+  return !!item && (item.op === "tip" || item.op === "cashout");
+}
+
+/** מזהה רשומת־הטיפ שהחלת ממתין־טיפ תיצור — נגזר מזהות הממתין עצמו
+ * (שחקן + סכום + חותמת היצירה), כך שההחלה החוזרת מאותו ממתין (מסירה
+ * חוזרת של הודעת האישור, שתי החלות על אותו פריט) יוצרת את אותה רשומה
+ * בדיוק, והביטול יודע להסיר אותה בלי לנחש. */
+export function opTipId(item: WaPendingApproval): string {
+  return `optip:${item.name}:${item.amount}:${item.at}`;
+}
+
+interface OpApplyFacts {
+  /* הטיפ באמת ירד מהיציאה הנוכחית של השחקן (היה סגור בזמן ההחלה). */
+  tipHitCashout: boolean;
+}
+
+/** מחיל ממתין־טיפ על השחקן: tipsGiven + רשומת טיפ ביומן, ודלתא על היציאה
+ * אם השחקן כבר סגור — בדיוק לוגיקת הטיפ הרגילה (כמו cashDelta
+ * באפליקציה). מחזיר עובדות להודעת האישור; ה־tipId נקבע מראש לפי
+ * opTipId. צילום השקית/אחרון נשלף על ידי הקורא דרך nextTipCompliment,
+ * לא כאן — כאן רק כותבים את התוצאה. */
+export function applyOpTip(
+  state: WaLiveState,
+  playerIndex: number,
+  item: WaPendingApproval,
+  tipId: string | number,
+  compliment: { bag: number[]; last: number; bagKey: string; lastKey: string; female: boolean },
+): OpApplyFacts {
+  const p = state.players[playerIndex];
+  const amount = Math.max(0, Number(item.amount) || 0);
+  const bagState = state as unknown as Record<string, unknown>;
+  bagState[compliment.bagKey] = compliment.bag;
+  bagState[compliment.lastKey] = compliment.last;
+  if (!compliment.female) {
+    state.tipComplimentBag = compliment.bag;
+    state.tipComplimentLast = compliment.last;
+  }
+  let next = { ...p, tipsGiven: r2((+p.tipsGiven || 0) + amount) };
+  let tipHitCashout = false;
+  if (p.cashout !== "" && p.cashout != null) {
+    const before = +p.cashout || 0;
+    const after = Math.max(0, before - amount);
+    next = { ...next, cashout: String(after) };
+    tipHitCashout = after !== before;
+  }
+  state.players[playerIndex] = next;
+  if (!(state.tips || []).some((t) => t.id === tipId)) {
+    state.tips = [
+      ...(state.tips || []),
+      { id: tipId, name: p.name, amount, at: Date.now() },
+    ];
+  }
+  return { tipHitCashout };
+}
+
+/** מחיל ממתין־יציאה: סוגר את השחקן עם ג'יטוני הממתין ומנקה ממנו את
+ * ממתין־הסגירה (state.pending), בדיוק כמו יציאה רגילה. */
+export function applyOpCashout(
+  state: WaLiveState,
+  playerIndex: number,
+  item: WaPendingApproval,
+): void {
+  const p = state.players[playerIndex];
+  state.players[playerIndex] = { ...p, cashout: String(item.amount) };
+  if (state.pending === p.name) state.pending = null;
+}
+
+/** היפוך החלת ממתין־טיפ שכבר אושר (ביטול הודעת־הממתין אחרי האישור):
+ * מחזיר את tipsGiven ואת היציאה לצילום שנשמר ברשומה, מסיר את רשומת
+ * הטיפ, ומשחזר את שקית המחמאות לצילום־הלפני של הממתין. */
+export function revertAppliedOpTip(
+  state: WaLiveState,
+  entry: UndoEntry,
+): void {
+  const rev = entry.tipRevert;
+  if (!rev) return;
+  const i = state.players.findIndex((p) => p.name === entry.name);
+  if (i !== -1) {
+    state.players[i] = {
+      ...state.players[i],
+      tipsGiven: rev.tipsGiven,
+      cashout: rev.cashout ?? state.players[i].cashout,
+    };
+  }
+  state.tips = (state.tips || []).filter((t) => t.id !== rev.tipId);
+  const item = entry.pending;
+  if (item && Array.isArray(item.tipBagBefore)) {
+    const female = !!item.tipFemale;
+    const bagState = state as unknown as Record<string, unknown>;
+    bagState[female ? "tipComplimentBagF" : "tipComplimentBagM"] = [...item.tipBagBefore];
+    bagState[female ? "tipComplimentLastF" : "tipComplimentLastM"] = item.tipLastBefore ?? null;
+    if (!female) {
+      state.tipComplimentBag = [...item.tipBagBefore];
+      state.tipComplimentLast = item.tipLastBefore ?? null;
+    }
+  }
+}
+
+/** היפוך החלת ממתין־יציאה שכבר אושר: מחזיר את ה־cashout לצילום־הלפני
+ * ואת ממתין־הסגירה אם השחקן היה הממתין לפני היציאה. */
+export function revertAppliedOpCashout(
+  state: WaLiveState,
+  entry: UndoEntry,
+): void {
+  const i = state.players.findIndex((p) => p.name === entry.name);
+  if (i === -1) return;
+  state.players[i] = { ...state.players[i], cashout: entry.cashoutRevert ?? "" };
+  if (entry.wasPending) state.pending = entry.name as string;
+}
+
 /** תקרת יומן הביטולים (applied) בלייב — ראו את הגיזום ב־apply. */
 export const MAX_APPLIED_RECORDS = 200;
 
@@ -406,9 +554,59 @@ export const openPlayers = (state: WaLiveState): WaPlayer[] =>
  * נגע בו. ההחלה שאחרי הביטול חייבת לנחות על אותו שחקן באותו שם — פתרון
  * השם הגולמי מההודעה מחדש דרך טבלת הכינויים עלול להושיב אדם אחר לגמרי
  * (למשל "דני" → "דני גוטניק" כשהיושב בפועל תוקן ל"דני לוי"). */
+/** שחזור פריט־הממתין המלא מרשומת "approve" (גל 4ב): הרשומה נושאת את
+ * צילום הממתין בשדה pending, אבל ביטול של החלה ישנה — או רשומה שנבנתה
+ * לפני שהצילום נשמר במלואו — עלול לשאת רק את שדות הליבה. משלימים את
+ * החסר משדות הרשומה עצמה, כדי שהפריט המשוחזר ישמור את סוג הפעולה שלו
+ * (op) ואת צילומי הטיפ/יציאה — אחרת האישור החוזר היה מחיל אותו כקנייה. */
+export function restorePendingSnapshot(entry: UndoEntry): WaPendingApproval {
+  const snap = entry.pending;
+  if (snap) {
+    return {
+      ...snap,
+      name: snap.name ?? (entry.name as string),
+      amount: snap.amount ?? entry.amount ?? 0,
+      at: snap.at ?? entry.at ?? 0,
+    };
+  }
+  return {
+    name: entry.name as string,
+    amount: entry.amount ?? 0,
+    at: entry.at ?? 0,
+    ...(entry.op ? { op: entry.op } : {}),
+  };
+}
+
 export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, string> {
   const retarget = new Map<string, string>();
   for (const e of [...entries].reverse()) {
+    /* רשומות פעולת־ממתין (גל 4ב — טיפ/יציאה חריגים): כמו "pending" של
+       הקניות — נוגעות רק בפריט הממתין עצמו: יצירה מסירה אותו, החלפה
+       משיבה את הצילום הקודם. אם הפריט כבר נצרך (אושר/נדחה) הוא איננו,
+       והביטול הוא no-op — בדיוק כמו בקנייה. היפוך של החלה שכבר אושרה
+       קורה בביטול הודעת־האישור עצמה (ענף "approveOp" שלמטה), לא כאן. */
+    if (e.t === "pendingOp") {
+      const before = e.pendingBefore;
+      if (before === null) {
+        state.pendingApprovals = (state.pendingApprovals || []).filter(
+          (p) =>
+            !(
+              p.name === e.name &&
+              p.op === e.op &&
+              p.amount === e.amount &&
+              p.at === e.at
+            ),
+        );
+      } else if (before) {
+        const snap = before as WaPendingApproval;
+        state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
+          p.name === e.name && p.op === e.op && p.at === e.at
+            ? { ...snap, op: snap.op ?? p.op }
+            : p,
+        );
+      }
+      continue;
+    }
     /* רשומות ממתין לא תלויות בשחקן יושב — הממתין בהגדרתו מחוץ לשולחן.
        כשהן ישבו מאחורי שער השחקן שלמטה, ביטולן דולג תמיד והגדלת־ממתין
        נספרה שוב בכל מסירה חוזרת (ממצא 4). */
@@ -455,7 +653,12 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
          סימן (אושר → הוסר → הודעת האישור נמסרת שוב). ה־no-op חל על צריכת
          החותמת בלבד; שחזור הממתין וניקוי approvedNames מתבצעים בכל מקרה. */
       if (e.t === "approve") {
-        if (e.pending) state.pendingApprovals = [...(state.pendingApprovals || []), e.pending];
+        if (e.pending) {
+          state.pendingApprovals = [
+            ...(state.pendingApprovals || []),
+            restorePendingSnapshot(e),
+          ];
+        }
         state.approvedNames = (state.approvedNames || []).filter((n) => n !== e.name);
       }
       continue;
@@ -518,6 +721,23 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
           state.tipComplimentLast = e.lastBefore ?? null;
         }
       }
+    } else if (e.t === "approveOp") {
+      /* ביטול אישור־פעולה (גל 4ב): ההחלה מתהפכת מהצילומים שברשומה —
+         טיפ דרך revertAppliedOpTip (שורת השחקן + רשומת הטיפ + השקית),
+         יציאה דרך revertAppliedOpCashout — והממתין חוזר לתור בצילומו
+         המלא, כדי שאישור חוזר יחיל אותו שוב בדיוק. */
+      const revEntry: UndoEntry = {
+        ...e,
+        name: state.players[i]?.name ?? e.name,
+      };
+      if (e.op === "tip") revertAppliedOpTip(state, revEntry);
+      else if (e.op === "cashout") revertAppliedOpCashout(state, revEntry);
+      if (e.pending) {
+        state.pendingApprovals = [
+          ...(state.pendingApprovals || []),
+          restorePendingSnapshot(revEntry),
+        ];
+      }
     } else if (e.t === "approve") {
       const j = i;
       const currentName = state.players[j]?.name;
@@ -538,7 +758,12 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
           };
         }
       }
-      if (e.pending) state.pendingApprovals = [...(state.pendingApprovals || []), e.pending];
+      if (e.pending) {
+        state.pendingApprovals = [
+          ...(state.pendingApprovals || []),
+          restorePendingSnapshot(e),
+        ];
+      }
       state.approvedNames = (state.approvedNames || []).filter(
         (n) => n !== e.name && n !== currentName,
       );

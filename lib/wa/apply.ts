@@ -8,11 +8,15 @@ import { buildTipsTable } from "../tipsTable.js";
 import { aliasesOf, findPlayer, READ_ONLY, resolveAlias } from "./parse.js";
 import { decoratePendingReminder } from "./reminders.js";
 import {
+  applyOpCashout,
+  applyOpTip,
   blank,
   findInState,
   isKnownName,
+  isOpPending,
   MAX_APPLIED_RECORDS,
   openPlayers,
+  opTipId,
   pickPending,
   playerPotSum,
   r2,
@@ -26,7 +30,7 @@ import { helpText, ownerAskText } from "./help.js";
 
 export { helpText } from "./help.js";
 
-import type { UndoEntry, WaLiveState } from "./state";
+import type { UndoEntry, WaLiveState, WaPendingApproval } from "./state";
 
 export interface WaCmd {
   kind: string;
@@ -225,13 +229,13 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
      שעריכה/מסירה־חוזרת של ההודעה מבטלת ומחילה מחדש בלי כפילות. */
   const ceilingIls = botMoneyCeilingIls(state, opts.lastSession);
   const pendForApproval = (name: string, amount: number) => {
-    const existing = (state.pendingApprovals || []).find((p) => p.name === name);
+    const existing = (state.pendingApprovals || []).find((p) => p.name === name && !isOpPending(p));
     const pendingBefore = existing
       ? { name: existing.name, amount: existing.amount, at: existing.at }
       : null;
     if (existing) {
       state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
-        p.name === name ? { ...p, amount: r2(p.amount + amount) } : p
+        p.name === name && !isOpPending(p) ? { ...p, amount: r2(p.amount + amount) } : p
       );
     } else {
       state.pendingApprovals = [
@@ -242,6 +246,47 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     record.push({ t: "pending", name, amount, at: now, pendingBefore });
     acks.push(
       `⚠️ סכום חריג: ${name} ${amount}₪ — לא חל. ממתין לאישור עדן (אשר ${name} / דחה ${name})`
+    );
+  };
+
+  /* גל 4ב (החלטת עדן — המשך 4.5): גם טיפ ויציאה חריגים מעל התקרה
+     מנותבים לתור האישור, לא נחסמים. הממתין נושא את סוג הפעולה (op) ואת
+     צילום־הלפני של ההחלה, והרשומה היא "pendingOp" (נפרדת מ־"pending"
+     של הקניות, שצילום־הלפני שלה הוא {amount, at} בלבד). עריכה־למטה של
+     הפקודה מתחת לתקרה מבטלת את הממתין דרך הביטול ומחילה רגיל — בדיוק
+     כמו בקנייה. ממתין־פעולה שני לאותו שחקן+סוג לא נוצר: הפקודה החוזרת
+     רק מצביעה על הממתין הקיים. */
+  const pendOpForApproval = (item: WaPendingApproval, label: string) => {
+    const existing = (state.pendingApprovals || []).find(
+      (p) => p.name === item.name && p.op === item.op
+    );
+    if (existing) {
+      const before: WaPendingApproval = { ...existing };
+      const atBefore = existing.at;
+      state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
+        p === existing ? { ...item, at: atBefore } : p
+      );
+      record.push({
+        t: "pendingOp",
+        op: item.op,
+        name: item.name,
+        amount: item.amount,
+        at: atBefore,
+        pendingBefore: before,
+      });
+    } else {
+      state.pendingApprovals = [...(state.pendingApprovals || []), item];
+      record.push({
+        t: "pendingOp",
+        op: item.op,
+        name: item.name,
+        amount: item.amount,
+        at: item.at,
+        pendingBefore: null,
+      });
+    }
+    acks.push(
+      `⚠️ ${label} — לא חל. ממתין לאישור עדן (אשר ${item.name} / דחה ${item.name})`
     );
   };
 
@@ -323,9 +368,103 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       const item = pending[idx];
       state.pendingApprovals = pending.filter((_, i) => i !== idx);
       if (cmd.kind === "reject") {
+        if (isOpPending(item)) {
+          /* דחיית פעולת־ממתין (גל 4ב): הממתין נצרך ושום דבר לא הוחל —
+             הטיפ/היציאה פשוט לא קורים. הרשומה נושאת את צילום הממתין
+             (pendingBefore = הפריט עצמו), כמו רשומת הדחייה של קנייה:
+             ביטול הודעת הדחייה לא מחזיר אותו — הדחייה סופית. */
+          record.push({
+            t: "pendingOp",
+            op: item.op,
+            name: item.name,
+            amount: item.amount,
+            at: item.at,
+            pendingBefore: item,
+          });
+          acks.push(
+            item.op === "tip"
+              ? `הטיפ של ${item.name} (${item.amount} ג'יטונים) נדחה — לא נרשם`
+              : `היציאה של ${item.name} (${item.amount} ג'יטונים) נדחתה — ${byGender(item.name, "נשאר", "נשארה")} בשולחן`
+          );
+          continue;
+        }
         record.push({ t: "pending", name: item.name, amount: item.amount, at: item.at });
         acks.push(
           `${item.name} ${byGender(item.name, "נדחה", "נדחתה")} — ${byGender(item.name, "לא נכנס", "לא נכנסה")} לשולחן`
+        );
+        continue;
+      }
+      /* אישור פעולת־ממתין (גל 4ב — טיפ/יציאה חריגים): ההחלה היא אותה
+         לוגיקה של הפקודה הרגילה, על צילום־הלפני שנשמר בממתין. השחקן
+         חייב להיות בשולחן; אם הוסר מאז ההמתנה — הפעולה אובדת עם הודעה,
+         לא מומצאת על שחקן אחר. */
+      if (isOpPending(item)) {
+        const rtOpName = sid ? retarget.get(sid) : undefined;
+        const opIdx = rtOpName
+          ? state.players.findIndex((p) => p.name === rtOpName)
+          : state.players.findIndex((p) => p.name === item.name);
+        if (opIdx === -1) {
+          record.push({
+            t: "pendingOp",
+            op: item.op,
+            name: item.name,
+            amount: item.amount,
+            at: item.at,
+            pendingBefore: item,
+          });
+          problems.push(`${item.name} כבר לא בשולחן — הפעולה הממתינה בוטלה`);
+          continue;
+        }
+        const opPlayer = state.players[opIdx];
+        if (item.op === "tip") {
+          const female = item.tipFemale ?? isFemaleName(opPlayer.name);
+          const { template, bag, last, bagKey, lastKey } = nextTipCompliment(state, {
+            female,
+          }) as unknown as {
+            template: string;
+            bag: number[];
+            last: number;
+            bagKey: string;
+            lastKey: string;
+          };
+          const tipId = opTipId(item);
+          applyOpTip(state, opIdx, item, tipId, {
+            bag,
+            last,
+            bagKey,
+            lastKey,
+            female,
+          });
+          record.push({
+            t: "approveOp",
+            op: "tip",
+            name: opPlayer.name,
+            pending: item,
+            tipRevert: {
+              tipsGiven: +opPlayer.tipsGiven || 0,
+              cashout: opPlayer.cashout,
+              tipId,
+            },
+          });
+          if (resolveAlias(opPlayer.name, aliases) === KOBI) acks.push(KOBI_TIP_OPENER);
+          acks.push(
+            `אושר: ${formatTipCompliment(template, opPlayer.name, item.amount)}`
+          );
+          continue;
+        }
+        const wasPending = state.pending === opPlayer.name;
+        applyOpCashout(state, opIdx, item);
+        const closedPlayer = state.players[opIdx];
+        record.push({
+          t: "approveOp",
+          op: "cashout",
+          name: opPlayer.name,
+          pending: item,
+          cashoutRevert: opPlayer.cashout ?? "",
+          wasPending,
+        });
+        acks.push(
+          `אושר: ${opPlayer.name} ${byGender(opPlayer.name, "יצא", "יצאה")} עם ${item.amount} ג'יטונים · ${settleLine(closedPlayer, cps)}`
         );
         continue;
       }
@@ -515,12 +654,36 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         problems.push(`טיפ של 0 לא נספר`);
         continue;
       }
-      /* תקרת שפיות (4.5): טיפ לא יכול להיות מובנה כקנייה, ולכן לא
-         מנותב לתור האישור (שתוכנו קניות) — נחסם עם הודעה מפורשת.
-         התקרה בג'יטונים = התקרה בשקלים × ג'יטונים־לשקל. */
+      /* תקרת שפיות (4.5, עודכן בגל 4ב לפי החלטת עדן): טיפ מעל התקרה לא
+         נחסם יותר — מנותב לתור האישור כמו קנייה חריגה, עם צילום־הלפני
+         של השקית/אחרון של המגדר שממנו תישלף המחמאה באישור. התקרה
+         בג'יטונים = התקרה בשקלים × ג'יטונים־לשקל. */
       if (amount > ceilingIls * cps) {
-        problems.push(
-          `טיפ של ${amount} ג'יטונים ל${p.name} חורג מתקרת השפיות (${ceilingIls * cps}) — לא נרשם. אם זה אמיתי, עדן ירשום ידנית באפליקציה`
+        const femalePend = isFemaleName(p.name);
+        const bkPend = tipBagKey(femalePend);
+        const lkPend = tipLastKey(femalePend);
+        const bagStatePend = state as unknown as Record<string, unknown>;
+        let bagBeforePend = Array.isArray(bagStatePend[bkPend])
+          ? [...(bagStatePend[bkPend] as number[])]
+          : [];
+        if (!bagBeforePend.length && !femalePend && Array.isArray(state.tipComplimentBag)) {
+          bagBeforePend = [...state.tipComplimentBag];
+        }
+        const lastBeforePend =
+          (bagStatePend[lkPend] as number | null | undefined) ??
+          (!femalePend ? state.tipComplimentLast : null) ??
+          null;
+        pendOpForApproval(
+          {
+            name: p.name,
+            amount,
+            at: now,
+            op: "tip",
+            tipBagBefore: bagBeforePend,
+            tipLastBefore: lastBeforePend,
+            tipFemale: femalePend,
+          },
+          `טיפ חריג: ${p.name} · ${amount} ג'יטונים`
         );
         continue;
       }
@@ -594,14 +757,22 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const p = state.players[found.index];
-      /* תקרת שפיות (4.5) ליציאה: ערימת הסיום לגיטימית יכולה לעבור את
-         תקרת הקנייה הבודדת (כמה ריבאיים מצטברים), ולכן הגבול כאן הוא
-         התקרה + כל מה שהשחקן עצמו הכניס. מעבר לזה זו כמעט תמיד אפס
-         מיותר בהקלדה — נחסם עם הודעה, לא מוחל. */
+      /* תקרת שפיות (4.5, עודכן בגל 4ב לפי החלטת עדן) ליציאה: ערימת
+         הסיום לגיטימית יכולה לעבור את תקרת הקנייה הבודדת (כמה ריבאיים
+         מצטברים), ולכן הגבול כאן הוא התקרה + כל מה שהשחקן עצמו הכניס.
+         מעבר לזה — לא נחסם יותר, אלא מנותב לתור האישור כמו קנייה
+         חריגה, עם צילום של ממתין־הסגירה כדי שהביטול יחזיר אותו. */
       const cashoutIls = (+cmd.chips || 0) / (cps || 1);
       if (cashoutIls > ceilingIls + (+p.buyin || 0)) {
-        problems.push(
-          `היציאה של ${p.name} (${cmd.chips} ג'יטונים ≈ ${Math.round(cashoutIls)}₪) חורגת מתקרת השפיות — לא נרשמה. אם זה אמיתי, עדן יסגור ידנית באפליקציה`
+        pendOpForApproval(
+          {
+            name: p.name,
+            amount: +cmd.chips || 0,
+            at: now,
+            op: "cashout",
+            wasPending: state.pending === p.name,
+          },
+          `יציאה חריגה: ${p.name} · ${cmd.chips} ג'יטונים (≈ ${Math.round(cashoutIls)}₪)`
         );
         continue;
       }
@@ -734,7 +905,8 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
      נהרס סיום הערב של 6.8.26. */
   const head = [...acks.map((a) => `${BOT_MARK} ${a}`), ...problems.map((x) => `${BOT_MARK} ⚠️ ${x}`)].join("\n");
   let ownerDm = null;
-  if (record.some((e) => e.t === "pending")) ownerDm = ownerAskText(state);
+  if (record.some((e) => e.t === "pending" || e.t === "pendingOp"))
+    ownerDm = ownerAskText(state);
   else if (record.some((e) => e.t === "rename")) {
     const renames = record.filter((e) => e.t === "rename");
     ownerDm = [
@@ -749,7 +921,9 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   /* האחרון בשולחן יצא — בסגירה מודרכת או ביציאה רגילה. אישור קצר בלבד:
      בלי דוח הביט הישן, והסיכום המלא עם הלינק יוצא מהאפליקציה פעם אחת. */
   const allClosed =
-    record.some((e) => e.t === "out") && state.players.length > 0 && !openPlayers(state).length;
+    record.some((e) => e.t === "out" || (e.t === "approveOp" && e.op === "cashout")) &&
+    state.players.length > 0 &&
+    !openPlayers(state).length;
   if (allClosed) {
     state.closing = false;
     state.pending = null;
