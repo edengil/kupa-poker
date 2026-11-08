@@ -8,6 +8,14 @@ const h = vi.hoisted(() => ({
   runPaymentReminders: vi.fn(async () => ({ ok: true, results: ["night"] })),
   runNoticeEmails: vi.fn(async () => ({ ok: true, due: 0, results: [] })),
   runNoticePushes: vi.fn(async () => ({ ok: true, due: 0, results: [] })),
+  runGroupSnapshots: vi.fn(async () => ({
+    groups: 1,
+    snapshotted: 1,
+    failed: 0,
+    snapshotsPruned: 0,
+    diagPruned: 0,
+    errors: [],
+  })),
   hour: 8,
   writes: [],
   row: null,
@@ -73,6 +81,9 @@ vi.mock("@/lib/runNoticeEmails", () => ({
 }));
 vi.mock("@/lib/runNoticePushes", () => ({
   runNoticePushes: (...args) => h.runNoticePushes(...args),
+}));
+vi.mock("@/lib/groupSnapshots", () => ({
+  runGroupSnapshots: (...args) => h.runGroupSnapshots(...args),
 }));
 vi.mock("@/lib/paymentReminder", () => ({
   jerusalemHour: () => h.hour,
