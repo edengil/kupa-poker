@@ -10,6 +10,8 @@ import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMer
 import { updateGroupCas } from "../lib/groupCas";
 import { createBroadcaster, watchPresence } from "../lib/realtime";
 import { resolveRootLanding } from "../lib/rootLanding";
+import { getSessionWithTimeout } from "../lib/sessionTimeout";
+import { hasAuthError, AUTH_ERROR_MESSAGE } from "../lib/authError";
 import Viewers from "./Viewers";
 import ViewerStats from "./ViewerStats";
 import InstallButton from "./InstallButton";
@@ -33,25 +35,8 @@ const C = {
   loss: festiveC.loss,
 };
 
-const SESSION_TIMEOUT_MS = 4000;
-
-/** getSession עם מבוי־זמן: בספארי/PWA הקריאה נתקעת לפעמים עד שנוגעים במסך
-    (מתועד גם בהערת המסלול המהיר למטה). אחרי 4 שניות מוותרים על ההמתנה —
-    אבל ניסוי H: timeout הוא לא "אין סשן". התוצאה מסומנת ב־timedOut, והקורא
-    נשאר במצב המתנה; הסשן האמיתי מגיע דרך onAuthStateChange. (הגרסה הקודמת,
-    ניסוי D, החזירה סשן־null מזויף — והיפוך הפאזה ל־signedOut הריץ את כל
-    אפקט ה־boot מחדש כשהסשן האמיתי נחת, מגבר remount־ים בפתיחה.) */
-function getSessionWithTimeout(supabase) {
-  return Promise.race([
-    supabase.auth
-      .getSession()
-      .then(({ data }) => ({ data, timedOut: false }))
-      .catch(() => ({ data: { session: null }, timedOut: false })),
-    new Promise((resolve) =>
-      setTimeout(() => resolve({ data: { session: null }, timedOut: true }), SESSION_TIMEOUT_MS)
-    ),
-  ]);
-}
+/* getSessionWithTimeout חי ב־lib/sessionTimeout — מקור־אמת אחד לשני
+   משטחי הכניסה (כאן וב־PublicApp, פריט 1.5). */
 
 /** מזהה קצר, קריא ולא ניתן לניחוש, שמופיע בלינק לשיתוף. */
 function newSlug() {
@@ -220,6 +205,11 @@ export default function OwnerApp({ hosts } = {}) {
      מהמטמון, והרשת רק מאמתת ברקע. */
   const signedOut = phase === "signedOut";
   useEffect(() => {
+    /* פריט 1.5: שער signedOut בגוף האפקט. האפקט תלוי ב־signedOut אבל בלי
+       השער הזה, כשהסשן פג והפאזה התהפכה ל־signedOut האפקט רץ שוב — והמסלול
+       המהיר עלה מהמטמון (boot + ready) ומסך הבעלים הוצג במקום התחברות.
+       כשמנותקים באמת: לא עולים מהמטמון, לא מאמתים, נשארים במסך ההתחברות. */
+    if (signedOut) return;
     let alive = true;
 
     const boot = (row, broadcaster) => {
@@ -525,7 +515,13 @@ export default function OwnerApp({ hosts } = {}) {
         </div>
       </Splash>
     );
-  if (phase === "signedOut") return <SignIn onSignIn={signIn} />;
+  if (phase === "signedOut")
+    return (
+      <SignIn
+        onSignIn={signIn}
+        failed={typeof window !== "undefined" && hasAuthError(window.location.search)}
+      />
+    );
 
   return (
     <>
@@ -580,7 +576,7 @@ export default function OwnerApp({ hosts } = {}) {
 }
 
 /* ============================ מסך התחברות ============================ */
-function SignIn({ onSignIn }) {
+export function SignIn({ onSignIn, failed = false }) {
   return (
     <main style={{ ...authShell }}>
       <div style={{ maxWidth: 340 }}>
@@ -589,6 +585,11 @@ function SignIn({ onSignIn }) {
           קופה <span style={{ color: C.brass }}>—</span> פוקר
         </h1>
         <EGByline style={{ margin: "0 0 14px" }} />
+        {failed && (
+          <p role="alert" style={{ color: C.loss, fontSize: 15, lineHeight: 1.7, margin: "0 0 14px" }}>
+            {AUTH_ERROR_MESSAGE}
+          </p>
+        )}
         <p style={{ color: C.dim, fontSize: 15, lineHeight: 1.7, margin: "0 0 28px" }}>
           ♠ התחבר כדי לנהל את ערבי הקבוצה. אחרי ההתחברות תקבל לינק לשיתוף שהחברים
           יוכלו לפתוח בלי חשבון.

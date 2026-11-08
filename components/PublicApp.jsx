@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
 import AppErrorBoundary from "./AppErrorBoundary";
 import { getSupabase } from "../lib/supabaseClient";
+import { getSessionWithTimeout } from "../lib/sessionTimeout";
+import { hasAuthError, AUTH_ERROR_MESSAGE } from "../lib/authError";
 import { configureStore, makeReadOnlyStore, publishStoreKey, DB_KEY } from "../lib/store";
 import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
 import { snapshotForViewer, viewerCps } from "../lib/publicShare";
@@ -197,10 +199,14 @@ export default function PublicApp({ slug, nightId = null }) {
     let alive = true;
 
     (async () => {
-      const { data } = await supabase.auth.getSession();
+      /* פריט 1.5: getSession עם מבוי־זמן (משותף עם OwnerApp) — getSession
+         גולמי נתקע לפעמים בספארי/PWA וה־splash נשאר תקוע. timeout הוא לא
+         "אין סשן": נשארים ב־loading והסשן האמיתי מגיע דרך onAuthStateChange. */
+      const { data, timedOut } = await getSessionWithTimeout(supabase);
       const user = data.session?.user;
       if (!alive) return;
       if (!user) {
+        if (timedOut) return;
         setPhase("signedOut");
         return;
       }
@@ -235,7 +241,7 @@ export default function PublicApp({ slug, nightId = null }) {
     if (phase !== "ready") return;
     let leave = null;
     (async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await getSessionWithTimeout(supabase);
       const u = data.session?.user;
       if (!u) return;
       leave = joinPresence(
@@ -314,7 +320,13 @@ export default function PublicApp({ slug, nightId = null }) {
   };
 
   if (phase === "loading") return <EGSplash />;
-  if (phase === "signedOut") return <SignIn onSignIn={signIn} />;
+  if (phase === "signedOut")
+    return (
+      <SignIn
+        onSignIn={signIn}
+        failed={typeof window !== "undefined" && hasAuthError(window.location.search)}
+      />
+    );
   if (phase === "missing")
     return <Splash tone="error">הלינק הזה לא מוביל לשום קבוצה.<br />בקש מהמנהל לינק מעודכן.</Splash>;
 
@@ -379,7 +391,7 @@ export default function PublicApp({ slug, nightId = null }) {
 }
 
 /* ============================ מסך התחברות ============================ */
-function SignIn({ onSignIn }) {
+export function SignIn({ onSignIn, failed = false }) {
   return (
     <main style={{ ...authShell }}>
       <div style={{ maxWidth: 340 }}>
@@ -388,6 +400,11 @@ function SignIn({ onSignIn }) {
           קופה <span style={{ color: C.brass }}>—</span> פוקר
         </h1>
         <EGByline style={{ margin: "0 0 14px" }} />
+        {failed && (
+          <p role="alert" style={{ color: C.loss, fontSize: 15, lineHeight: 1.7, margin: "0 0 14px" }}>
+            {AUTH_ERROR_MESSAGE}
+          </p>
+        )}
         <p style={{ color: C.dim, fontSize: 15, lineHeight: 1.7, margin: "0 0 24px" }}>
           ♠ כדי לראות את הטבלה צריך להתחבר. זה לוקח שנייה, ואין צורך בהרשמה.
         </p>
