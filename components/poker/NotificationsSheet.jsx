@@ -1,16 +1,58 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { C } from "../../lib/poker/colors";
 import { brassCta } from "../../lib/poker/festive";
 import { X } from "./icons";
 
 /**
  * רשימת ההתראות. סימון העברה נשמר באותו אובייקט payments.
+ * גל 5, פריט 5.2: המגירה מדווחת ל־onVisible אילו פריטים הוצגו בפועל
+ * (נכנסו לאזור הגלילה הנראה) — רק הם מסומנים "נצפה" אצל ההורה, כך
+ * שפתיחה חלקית של רשימה ארוכה משאירה באדג' על מה שלא נראה.
  */
-export function NotificationsSheet({ items, onClose, onMark }) {
+export function NotificationsSheet({ items, onClose, onMark, onVisible }) {
   const [busyId, setBusyId] = useState(null);
   const list = items || [];
+  const scrollRef = useRef(null);
+  const nodesRef = useRef(new Map());
+  const reportedRef = useRef(new Set());
+
+  const reportVisible = useCallback(
+    (ids) => {
+      if (!onVisible) return;
+      const fresh = (ids || []).filter(
+        (id) => typeof id === "string" && !reportedRef.current.has(id)
+      );
+      if (!fresh.length) return;
+      for (const id of fresh) reportedRef.current.add(id);
+      onVisible(fresh);
+    },
+    [onVisible]
+  );
+
+  useEffect(() => {
+    if (!onVisible) return;
+    /* בלי IntersectionObserver (דפדפן ישן/סביבת בדיקה) — כל מה שנרנדר
+       נחשב מוצג, כמו ההתנהגות הישנה. */
+    if (typeof IntersectionObserver === "undefined") {
+      reportVisible(list.map((item) => item.id));
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const id = entry.target.getAttribute("data-notice-id");
+          if (id) reportVisible([id]);
+          observer.unobserve(entry.target);
+        }
+      },
+      { root: scrollRef.current, threshold: 0.6 }
+    );
+    for (const node of nodesRef.current.values()) observer.observe(node);
+    return () => observer.disconnect();
+  }, [list, onVisible, reportVisible]);
 
   async function mark(item) {
     if (!onMark || busyId) return;
@@ -41,6 +83,7 @@ export function NotificationsSheet({ items, onClose, onMark }) {
       }}
     >
       <div
+        ref={scrollRef}
         onClick={(event) => event.stopPropagation()}
         style={{
           width: "100%",
@@ -87,6 +130,11 @@ export function NotificationsSheet({ items, onClose, onMark }) {
             <article
               key={item.id}
               data-testid={`notice-${item.kind}`}
+              data-notice-id={item.id}
+              ref={(node) => {
+                if (node) nodesRef.current.set(item.id, node);
+                else nodesRef.current.delete(item.id);
+              }}
               style={{
                 borderTop: `1px solid ${C.line}`,
                 padding: "12px 0",

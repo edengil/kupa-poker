@@ -65,7 +65,18 @@ vi.mock("../components/poker/MonthHeroesCard", () => ({ MonthHeroesCard: () => n
 vi.mock("../components/poker/RecentFormCard", () => ({ RecentFormCard: () => null }));
 vi.mock("../components/poker/NightFocus", () => ({ NightFocus: () => null }));
 vi.mock("../components/poker/TransferConfirmPopup", () => ({ TransferConfirmPopup: () => null }));
-vi.mock("../components/poker/NotificationsSheet", () => ({ NotificationsSheet: () => null }));
+vi.mock("../components/poker/NotificationsSheet", () => ({
+  /* גל 5, פריט 5.2: המגירה כבר לא מסמנת בפתיחה — היא מדווחת אילו פריטים
+     הוצגו בפועל דרך onVisible, ורק הם מסומנים. המוק מדמה מגירה שמציגה
+     את כל פריטיה מיד בהרכבה (כמו רשימה קצרה שנכנסת כולה למסך). */
+  NotificationsSheet: (p) => {
+    React.useEffect(() => {
+      p.onVisible?.((p.items || []).map((i) => i.id));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return null;
+  },
+}));
 vi.mock("../components/poker/PokerTable", () => ({ PokerTable: () => null }));
 vi.mock("../components/poker/PlanCard", () => ({ PlanCard: () => null }));
 vi.mock("../components/poker/BotToggle", () => ({ BotToggle: () => null }));

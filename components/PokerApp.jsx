@@ -301,15 +301,19 @@ function App({
     () => (db ? noticesForViewer(collectNotices(db), viewerName, { isAdmin, aliases }) : []),
     [db, viewerName, isAdmin, aliases]
   );
-  /* באדג' בסגנון פייסבוק: סופר רק התראות שטרם נצפו. פתיחת המגירה מסמנת
-     את כל ה־id-ים הנוכחיים כנצפו; התראה חדשה (id חדש) תדליק שוב את הבאדג'. */
+  /* באדג' בסגנון פייסבוק: סופר רק התראות שטרם נצפו. המגירה מדווחת אילו
+     פריטים הוצגו בפועל, ורק הם מסומנים כנצפו (גל 5, פריט 5.2) — פתיחה
+     חלקית משאירה באדג' על מה שלא נראה. התראה חדשה (id חדש) תדליק שוב
+     את הבאדג'. מפתח ה־seen כולל את הקבוצה — אין דיכוי חוצה־קבוצות. */
   const [seenIds, setSeenIds] = useState([]);
-  /* טעינת ה־id-ים שנצפו מהאחסון כשהצופה מתחלף — התאמת state בשלב הרינדור
-     (הדפוס המתועד של React), במקום אפקט שמסנכרן state אחרי הרינדור. */
+  /* טעינת ה־id-ים שנצפו מהאחסון כשהצופה/הקבוצה מתחלפים — התאמת state
+     בשלב הרינדור (הדפוס המתועד של React), במקום אפקט שמסנכרן state
+     אחרי הרינדור. */
+  const seenScope = `${groupId ?? ""}|${viewerName ?? ""}`;
   const [seenFor, setSeenFor] = useState(SEEN_FOR_UNSET);
-  if (seenFor !== viewerName) {
-    setSeenFor(viewerName);
-    setSeenIds(loadSeenIds(safeStorage(), viewerName));
+  if (seenFor !== seenScope) {
+    setSeenFor(seenScope);
+    setSeenIds(loadSeenIds(safeStorage(), viewerName, groupId));
   }
   const unseenCount = useMemo(
     () => unseenNotices(notices, seenIds).length,
@@ -317,15 +321,18 @@ function App({
   );
   const openNotices = useCallback(() => {
     setNoticesOpen(true);
-    setSeenIds((prev) => {
-      const { ids, changed } = markSeenIds(
-        prev,
-        notices.map((n) => n.id)
-      );
-      if (changed) saveSeenIds(safeStorage(), viewerName, ids);
-      return changed ? ids : prev;
-    });
-  }, [notices, viewerName]);
+  }, []);
+  /* המגירה מדווחת פריטים שהוצגו בפועל (גלילה חושפת עוד) — רק הם נצפים. */
+  const markNoticesVisible = useCallback(
+    (ids) => {
+      setSeenIds((prev) => {
+        const { ids: next, changed } = markSeenIds(prev, ids);
+        if (changed) saveSeenIds(safeStorage(), viewerName, next, groupId);
+        return changed ? next : prev;
+      });
+    },
+    [viewerName, groupId]
+  );
   const markNotice = useCallback(async (item) => {
     if (!db || !item?.sessionId || item.index == null) return;
     const session = db.sessions.find((s) => s.id === item.sessionId);
@@ -490,6 +497,7 @@ function App({
             items={notices}
             onClose={() => setNoticesOpen(false)}
             onMark={markNotice}
+            onVisible={markNoticesVisible}
           />
         ) : null}
         <Banner
