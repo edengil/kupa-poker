@@ -14,6 +14,17 @@ const SITE = "https://kupa-poker.vercel.app";
 const REDIRECT_URI = `${SITE}/api/calendar/callback`;
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
+/* בריחה ל־HTML לכל ערך שמגיע מהבקשה ומוזרק לדף (גל 2, פריט 2.1):
+   פרמטר ה־error של גוגל הוזרק גולמי לגוף הדף — Reflected XSS. */
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function htmlPage(title, body) {
   const backBtn =
     `<div style="margin-top:28px">` +
@@ -33,7 +44,7 @@ export async function GET(request) {
   const groupId = url.searchParams.get("state") || "";
 
   if (error || !code) {
-    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>גוגל לא אישרה את החיבור (${error || "no_code"}). נסו שוב.</p>`);
+    return htmlPage("החיבור נכשל", `<h1>❌ החיבור נכשל</h1><p>גוגל לא אישרה את החיבור (${escapeHtml(error.slice(0, 100)) || "no_code"}). נסו שוב.</p>`);
   }
 
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || "";
