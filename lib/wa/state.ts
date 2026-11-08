@@ -91,6 +91,10 @@ export interface UndoEntry {
   bagBefore?: number[];
   lastBefore?: number | null;
   female?: boolean;
+  /* גרסת צילום השקית: 2 = bagBefore/lastBefore הם הצילום המדויק של
+     המפתח המגדרי (BagM/BagF) שממנו נשלפה המחמאה; בלי השדה — רשומת
+     מורשת, והצילום הוא של שדות המורשת (גל 4, פריט 4.2). */
+  bagV?: number;
   at?: number;
   pending?: WaPendingApproval;
   player?: WaPlayer;
@@ -487,8 +491,21 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
         state.tips = (state.tips || []).filter((t) => t.id !== e.tipId);
       }
       if (e.bagBefore) {
-        state.tipComplimentBag = e.bagBefore;
-        state.tipComplimentLast = e.lastBefore ?? null;
+        if (e.bagV === 2) {
+          /* שחזור מדויק של השקית המגדרית שממנה נשלפה המחמאה — השליפה
+             הבאה אחרי הביטול חוזרת בדיוק לנקודה שלפני הטיפ. לזכר גם
+             מראת־המורשת מתעדכנת, כמו בהחלה. */
+          const bagState = state as unknown as Record<string, unknown>;
+          bagState[e.female ? "tipComplimentBagF" : "tipComplimentBagM"] = e.bagBefore;
+          bagState[e.female ? "tipComplimentLastF" : "tipComplimentLastM"] = e.lastBefore ?? null;
+          if (!e.female) {
+            state.tipComplimentBag = e.bagBefore;
+            state.tipComplimentLast = e.lastBefore ?? null;
+          }
+        } else {
+          state.tipComplimentBag = e.bagBefore;
+          state.tipComplimentLast = e.lastBefore ?? null;
+        }
       }
     } else if (e.t === "approve") {
       const j = i;

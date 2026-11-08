@@ -1,7 +1,7 @@
 /* החלת פקודות על ערב חי. לא שולח לוואטסאפ — רק מצב ותשובה אחת. */
 
 import { buildReport, CPS, settleLine } from "../report.js";
-import { nextTipCompliment, formatTipCompliment } from "../tipCompliments.js";
+import { nextTipCompliment, formatTipCompliment, tipBagKey, tipLastKey } from "../tipCompliments.js";
 import { isFemaleName, byGender } from "../gender.js";
 import { BOT_MARK } from "../botMark.js";
 import { buildTipsTable } from "../tipsTable.js";
@@ -443,9 +443,23 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const tipId = `${msgId || "tip"}_${record.length}_${Date.now()}`;
-      const bagBefore = [...(state.tipComplimentBag || [])];
-      const lastBefore = state.tipComplimentLast;
       const female = isFemaleName(p.name);
+      /* צילום־לפני של השקית שממנה באמת שולפים (גל 4, פריט 4.2): השקית
+         חיה במפתח המגדרי (BagM/BagF), עם נפילת־מורשת לזכר כמו בתוך
+         nextTipCompliment. הצילום הישן העתיק את שדה המורשת — והביטול
+         "שחזר" שדה שאף אחד לא שולף ממנו, בעוד השליפה בפועל נשארה
+         צרכנית. bagV:2 מסמן רשומה עם צילום מגדרי מדויק. */
+      const bk = tipBagKey(female);
+      const lk = tipLastKey(female);
+      const bagState = state as unknown as Record<string, unknown>;
+      let bagBefore = Array.isArray(bagState[bk]) ? [...(bagState[bk] as number[])] : [];
+      if (!bagBefore.length && !female && Array.isArray(state.tipComplimentBag)) {
+        bagBefore = [...state.tipComplimentBag];
+      }
+      const lastBefore =
+        (bagState[lk] as number | null | undefined) ??
+        (!female ? state.tipComplimentLast : null) ??
+        null;
       const { template, bag, last, bagKey, lastKey } = nextTipCompliment(state, { female }) as unknown as {
         template: string;
         bag: number[];
@@ -483,6 +497,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         bagBefore,
         lastBefore,
         female,
+        bagV: 2,
         ...(cashDelta !== undefined ? { cashDelta } : {}),
       });
       // BOT_MARK מתווסף אוטומטית על כל ack
