@@ -17,7 +17,7 @@ import { GapsBoard } from "./GapsBoard.jsx";
 import { checkNightBalance, confirmSaveIfUnbalanced } from "../../lib/poker/nightBalance";
 
 /* טאב הזנה — ערבים חדשים / חודש / שנתי. עריכת ערב קיים בטאב הערבים. */
-export function InputTab({ db, commit, years }) {
+export function InputTab({ db, commit, years, groupId = null }) {
   const [text, setText] = useState("");
   const [kind, setKind] = useState("session");
   const [year, setYear] = useState(new Date().getFullYear());
@@ -260,7 +260,7 @@ export function InputTab({ db, commit, years }) {
       )}
       <GapsBoard db={db} />
       <AliasCard db={db} commit={commit} />
-      <BackupCard db={db} commit={commit} />
+      <BackupCard db={db} commit={commit} groupId={groupId} />
     </div>
   );
 }

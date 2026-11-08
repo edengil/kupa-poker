@@ -298,7 +298,10 @@ grant all privileges on table public.diag_events to service_role;
 -- ---------------------------------------------------------------------------
 create table if not exists public.group_snapshots (
   id         uuid primary key default gen_random_uuid(),
-  group_id   uuid not null references public.groups (id) on delete cascade,
+  -- בלי on delete cascade על group_id בכוונה: צילום שלפני־מחיקה חייב
+  -- לשרוד את מחיקת הקבוצה — הוא כל נקודת השחזור. הצילומים נגזמים לפי
+  -- גיל (30 יום) בקרון, ומחיקת הבעלים (owner_id cascade) כן מנקה אותם.
+  group_id   uuid not null,
   owner_id   uuid not null references auth.users (id) on delete cascade,
   slug       text not null,
   name       text not null,

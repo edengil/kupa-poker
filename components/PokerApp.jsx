@@ -515,7 +515,7 @@ function App({
         <Suspense fallback={<TabFallback />}>
           <ViewTransition key={tab}>
           {tab === "input" ? (
-            <InputTab db={db} commit={commit} years={years} />
+            <InputTab db={db} commit={commit} years={years} groupId={groupId} />
           ) : tab === "live" ? (
             <>
               <LiveTab
