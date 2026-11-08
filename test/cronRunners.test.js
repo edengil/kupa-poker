@@ -30,6 +30,17 @@ function fakeSupabase() {
         eq() {
           return chain;
         },
+        /* גל 3 (3.3): runNoticeEmails מסדר ומגביל את שליפת הצפיות —
+           ה־order מחזיר את השרשרת וה־limit פותר כ־await (סוף השרשרת). */
+        order() {
+          return chain;
+        },
+        limit() {
+          return Promise.resolve({
+            data: table === "group_views" ? h.views : [],
+            error: null,
+          });
+        },
         async single() {
           if (table === "groups") {
             return h.row
