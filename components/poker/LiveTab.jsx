@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { store, flushStore, subscribeStoreKey } from "../../lib/store";
-import { buildReport, nightDateParts, DEFAULT_BUYIN, ENTRY } from "../../lib/report";
+import { buildReport, DEFAULT_BUYIN, ENTRY } from "../../lib/report";
 import { nightSummaryText } from "../../lib/nightShare";
 import { C } from "../../lib/poker/colors";
 import { fmt } from "../../lib/poker/format";
@@ -18,8 +18,6 @@ import { computeLivePace, averageNightMs, formatClock } from "../../lib/poker/li
 import { notifyTransfersSettlement } from "../../lib/poker/notifyTransfersClient";
 import { detectLiveRecords, liveRecordAnnouncement } from "../../lib/poker/liveRecords";
 import { postToGroup } from "../../lib/postToGroup";
-import { buildAttendanceSnapshot } from "../../lib/poker/attendance";
-import { matchViewerToPlayer } from "../../lib/poker/personalHighlights";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "../../lib/poker/config";
 import { brokenRecords } from "../../lib/poker/brokenRecords";
 import {
@@ -40,7 +38,7 @@ import { BotToggle } from "./BotToggle";
 import { PokerTable } from "./PokerTable";
 import { Plus, Minus, UserPlus, Coins, X } from "./icons";
 import { brassCta, sectionEyebrow, sectionTitle } from "../../lib/poker/festive";
-import { checkNightBalance, confirmSaveIfUnbalanced, deductChipsShortage } from "../../lib/poker/nightBalance";
+import { buildNightRecord } from "./live/buildNightRecord";
 
 /* שעון לפעולות משתמש בתוך handlers (לא לרינדור) — saveNight ודומיו. */
 const nowMs = () => Date.now();
@@ -549,82 +547,29 @@ export function LiveTab({
       alert("יש שחקנים שעדיין לא הוזנו להם ג׳יטונים ביציאה. יש להשלים את כולם לפני סיום הערב (גם 0).");
       return;
     }
-    /* נטו ב־₪ כמו תמיד; בנוסף chips / tipsGiven על כל רשומה כדי ששיאי
-       ג'יטונים וטיפים יעבדו מכאן והלאה. */
-    const entries = players
-      .filter((p) => p.cashout !== "")
-      .map((p) => {
-        const chips = +p.cashout || 0;
-        const buyin = +p.buyin || 0;
-        const net = r2(chips / cps - buyin);
-        return {
-          name: p.name,
-          amount: net,
-          chips,
-          buyin,
-          tipsGiven: +p.tipsGiven || 0,
-          buyinEvents: Array.isArray(p.buyinEvents) && p.buyinEvents.length ? p.buyinEvents : undefined,
-        };
-      });
-    /* כולל מי שסגר באפס — קודם סוננו החוצה כש־chips=0 */
-    if (!entries.length) return;
-    /* אזהרה רכה לפני שמירה לא־מאוזנת — לא חוסם קניות/ישיבה באמצע המשחק */
-    const balCheck = checkNightBalance({
-      entries,
+    /* בניית רשומת הערב חולצה ל־live/buildNightRecord (גל 8, 8.2) —
+       כאן נשארות רק תופעות הלוואי: שיאים, commit, שטיפה והתראות. */
+    const built = buildNightRecord({
+      players,
+      cps,
       cashSumChips,
       potChips,
-      cps,
+      startedAt,
+      planSnap,
+      db,
+      aliases: A,
+      tips,
+      coupleFills,
+      actionLog,
+      handOfNight,
+      savings5,
+      savingsPot,
+      potDraft,
+      nowMs,
     });
-    if (!confirmSaveIfUnbalanced(balCheck)) return;
-    /* חוסר בגיטונים — יורד מהמרוויחים באופן יחסי, בשקלים שלמים (לפי עדן).
-       החיתוך חל על הג'יטונים עצמם (לא רק על amount) דרך deductChipsShortage
-       — אותה חלוקה יחסית כמו במנוע החלוקה, ובלי סכומים שליליים (ממצא 7) */
-    const chipsShortage = balCheck.chipsGapShekels != null && balCheck.chipsGapShekels < -0.01
-      ? Math.round(-balCheck.chipsGapShekels)
-      : 0;
-    if (chipsShortage > 0) {
-      deductChipsShortage(entries, chipsShortage, cps);
-    }
-    /* תאריך הערב = תחילת המשחק בשעון ישראל (לא חצות אחרי סגירה מאוחרת). */
-    const endedAt = nowMs();
-    const { d, mo, y, iso } = nightDateParts(startedAt, endedAt);
-    /* צילום נוכחות: אישורי הגעה מול מי שבאמת ישב. שמות הצופים ממופים
-       לשמות שחקנים; מי שלא זוהה נשאר עם שם ההתחברות ופשוט לא נספר. */
-    const attendance = planSnap
-      ? buildAttendanceSnapshot({
-          rsvpRows: (planSnap.rsvpRows || []).map((r) => ({
-            status: r.status,
-            playerName:
-              matchViewerToPlayer(db, { name: r.name, email: r.email }) || r.name,
-          })),
-          actualNames: players.map((p) => p.name),
-          aliases: A,
-        })
-      : undefined;
-    const potFinal = effectivePot(savingsPot, potDraft);
-    const rec = {
-      id: "live_" + nowMs(),
-      iso,
-      d,
-      mo,
-      y,
-      entries,
-      tips: tips.length ? tips.map(({ name, amount, at }) => ({ name, amount, at })) : undefined,
-      cps,
-      coupleFills: coupleFills.length ? coupleFills : undefined,
-      startedAt: startedAt || null,
-      endedAt,
-      location: planSnap?.location || db.plan?.location || undefined,
-      placeNote: planSnap?.note || db.plan?.note || undefined,
-      /* יומן הפעולות נשמר עם הערב — רק ממנו מחשבים שיאי יציאה, רק לערבי לייב */
-      actionLog: actionLog.length ? actionLog : undefined,
-      handOfNight: handOfNight.trim() || undefined,
-      attendance,
-      savings5: savings5 || undefined,
-      /* סכום הקופה שהמנהל אישר/ערך בסוף הערב — הוא מה שנרשם ומה שמצטבר (עדן, 19.10) */
-      savingsPot: potFinal > 0 ? potFinal : undefined,
-    };
-    const roster = [...new Set([...(db.roster || []), ...players.map((p) => p.name)])];
+    if (built.status !== "ok") return;
+    const { rec, roster, endedAt } = built;
+    const { d, mo, y } = built.dateParts;
     /* גל 7 (7.5): מונה הקופה הקבוצתי db.savingsPot כבר לא מתוחזק
        ידנית — היתרה נגזרת תמיד מ־potOverview (סכום הרשום של הערבים
        פחות המשיכות). השדה הישן נשאר בנתונים כמו שהוא, לא נכתב ולא
