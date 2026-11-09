@@ -26,6 +26,8 @@ const CHAIN = [
   "202610300002_wave2b_stamp_sid_privacy.sql",
   "202610300003_wave2b_applied_privacy.sql",
   "202610300004_wave2_frozen_flags_privacy.sql",
+  // גל 7 (7.3): הקרנת צופה אחת — filter מאוחד מעל project_session_for_viewer.
+  "202611090001_wave7_viewer_projection_unified.sql",
 ];
 
 const POT_PLAN = JSON.stringify([
