@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PokerApp from "./PokerApp";
 import AppErrorBoundary from "./AppErrorBoundary";
-import { reportBeacon } from "../lib/diagReport";
+import { reportBeacon, reportDiag } from "../lib/diagReport";
 import { getSupabase } from "../lib/supabaseClient";
 import { configureStore, makeSupabaseStore, flushStore, clearLocalCache, forgetStoreKey, seedStoreLive, snapshotStoreLive, publishStoreKey, store, LIVE_KEY, DB_KEY, CONFIG_KEY } from "../lib/store";
 import { liveFingerprint, mergeLiveStates, decideLivePoll } from "../lib/liveMerge";
@@ -308,7 +308,10 @@ export default function OwnerApp({ hosts } = {}) {
 
       if (landing.kind === "error") {
         if (alive && !cachedRow) {
-          setMessage(landing.message);
+          /* גל 6 (6.3): את טקסט השגיאה הגולמי שולחים לאבחון בלבד — המסך
+             מציג הודעה עברית נקייה עם מזהה־לקוח של האירוע, לא טקסט Postgres. */
+          reportDiag("root-landing", new Error(landing.message));
+          setMessage("האירוע נרשם באבחון");
           setPhase("error");
         }
         return;
@@ -495,7 +498,9 @@ export default function OwnerApp({ hosts } = {}) {
   if (phase === "error")
     return (
       <Splash tone="error">
-        {message || "משהו השתבש"}
+        {/* גל 6 (6.3): הודעה עברית נקייה + מזהה אירוע לאבחון — בלי טקסט מסד. */}
+        לא הצלחנו לטעון את הקבוצה כרגע. נסו שוב בעוד רגע.
+        {message ? <div style={{ fontSize: 12.5, opacity: 0.75, marginTop: 8 }}>מזהה אירוע: {message}</div> : null}
         {/* פריט 1.4: מסך השגיאה הוא מסך נסה־שוב — כשל חולף בנחיתת השורש
             לא יוצר קבוצה ולא תוקע את המשתמש; רענון מנסה את ההכרעה מחדש. */}
         <div>
