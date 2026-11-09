@@ -3,36 +3,17 @@
 import { ALIASES, findPlayer, resolveAlias } from "./parse.js";
 import { potForBuyin } from "../poker/helpers.js";
 import { DEFAULT_BUYIN } from "../report.js";
+import type { BuyinEvent, Player, Tip } from "../poker/entities.js";
 
 export const r2 = (v: number): number => Math.round(v * 100) / 100;
 
-export interface WaBuyinEvent {
-  amount: number;
-  at?: number;
-  total?: number;
-  pot?: number;
-  /* זהות יציבה של החותמת: מזהה הודעת הוואטסאפ + אינדקס הפקודה בתוכה.
-     הצילום (amount+at+total) אינו זהות — שתי קניות של 50 באותה אלפית־שנייה
-     נראות זהות, ושם השחקן הוא תווית משתנה. ה־sid הוא מה שמאפשר לביטול
-     למצוא בדיוק את החותמת הזו גם אחרי שינוי שם, ולהחלה־מחדש לנחות על
-     אותו שחקן. שדה פנימי של הבוט — מוסר בהקרנת הצופה (publicShare/SQL). */
-  sid?: string;
-}
-
-export interface WaPlayer {
-  name: string;
-  buyin?: number | string;
-  cashout?: string | number;
-  tipsGiven?: number;
-  buyinEvents?: WaBuyinEvent[];
-}
-
-export interface WaTip {
-  id?: string | number;
-  name: string;
-  amount?: number;
-  at?: number;
-}
+/* גל 7 (7.4): ההצהרות של הבוט הן כינויים לטיפוסים הקנוניים ב־
+   lib/poker/entities.ts — ישות אחת מוצהרת במקום אחד. שדות ה־Wa*
+   הצרים יותר (amount חובה באירוע של בוט) מתועדים שם כאופציונליים
+   כי כותבים אחרים לא תמיד כותבים אותם. */
+export type WaBuyinEvent = BuyinEvent;
+export type WaPlayer = Player;
+export type WaTip = Tip;
 
 export interface WaPendingApproval {
   name: string;

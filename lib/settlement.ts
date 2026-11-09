@@ -14,23 +14,15 @@
 import { CPS } from "./report";
 import { FEMALE, canonName, isFemaleName } from "./gender.js";
 import { FILL_COUPLES } from "./poker/coupleFills.js";
+import type { Player, Transfer as CanonicalTransfer } from "./poker/entities.js";
 
 export { FEMALE, canonName, isFemaleName };
 
-export interface SettlePlayer {
-  name: string;
-  buyin?: number | string;
-  cashout?: number | string;
-}
-
-export interface Transfer {
-  from: string;
-  to: string;
-  amount: number;
-  pair?: boolean;
-  joint?: boolean;
-  fromSplit?: Record<string, number>;
-}
+/* גל 7 (7.4): כינויים לטיפוסים הקנוניים ב־lib/poker/entities.ts —
+   Transfer הקנוני נושא גם את דגלי pot/residual/manual של תוכניות
+   התשלומים השמורות, לא רק את דגלי החלוקה. */
+export type SettlePlayer = Player;
+export type Transfer = CanonicalTransfer;
 
 export interface SettleResult {
   transfers: Transfer[];

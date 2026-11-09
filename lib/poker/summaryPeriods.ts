@@ -4,13 +4,16 @@
 import { yearNum } from "./totals.js";
 import { MONTHS } from "./format.js";
 
-interface Session {
+/* שדות התאריך הגולמיים של ערב כפי שנטענים מהאחסון — unknown בכוונה:
+   הנתונים הישנים לא מנוקים, והבדיקות כאן הן בדיקות תקפות, לא הנחות.
+   (לא Session הקנוני מ־entities.ts, שמניח y/mo מנוקים ל־number.) */
+interface SessionDateParts {
   y?: unknown;
   mo?: unknown;
 }
 
 interface Db {
-  sessions?: Session[];
+  sessions?: SessionDateParts[];
 }
 
 interface PeriodBase {

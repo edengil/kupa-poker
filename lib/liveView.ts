@@ -1,17 +1,14 @@
 import { r2, canon } from "./poker/helpers";
 import { partitionByNet } from "./report";
+import type { Player } from "./poker/entities";
 
 /**
  * לוגיקת תצוגה טהורה של טאב הלייב — חולצה מ־LiveTab.jsx (פיצול 2026-10-16)
  * כדי שתהיה ניתנת לבדיקה בנפרד מהרכיב. אין כאן שום state.
  */
 
-export interface LivePlayer {
-  name: string;
-  buyin?: number | string;
-  cashout?: number | string;
-  buyinEvents?: { amount?: number; pot?: number }[];
-}
+/* גל 7 (7.4): כינוי לטיפוס השחקן הקנוני ב־lib/poker/entities.ts. */
+export type LivePlayer = Player;
 
 export interface PlayersViewOpts {
   recent?: Record<string, number>;

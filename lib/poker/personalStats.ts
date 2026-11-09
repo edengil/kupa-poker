@@ -19,12 +19,10 @@ import {
 import { playerBalanceBreakdown } from "./totals.js";
 import { paymentSpeedForPlayer, formatPaymentDelay } from "./paymentSpeed.js";
 
-export interface BuyinEvent {
-  at?: number | string;
-  amount?: number;
-  total?: number;
-  pot?: number;
-}
+/* גל 7 (7.4): BuyinEvent הקנוני מ־lib/poker/entities.ts — אחד לכל
+   המערכת (עם sid פנימי אופציונלי). המודול גם מייצא אותו מחדש. */
+import type { BuyinEvent, Session, Tip } from "./entities.js";
+export type { BuyinEvent };
 
 export interface StatsEntry {
   name: string;
@@ -33,16 +31,14 @@ export interface StatsEntry {
   buyinEvents?: BuyinEvent[];
 }
 
-export interface StatsTip {
-  name: string;
-  amount?: number | string;
-}
+/* גל 7 (7.4): StatsTip הוא Tip הקנוני עם amount שמותר גם כמיתר —
+   נתוני טיפים היסטוריים נטענים לפעמים לא־מנוקים. */
+export type StatsTip = Tip & { amount?: number | string };
 
-export interface StatsSession {
+/* תת־הצורה של Session שהסטטיסטיקה צורכת: iso חובה אצלה (היא מסננת
+   ערבים בלי תאריך לפני החישוב); שאר השדות — הקנוניים. */
+export interface StatsSession extends Session {
   iso: string;
-  d?: number;
-  mo?: number;
-  y?: number;
   entries?: StatsEntry[];
   tips?: StatsTip[];
 }
