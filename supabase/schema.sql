@@ -328,11 +328,13 @@ grant all privileges on table public.group_snapshots to service_role;
 -- הצפייה דורשת התחברות: ה-slug נשאר מפתח הגישה, אבל בנוסף אליו צריך
 -- חשבון Google — אחרת אין דרך לדעת מי צופה. לכן execute רק ל-authenticated.
 -- ---------------------------------------------------------------------------
--- פרטיות קופה (גלים 1–2): הקרנת צופה אחת לכל הפונקציות הציבוריות.
+-- פרטיות קופה (גלים 1–2, 7): הקרנת צופה אחת לכל הפונקציות הציבוריות.
 -- הגדרות הפונקציות בבלוק הזה הן הגרסאות הסופיות בשרשרת המיגרציות:
 -- project_payments_for_viewer — 202610300001; ‏strip_buyin_event_sids —
 -- 202610300002; ‏public_group — 202610300003; ‏project_session_for_viewer
--- ו־filter_shared_group_data — 202610300004.
+-- — 202610300004; ‏filter_shared_group_data — 202611090001 (גל 7, 7.3:
+-- גוף נקי מעל project_session_for_viewer, בלי הסרה כפולה, וענף
+-- ה־shareHistory=false עובר דרך project ולכן גם בלי sid).
 -- ---------------------------------------------------------------------------
 
 -- עזר הקרנה: מערך שחקנים/שורות־ערב → אותו מערך כשמכל אירוע קנייה הוסר
@@ -482,8 +484,10 @@ $$;
 
 revoke all on function public.project_session_for_viewer(jsonb) from public, anon, authenticated, service_role;
 
--- סינון נתוני קבוצה לתגובות RPC ציבוריות: shareHistory + הקרנת קופה מלאה
--- + הסרת סימוני ההקפאה מ־manualSettlement של כל ערב מוקרן, בשני המצבים.
+-- סינון נתוני קבוצה לתגובות RPC ציבוריות — גל 7 (7.3): גוף נקי מעל
+-- project_session_for_viewer; אין הסרות אינליין משלו (ההסרה הכפולה
+-- של סימוני ההקפאה אוחדה לתוך project). ענף shareHistory=false עובר
+-- גם הוא דרך project — לכן גם בלי sid, כמו צד ה־JS.
 create or replace function public.filter_shared_group_data(p_data jsonb, p_config jsonb)
 returns jsonb
 language plpgsql
@@ -506,11 +510,6 @@ begin
       order by coalesce((elem->>'endedAt')::numeric, 0) desc,
                coalesce(elem->>'iso', '') desc
       limit 1;
-    -- גל 2: גם סימוני ההקפאה יוצאים מ־manualSettlement של הערב המוקרן
-    if last_sess is not null and jsonb_typeof(last_sess->'manualSettlement') = 'object' then
-      last_sess := jsonb_set(last_sess, '{manualSettlement}',
-        (last_sess->'manualSettlement') - 'frozenReal' - 'frozenAuto' - 'frozenActual', true);
-    end if;
     return jsonb_build_object(
       'sessions', case when last_sess is null then '[]'::jsonb
                        else jsonb_build_array(last_sess) end,
@@ -524,15 +523,6 @@ begin
   select coalesce(jsonb_agg(public.project_session_for_viewer(elem) order by ord), '[]'::jsonb)
     into projected
     from jsonb_array_elements(sessions) with ordinality as t(elem, ord);
-  -- גל 2: גם סימוני ההקפאה יוצאים מ־manualSettlement של כל ערב מוקרן
-  select coalesce(jsonb_agg(
-      case when jsonb_typeof(elem->'manualSettlement') = 'object'
-        then jsonb_set(elem, '{manualSettlement}',
-               (elem->'manualSettlement') - 'frozenReal' - 'frozenAuto' - 'frozenActual', true)
-        else elem
-      end order by ord), '[]'::jsonb)
-    into projected
-    from jsonb_array_elements(projected) with ordinality as t(elem, ord);
   return (p_data - 'savingsPot' - 'savingsWithdrawals')
     || jsonb_build_object('sessions', projected);
 end;
