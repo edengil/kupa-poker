@@ -66,32 +66,12 @@ const KOBI = "קובי סעדה";
 const KOBI_TIP_OPENER = "יא חאלייה";
 
 /* ============================================================================
-   תקרת שפיות לפקודת כסף בודדת של הבוט (גל 4, 4.5 · החלטת עדן 7).
-   טעות הקלדה אחת בהודעת וואטסאפ ("דן +5000" במקום +500) לא נכנסת
-   ללייב: פקודת קנייה מעל התקרה לא חלה ומנותבת לתור אישור עדן — אותו
-   תור של שחקן לא־מוכר, בלי מנגנון חדש. התקרה נגזרת מהיסטוריית
-   הקבוצה: אירוע הקנייה הבודד הגדול ביותר שנראה (בלייב הנוכחי או
-   בערב האחרון שנסגר) × 4, עם רצפת גיבוי לערב חדש בלי היסטוריה.
+   אין יותר תקרה ואין תור אישור לפקודות כסף בבוט (החלטת עדן 9.11,
+   מבטלת את 4.5 ואת המשך 4.5ב): הקבוצה היא רק כניסות/יציאות/טיפים,
+   ומה שרושמים זה מה שהיה. כל פקודת כסף — בכל סכום — חלה מיד בנתיב
+   הרגיל. טעות מתקנים בעריכת ההודעה (ביטול+החלה־מחדש) או באתר.
+   הממתין היחיד שנשאר הוא של שחקן לא־מוכר (החלטה נפרדת, לא של סכום).
    ============================================================================ */
-export const BOT_MONEY_CEILING_FALLBACK_ILS = 1000;
-const BOT_MONEY_CEILING_MULT = 4;
-
-export function botMoneyCeilingIls(
-  state: { players?: Array<{ buyinEvents?: Array<{ amount?: unknown }> }> } | null | undefined,
-  lastSession?: { players?: Array<{ buyinEvents?: Array<{ amount?: unknown }> }> } | null
-): number {
-  let biggest = 0;
-  const scan = (players?: Array<{ buyinEvents?: Array<{ amount?: unknown }> }>) => {
-    for (const p of players || []) {
-      for (const e of p?.buyinEvents || []) {
-        biggest = Math.max(biggest, Math.abs(Number(e?.amount) || 0));
-      }
-    }
-  };
-  scan(state?.players);
-  scan(lastSession?.players);
-  return Math.max(BOT_MONEY_CEILING_FALLBACK_ILS, biggest * BOT_MONEY_CEILING_MULT);
-}
 
 /* --------------------------- החלת הפקודות ---------------------------
    כל הודעה נרשמת ב-live.applied לפי מזהה ההודעה, יחד עם מה שהיא עשתה.
@@ -224,71 +204,6 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   const acks = [];
   const problems = [];
 
-  /* תקרת השפיות של ההודעה הזו (4.5) + ניתוב לתור האישור: אותו דפוס
-     בדיוק של שחקן לא־מוכר — ממתין מצטבר עם צילום pendingBefore, כך
-     שעריכה/מסירה־חוזרת של ההודעה מבטלת ומחילה מחדש בלי כפילות. */
-  const ceilingIls = botMoneyCeilingIls(state, opts.lastSession);
-  const pendForApproval = (name: string, amount: number) => {
-    const existing = (state.pendingApprovals || []).find((p) => p.name === name && !isOpPending(p));
-    const pendingBefore = existing
-      ? { name: existing.name, amount: existing.amount, at: existing.at }
-      : null;
-    if (existing) {
-      state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
-        p.name === name && !isOpPending(p) ? { ...p, amount: r2(p.amount + amount) } : p
-      );
-    } else {
-      state.pendingApprovals = [
-        ...(state.pendingApprovals || []),
-        { name, amount, at: now },
-      ];
-    }
-    record.push({ t: "pending", name, amount, at: now, pendingBefore });
-    acks.push(
-      `⚠️ סכום חריג: ${name} ${amount}₪ — לא חל. ממתין לאישור עדן (אשר ${name} / דחה ${name})`
-    );
-  };
-
-  /* גל 4ב (החלטת עדן — המשך 4.5): גם טיפ ויציאה חריגים מעל התקרה
-     מנותבים לתור האישור, לא נחסמים. הממתין נושא את סוג הפעולה (op) ואת
-     צילום־הלפני של ההחלה, והרשומה היא "pendingOp" (נפרדת מ־"pending"
-     של הקניות, שצילום־הלפני שלה הוא {amount, at} בלבד). עריכה־למטה של
-     הפקודה מתחת לתקרה מבטלת את הממתין דרך הביטול ומחילה רגיל — בדיוק
-     כמו בקנייה. ממתין־פעולה שני לאותו שחקן+סוג לא נוצר: הפקודה החוזרת
-     רק מצביעה על הממתין הקיים. */
-  const pendOpForApproval = (item: WaPendingApproval, label: string) => {
-    const existing = (state.pendingApprovals || []).find(
-      (p) => p.name === item.name && p.op === item.op
-    );
-    if (existing) {
-      const before: WaPendingApproval = { ...existing };
-      const atBefore = existing.at;
-      state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
-        p === existing ? { ...item, at: atBefore } : p
-      );
-      record.push({
-        t: "pendingOp",
-        op: item.op,
-        name: item.name,
-        amount: item.amount,
-        at: atBefore,
-        pendingBefore: before,
-      });
-    } else {
-      state.pendingApprovals = [...(state.pendingApprovals || []), item];
-      record.push({
-        t: "pendingOp",
-        op: item.op,
-        name: item.name,
-        amount: item.amount,
-        at: item.at,
-        pendingBefore: null,
-      });
-    }
-    acks.push(
-      `⚠️ ${label} — לא חל. ממתין לאישור עדן (אשר ${item.name} / דחה ${item.name})`
-    );
-  };
 
   for (let ci = 0; ci < cmds.length; ci++) {
     let cmd = cmds[ci];
@@ -369,10 +284,10 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       state.pendingApprovals = pending.filter((_, i) => i !== idx);
       if (cmd.kind === "reject") {
         if (isOpPending(item)) {
-          /* דחיית פעולת־ממתין (גל 4ב): הממתין נצרך ושום דבר לא הוחל —
-             הטיפ/היציאה פשוט לא קורים. הרשומה נושאת את צילום הממתין
-             (pendingBefore = הפריט עצמו), כמו רשומת הדחייה של קנייה:
-             ביטול הודעת הדחייה לא מחזיר אותו — הדחייה סופית. */
+          /* דחיית פעולת־ממתין היסטורית (גל 4ב, מנגנון שהוסר 9.11):
+             פריטים כאלה יכולים להתקיים רק בלייב שנוצר לפני ההסרה —
+             ממשיכים לטפל בהם עד שהתור מתרוקן: הממתין נצרך ושום דבר
+             לא הוחל — הטיפ/היציאה פשוט לא קורים. */
           record.push({
             t: "pendingOp",
             op: item.op,
@@ -394,10 +309,12 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         );
         continue;
       }
-      /* אישור פעולת־ממתין (גל 4ב — טיפ/יציאה חריגים): ההחלה היא אותה
-         לוגיקה של הפקודה הרגילה, על צילום־הלפני שנשמר בממתין. השחקן
-         חייב להיות בשולחן; אם הוסר מאז ההמתנה — הפעולה אובדת עם הודעה,
-         לא מומצאת על שחקן אחר. */
+      /* אישור פעולת־ממתין היסטורית (גל 4ב — טיפ/יציאה ממתינים): ממתינים
+         כאלה לא נוצרים יותר (המנגנון הוסר 9.11), אבל פריט קיים בלייב
+         ממשיך להיות ניתן לאישור עד שהתור מתרוקן: ההחלה היא אותה לוגיקה
+         של הפקודה הרגילה, על צילום־הלפני שנשמר בממתין. השחקן חייב להיות
+         בשולחן; אם הוסר מאז ההמתנה — הפעולה אובדת עם הודעה, לא מומצאת
+         על שחקן אחר. */
       if (isOpPending(item)) {
         const rtOpName = sid ? retarget.get(sid) : undefined;
         const opIdx = rtOpName
@@ -654,39 +571,6 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         problems.push(`טיפ של 0 לא נספר`);
         continue;
       }
-      /* תקרת שפיות (4.5, עודכן בגל 4ב לפי החלטת עדן): טיפ מעל התקרה לא
-         נחסם יותר — מנותב לתור האישור כמו קנייה חריגה, עם צילום־הלפני
-         של השקית/אחרון של המגדר שממנו תישלף המחמאה באישור. התקרה
-         בג'יטונים = התקרה בשקלים × ג'יטונים־לשקל. */
-      if (amount > ceilingIls * cps) {
-        const femalePend = isFemaleName(p.name);
-        const bkPend = tipBagKey(femalePend);
-        const lkPend = tipLastKey(femalePend);
-        const bagStatePend = state as unknown as Record<string, unknown>;
-        let bagBeforePend = Array.isArray(bagStatePend[bkPend])
-          ? [...(bagStatePend[bkPend] as number[])]
-          : [];
-        if (!bagBeforePend.length && !femalePend && Array.isArray(state.tipComplimentBag)) {
-          bagBeforePend = [...state.tipComplimentBag];
-        }
-        const lastBeforePend =
-          (bagStatePend[lkPend] as number | null | undefined) ??
-          (!femalePend ? state.tipComplimentLast : null) ??
-          null;
-        pendOpForApproval(
-          {
-            name: p.name,
-            amount,
-            at: now,
-            op: "tip",
-            tipBagBefore: bagBeforePend,
-            tipLastBefore: lastBeforePend,
-            tipFemale: femalePend,
-          },
-          `טיפ חריג: ${p.name} · ${amount} ג'יטונים`
-        );
-        continue;
-      }
       const tipId = `${msgId || "tip"}_${record.length}_${Date.now()}`;
       const female = isFemaleName(p.name);
       /* צילום־לפני של השקית שממנה באמת שולפים (גל 4, פריט 4.2): השקית
@@ -757,25 +641,6 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const p = state.players[found.index];
-      /* תקרת שפיות (4.5, עודכן בגל 4ב לפי החלטת עדן) ליציאה: ערימת
-         הסיום לגיטימית יכולה לעבור את תקרת הקנייה הבודדת (כמה ריבאיים
-         מצטברים), ולכן הגבול כאן הוא התקרה + כל מה שהשחקן עצמו הכניס.
-         מעבר לזה — לא נחסם יותר, אלא מנותב לתור האישור כמו קנייה
-         חריגה, עם צילום של ממתין־הסגירה כדי שהביטול יחזיר אותו. */
-      const cashoutIls = (+cmd.chips || 0) / (cps || 1);
-      if (cashoutIls > ceilingIls + (+p.buyin || 0)) {
-        pendOpForApproval(
-          {
-            name: p.name,
-            amount: +cmd.chips || 0,
-            at: now,
-            op: "cashout",
-            wasPending: state.pending === p.name,
-          },
-          `יציאה חריגה: ${p.name} · ${cmd.chips} ג'יטונים (≈ ${Math.round(cashoutIls)}₪)`
-        );
-        continue;
-      }
       // סגירה חוזרת = עדכון. דורסים את הערך הקודם ואומרים את זה במפורש
       const wasClosed = p.cashout !== "" && p.cashout != null;
       record.push({ t: "out", name: p.name, before: p.cashout ?? "" });
@@ -798,12 +663,6 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
          מהביטול ועוקפים את הסחת־הממתין — השחקן כבר הושב על ידי ההודעה
          הזו עצמה, והשם המתוקן שלו לא חייב להיות ברשימת המוכרים. */
       const name = rtName || found.resolved || resolveAlias(cmd.name, aliases);
-      /* תקרת שפיות (4.5): סכום חריג לא מושיב ולא יוצר ממתין רגיל —
-         מנותב לתור האישור עם סימון מפורש, גם כשהשם מוכר. */
-      if (cmd.amount > ceilingIls) {
-        pendForApproval(name, cmd.amount);
-        continue;
-      }
       const extras = [
         ...(state.players || []).map((p) => p.name),
         ...(state.approvedNames || []),
@@ -866,12 +725,6 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     }
 
     const p = state.players[found.index];
-    /* תקרת שפיות (4.5) גם ליושב: תוספת חריגה לא נחתמת — מנותבת לתור
-       האישור. הפחתה (סכום שלילי) היא תיקון רישום ולא מוגבלת כאן. */
-    if (cmd.amount > ceilingIls) {
-      pendForApproval(p.name, cmd.amount);
-      continue;
-    }
     const next = stampBuyin(state, p, cmd.amount, now, sid);
     const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
     state.players[found.index] = next;
