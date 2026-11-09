@@ -14,6 +14,7 @@ import { trackWaSend, recordGateSwallow } from "@/lib/wa/healthServer";
 import { shouldSkipNudge } from "@/lib/wa/quota";
 import { casWriteGroup, updateGroupCas } from "@/lib/groupCas";
 import { reminderKind, writeReminderStamp } from "@/lib/wa/reminderWrite";
+import { resolveEffectiveSlug } from "@/lib/groupSlug";
 import { AL, canon } from "@/lib/poker/helpers";
 import { resolveCps, DEFAULT_BUYIN } from "@/lib/report";
 import { normalize } from "@/lib/poker/db";
@@ -141,10 +142,11 @@ export async function POST(request) {
     return ok({ skipped: "not allowed" });
 
   const supabase = getAdminSupabase();
+  const slug = await resolveEffectiveSlug(supabase, envValue);
   const { data: row, error } = await supabase
     .from("groups")
     .select("id, slug, live, config, data, updated_at")
-    .eq("slug", envValue("KUPA_GROUP_SLUG"))
+    .eq("slug", slug)
     .single();
 
   if (error || !row) {

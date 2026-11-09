@@ -7,6 +7,7 @@ import { sendToGroup, maybeRemindPending, maybeRemindBitIdle } from "@/lib/whats
 import { trackWaSend } from "@/lib/wa/healthServer";
 import { shouldSkipNudge } from "@/lib/wa/quota";
 import { reminderKind, writeReminderStamp } from "@/lib/wa/reminderWrite";
+import { resolveEffectiveSlug } from "@/lib/groupSlug";
 
 /* ============================================================================
    תזכורות בוט תלויות־זמן — ממתינים לאישור (8 דק׳) וביט שקט (שעתיים).
@@ -35,10 +36,11 @@ export async function GET(request) {
   }
   try {
     const supabase = getAdminSupabase();
+    const slug = await resolveEffectiveSlug(supabase, envValue);
     const { data: row, error } = await supabase
       .from("groups")
       .select("id, slug, live, config")
-      .eq("slug", envValue("KUPA_GROUP_SLUG"))
+      .eq("slug", slug)
       .single();
     if (error || !row) return NextResponse.json({ ok: true, skipped: "no group" });
     if (!row.config?.botOn) return NextResponse.json({ ok: true, skipped: "bot off" });

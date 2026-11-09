@@ -655,13 +655,29 @@ export function ShareBar({ slug, groupId, supabase, onSignOut, onSlugChange }) {
   const rotate = async () => {
     if (busy) return;
     const ok = confirm(
-      "להחליף את לינק הצפייה?\n\nהלינק הישן יפסיק לעבוד מיד.\nאם הבוט בוואטסאפ משתמש באותו slug — צריך לעדכן גם ב-Vercel את KUPA_GROUP_SLUG ולעשות Redeploy."
+      "להחליף את לינק הצפייה?\n\nהלינק הישן יפסיק לעבוד מיד. הבוט והתזכורות ימשיכו לעבוד אוטומטית על הלינק החדש — אין צורך בשום עדכון נוסף."
     );
     if (!ok) return;
     setBusy(true);
     try {
       const next = newSlug();
-      const { error } = await supabase.from("groups").update({ slug: next }).eq("id", groupId);
+      /* גל 6 (6.1): שומרים את ה־slug היוצא ברשימת העוגנים שבקונפיג
+         (prevSlugs), כדי שצרכני הבוט/התזכורות ימשיכו למצוא את השורה
+         לפי ה־slug שבסביבה גם אחרי הסיבוב — בלי עדכון env ובלי Redeploy. */
+      const { data: cur, error: readErr } = await supabase
+        .from("groups")
+        .select("config")
+        .eq("id", groupId)
+        .single();
+      if (readErr) throw readErr;
+      const prevConfig = cur?.config || {};
+      const prevSlugs = Array.from(
+        new Set([...(Array.isArray(prevConfig.prevSlugs) ? prevConfig.prevSlugs : []), slug])
+      );
+      const { error } = await supabase
+        .from("groups")
+        .update({ slug: next, config: { ...prevConfig, prevSlugs } })
+        .eq("id", groupId);
       if (error) throw error;
       try {
         localStorage.removeItem(`poker:cache:pub:${slug}`);
