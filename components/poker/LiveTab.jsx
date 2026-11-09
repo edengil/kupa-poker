@@ -625,9 +625,10 @@ export function LiveTab({
       savingsPot: potFinal > 0 ? potFinal : undefined,
     };
     const roster = [...new Set([...(db.roster || []), ...players.map((p) => p.name)])];
-    // קופת החיסכון מצטברת ברמת הקבוצה (רק האדמין רואה) — לפי הסכום שאושר
-    const prevPot = Number(db.savingsPot) || 0;
-    const newPot = r2(prevPot + potFinal);
+    /* גל 7 (7.5): מונה הקופה הקבוצתי db.savingsPot כבר לא מתוחזק
+       ידנית — היתרה נגזרת תמיד מ־potOverview (סכום הרשום של הערבים
+       פחות המשיכות). השדה הישן נשאר בנתונים כמו שהוא, לא נכתב ולא
+       נקרא. הסכום שאושר לערב נשמר על הערב עצמו (rec.savingsPot). */
     // שבירת שיאים נבדקת מול ה-db שלפני ההוספה — ואם נשבר משהו, הבוט מכריז בקבוצה
     if (typeof onRecords === "function") {
       try {
@@ -642,7 +643,6 @@ export function LiveTab({
       sessions: [...db.sessions, rec].sort((a, b) => a.iso.localeCompare(b.iso)),
       roster,
       plan: null, // הערב התקיים — ההזמנה כבר לא רלוונטית
-      savingsPot: newPot > 0 ? newPot : undefined,
     });
     store.set(LIVE_KEY, "");
     const saved = await flushStore();

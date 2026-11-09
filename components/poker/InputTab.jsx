@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { buildSettlement } from "../../lib/report";
+import { playersFromSession } from "../../lib/nightShare";
 import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
 import { C } from "../../lib/poker/colors";
 import { fmt, MONTHS } from "../../lib/poker/format";
@@ -34,11 +35,11 @@ export function InputTab({ db, commit, years, groupId = null }) {
      המספרים הנכונים והחלוקה מחושבת מהם, בלי תלות במה שהבוט רשם. */
   function openSplit() {
     const norm = entries.map((e) => ({ name: canon(e.name, AL(db)), amount: e.amount }));
-    const pseudo = norm.map((e) => ({
-      name: e.name,
-      buyin: e.amount < 0 ? -e.amount : 0,
-      cashout: String(Math.max(0, e.amount)),
-    }));
+    /* גל 7 (7.5ב): ענף־הנפילה האחד — playersFromSession מחשב בדיוק
+       את אותם buyin/cashout מהנטו (האינליין הקודם שכפל אותו, רק בלי
+       tipsGiven, ש־settle לא צורך). ענף־הקנייה לא חל כאן: entries
+       מההדבקה הן נטו בלבד, בלי buyin/chips. */
+    const pseudo = playersFromSession({ entries: norm });
     const split = buildSettlement(settle(pseudo, 1), {
       isCashOnly,
       transferVerb,

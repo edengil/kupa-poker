@@ -111,16 +111,14 @@ export function PotDashboard({ db, commit, isAdmin }) {
       return;
     }
     if (!commit) return;
-    /* B5 (עדן, 18.10): העריכה מעדכנת גם את היתרה המצטברת של הקבוצה בהפרש —
-       אחרת התיעוד של הערב והיתרה האמיתית מתפצלים. */
-    const old = Number(db.sessions.find((s) => s.id === sessionId)?.savingsPot) || 0;
-    const newTotal = r2((Number(db.savingsPot) || 0) + r2(v - old));
+    /* גל 7 (7.5): היתרה המצטברת נגזרת מ־potOverview — העריכה נוגעת
+       רק בשדה של הערב, והיתרה מתעדכנת מאליה מהנגזרת. (לפני הגל,
+       B5 תחזק כאן את db.savingsPot ידנית בהפרש; המונה הופסק.) */
     commit({
       ...db,
       sessions: db.sessions.map((s) =>
         s.id === sessionId ? { ...s, savingsPot: v > 0 ? r2(v) : undefined } : s
       ),
-      savingsPot: newTotal > 0 ? newTotal : undefined,
     });
     /* בודקים את תוצאת השטיפה (גל 4, 4.6 — בדפוס signOut של OwnerApp):
        שמירה שלא הגיעה לענן לא סוגרת את העורך כאילו הכול תקין. הערך

@@ -171,16 +171,13 @@ export function LastSettlementCard({
     }
     const sid = sessionId || session?.id;
     if (!sid || !commit) return;
-    // כמו בדשבורד הקופה: עריכת הרשום מעדכנת גם את היתרה המצטברת בהפרש,
-    // אחרת השדה והיתרה מתפצלים (סטיית מעקב שנמצאה בביקורת 25.10).
-    const old = Number(db.sessions.find((s) => s.id === sid)?.savingsPot) || 0;
-    const newTotal = r2((Number(db.savingsPot) || 0) + r2(v - old));
+    /* גל 7 (7.5): כמו בדשבורד הקופה — היתרה המצטברת נגזרת
+       מ־potOverview, והעריכה נוגעת רק בשדה של הערב. */
     commit({
       ...db,
       sessions: db.sessions.map((s) =>
         s.id === sid ? { ...s, savingsPot: v > 0 ? r2(v) : undefined } : s
       ),
-      savingsPot: newTotal > 0 ? newTotal : undefined,
     });
     setEditingPot(false);
     setPotValue("");
