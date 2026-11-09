@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { C } from "../../lib/poker/colors";
+import { C } from "@/lib/poker/colors";
 import {
   buildFullBackup,
   downloadJsonFile,
   fullBackupFilename,
   parseFullBackup,
-} from "../../lib/poker/db";
-import { CONFIG_KEY, LIVE_KEY, store } from "../../lib/store";
-import { getSupabase } from "../../lib/supabaseClient";
-import { exportSessionsCsv } from "../../lib/poker/csvExport";
+} from "@/lib/poker/db";
+import { CONFIG_KEY, LIVE_KEY, store } from "@/lib/store";
+import { getSupabase } from "@/lib/supabaseClient";
+import { exportSessionsCsv } from "@/lib/poker/csvExport";
 import { Download, Upload } from "./icons";
 
 const btn = {

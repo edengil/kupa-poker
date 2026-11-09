@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { summaryCardData } from "../../lib/poker/summaryCard";
-import { buildSummaryCardSvg } from "../../lib/poker/summaryCardSvg";
+import { C } from "@/lib/poker/colors";
+import { summaryCardData } from "@/lib/poker/summaryCard";
+import { buildSummaryCardSvg } from "@/lib/poker/summaryCardSvg";
 
 
 

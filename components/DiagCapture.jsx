@@ -11,7 +11,7 @@
    ============================================================================ */
 
 import { useEffect } from "react";
-import { reportDiag } from "../lib/diagReport";
+import { reportDiag } from "@/lib/diagReport";
 
 let installed = false;
 

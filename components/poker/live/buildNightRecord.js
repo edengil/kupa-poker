@@ -1,13 +1,13 @@
-import { r2 } from "../../../lib/poker/helpers";
-import { nightDateParts } from "../../../lib/report";
-import { buildAttendanceSnapshot } from "../../../lib/poker/attendance";
-import { matchViewerToPlayer } from "../../../lib/poker/personalHighlights";
-import { effectivePot } from "../../../lib/liveView";
+import { r2 } from "@/lib/poker/helpers";
+import { nightDateParts } from "@/lib/report";
+import { buildAttendanceSnapshot } from "@/lib/poker/attendance";
+import { matchViewerToPlayer } from "@/lib/poker/personalHighlights";
+import { effectivePot } from "@/lib/liveView";
 import {
   checkNightBalance,
   confirmSaveIfUnbalanced,
   deductChipsShortage,
-} from "../../../lib/poker/nightBalance";
+} from "@/lib/poker/nightBalance";
 
 /* בניית רשומת הערב השמור מתוך מצב הלייב — ליבת החישוב של saveNight
    ב־LiveTab, חולצה לכאן כפונקציה נטולת־מצב (גל 8, 8.2): אותו חישוב

@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
-import { configureStore, makeReadOnlyStore } from "../lib/store";
-import { snapshotForViewer, viewerCps } from "../lib/publicShare";
-import { DEFAULT_BUYIN } from "../lib/report";
+import { configureStore, makeReadOnlyStore } from "@/lib/store";
+import { snapshotForViewer, viewerCps } from "@/lib/publicShare";
+import { DEFAULT_BUYIN } from "@/lib/report";
 
 /* מנוי שאינו משתנה לעולם — לקריאת "האם אנחנו בלקוח אחרי hydration"
    דרך useSyncExternalStore, כמו ב־PushPrompt וב־PreviewApp. */

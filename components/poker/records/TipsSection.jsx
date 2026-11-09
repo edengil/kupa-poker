@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { sectionTitle } from "../../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { sectionTitle } from "@/lib/poker/festive";
 import { RecordCard, recordDate as dt } from "./RecordCard";
-import { fmt } from "../../../lib/poker/format";
+import { fmt } from "@/lib/poker/format";
 
 /* שיאי טיפים — חולץ מ־RecordsTab. */
 export function TipsSection({ recs }) {

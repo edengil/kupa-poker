@@ -1,6 +1,6 @@
 "use client";
 
-import { C } from "../../../lib/poker/colors";
+import { C } from "@/lib/poker/colors";
 import { inputStyle } from "../ui";
 
 /** שדה יציאה בג'יטונים לשחקן אחד. */

@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { festiveCardSoft } from "../../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { festiveCardSoft } from "@/lib/poker/festive";
 
 /* כרטיס שיא אחד (אייקון, כותרת, מחזיק, ערך, מקומות 2–3) — חולץ מ־RecordsTab,
    שם הוגדר בתוך הרכיב וסומן 63 פעמים ע"י react-hooks/static-components. */

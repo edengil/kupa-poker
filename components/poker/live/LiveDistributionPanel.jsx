@@ -1,11 +1,11 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2 } from "../icons";
-import { C } from "../../../lib/poker/colors";
-import { fmtGap } from "../../../lib/poker/format";
-import { r2 } from "../../../lib/poker/helpers";
-import { brassCta, brassCtaMuted } from "../../../lib/poker/festive";
-import { labelAction } from "../../../lib/liveActionLog";
+import { C } from "@/lib/poker/colors";
+import { fmtGap } from "@/lib/poker/format";
+import { r2 } from "@/lib/poker/helpers";
+import { brassCta, brassCtaMuted } from "@/lib/poker/festive";
+import { labelAction } from "@/lib/liveActionLog";
 
 /** מאזן יציאות, סיום הערב, ויומן הביטולים לפני החלוקה. */
 export function LiveDistributionPanel({

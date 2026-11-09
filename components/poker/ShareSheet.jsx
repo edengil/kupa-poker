@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { C } from "../../lib/poker/colors";
+import { C } from "@/lib/poker/colors";
 import { IconBtn } from "./ui";
-import { waOpen, waShare } from "../../lib/poker/helpers";
+import { waOpen, waShare } from "@/lib/poker/helpers";
 import { CheckCircle2, Copy, Send, Share2, X } from "./icons";
-import { sectionEyebrow } from "../../lib/poker/festive";
-import { postToGroup } from "../../lib/postToGroup";
+import { sectionEyebrow } from "@/lib/poker/festive";
+import { postToGroup } from "@/lib/postToGroup";
 import { SendSettlementLink } from "./SendSettlementLink";
 
 /* גיליון שיתוף לסיכום / חלוקה — חולץ מ-PokerApp.jsx כ-JSX נקי.

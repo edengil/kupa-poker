@@ -2,8 +2,8 @@
 
 import { useState, useSyncExternalStore } from "react";
 import PokerApp from "./PokerApp";
-import { configureStore } from "../lib/store";
-import { buildSeedDb } from "../lib/poker/seed";
+import { configureStore } from "@/lib/store";
+import { buildSeedDb } from "@/lib/poker/seed";
 
 const PREFIX = "poker:preview:";
 

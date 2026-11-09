@@ -1,11 +1,11 @@
-import { canon, potForBuyin, r2 } from "../../../lib/poker/helpers";
-import { appendAction } from "../../../lib/liveActionLog";
+import { canon, potForBuyin, r2 } from "@/lib/poker/helpers";
+import { appendAction } from "@/lib/liveActionLog";
 import {
   applyBuyinEdit,
   applyBuyinEditWithChanges,
   parseBuyinEditInput,
-} from "../../../lib/liveBuyinEdit";
-import { setConfig } from "../../../lib/poker/config";
+} from "@/lib/liveBuyinEdit";
+import { setConfig } from "@/lib/poker/config";
 
 /* פעולות השחקן והקנייה של טאב הלייב (הושבה, קנייה/תיקון, עריכת סכום,
    יציאה, הסרה) — חולצו מ־LiveTab (גל 8, 8.2) כמפעל שמקבל את מצב

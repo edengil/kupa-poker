@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { fmt } from "../../lib/poker/format";
-import { AL, balance, canon, toWhatsApp } from "../../lib/poker/helpers";
-import { parseDate, parseEntries } from "../../lib/poker/parse";
+import { C } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
+import { AL, balance, canon, toWhatsApp } from "@/lib/poker/helpers";
+import { parseDate, parseEntries } from "@/lib/poker/parse";
 import { BalanceMeter } from "./chrome";
 import { Tag } from "./ui";
-import { checkNightBalance, confirmSaveIfUnbalanced } from "../../lib/poker/nightBalance";
-import { applySessionEdit } from "../../lib/sessionEdit";
+import { checkNightBalance, confirmSaveIfUnbalanced } from "@/lib/poker/nightBalance";
+import { applySessionEdit } from "@/lib/sessionEdit";
 
 /**
  * עריכת ערב שמור במקום — בלי לקפוץ לטאב ההזנה (שם ה־lazy load

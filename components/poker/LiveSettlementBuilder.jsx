@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
+import { C } from "@/lib/poker/colors";
 import { IconBtn } from "./ui";
 import { X, Send, Copy, CheckCircle2 } from "./icons";
-import { brassCta, sectionEyebrow } from "../../lib/poker/festive";
-import { postToGroup } from "../../lib/postToGroup";
+import { brassCta, sectionEyebrow } from "@/lib/poker/festive";
+import { postToGroup } from "@/lib/postToGroup";
 import {
   openingBalances,
   openingBalancesWithPot,
@@ -17,14 +17,14 @@ import {
   settleFromBalances,
   buildManualSettlementText,
   maxPayable,
-} from "../../lib/manualSettlement";
-import { POT_SINK_NAME, RESIDUAL_SINK_NAME } from "../../lib/nightShare";
+} from "@/lib/manualSettlement";
+import { POT_SINK_NAME, RESIDUAL_SINK_NAME } from "@/lib/nightShare";
 import {
   buildSettlementInviteText,
   resolveBrowserInviteUrl,
   withSettlementLink,
-} from "../../lib/settlementInvite";
-import { withBotMark } from "../../lib/botMark";
+} from "@/lib/settlementInvite";
+import { withBotMark } from "@/lib/botMark";
 
 /**
  * חלוקה ידנית (מנהל):

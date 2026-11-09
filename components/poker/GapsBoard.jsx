@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { fmt } from "../../lib/poker/format";
+import { C } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
 import { ChevronDown, AlertTriangle } from "./icons";
-import { buildGapsReport, DEFAULT_LARGE_GAP } from "../../lib/poker/gapsBoard.js";
-import { computeOpenDebts } from "../../lib/poker/openDebts.js";
+import { buildGapsReport, DEFAULT_LARGE_GAP } from "@/lib/poker/gapsBoard.js";
+import { computeOpenDebts } from "@/lib/poker/openDebts.js";
 
 function fmtIsoHe(iso) {
   if (!iso || typeof iso !== "string") return iso || "";

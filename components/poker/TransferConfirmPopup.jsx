@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
-import { C } from "../../lib/poker/colors";
-import { canon, DEFAULT_ALIASES } from "../../lib/poker/helpers";
-import { couplePartner } from "../../lib/paymentAccess";
-import { brassCta } from "../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { canon, DEFAULT_ALIASES } from "@/lib/poker/helpers";
+import { couplePartner } from "@/lib/paymentAccess";
+import { brassCta } from "@/lib/poker/festive";
 
 const COPY = {
   paid: {

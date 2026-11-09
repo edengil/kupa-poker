@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { C } from "../../lib/poker/colors";
-import { botHealthView, formatAgoHe } from "../../lib/wa/health.js";
-import { waQuotaView } from "../../lib/wa/quota.js";
+import { C } from "@/lib/poker/colors";
+import { botHealthView, formatAgoHe } from "@/lib/wa/health.js";
+import { waQuotaView } from "@/lib/wa/quota.js";
 
 /* מתג בוט וואטסאפ — חולץ מ-PokerApp.jsx.
    שורת הסטטוס התחתונה היא אינדיקטור בריאות הערוץ (config.botHealth,

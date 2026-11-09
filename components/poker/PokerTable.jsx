@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { C, RADIUS, SEAT } from "../../lib/poker/colors";
-import { dur, hhmm } from "../../lib/poker/helpers";
+import { C, RADIUS, SEAT } from "@/lib/poker/colors";
+import { dur, hhmm } from "@/lib/poker/helpers";
 
 /* שולחן פוקר ויזואלי — חולץ מ-PokerApp.jsx כ-JSX נקי.
    סדר מושבים קבוע: עדן תמיד למטה, והשאר נשמרים באותו מקום יחסי.

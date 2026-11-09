@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { C } from "../../lib/poker/colors";
-import { fmt } from "../../lib/poker/format";
-import { festiveCardSoft, sectionEyebrow } from "../../lib/poker/festive";
-import { computeMonthHeroes, computeRollingHeroes, currentCalendarMonth } from "../../lib/poker/monthHeroes";
+import { C } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
+import { festiveCardSoft, sectionEyebrow } from "@/lib/poker/festive";
+import { computeMonthHeroes, computeRollingHeroes, currentCalendarMonth } from "@/lib/poker/monthHeroes";
 
 /**
  * גיבור החודש / ירידת החודש במסך הבית.

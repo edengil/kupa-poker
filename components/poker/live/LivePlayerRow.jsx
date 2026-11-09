@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { fmt } from "../../../lib/poker/format";
-import { r2 } from "../../../lib/poker/helpers";
-import { tipShownFor } from "../../../lib/liveMerge";
-import { playerTipEvents, isManualTip } from "../../../lib/manualTips";
-import { playerChips } from "../../../lib/liveView";
+import { C } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
+import { r2 } from "@/lib/poker/helpers";
+import { tipShownFor } from "@/lib/liveMerge";
+import { playerTipEvents, isManualTip } from "@/lib/manualTips";
+import { playerChips } from "@/lib/liveView";
 import {
   partnerOf,
   DEFAULT_FILL_CHIPS,
@@ -15,7 +15,7 @@ import {
   summarizeCoupleFills,
   formatFillBadge,
   shortCoupleName,
-} from "../../../lib/poker/coupleFills";
+} from "@/lib/poker/coupleFills";
 import { IconBtn, RoundBtn, inputStyle } from "../ui";
 import { LiveExitField } from "./LiveExitField";
 import { Plus, Minus, X } from "../icons";

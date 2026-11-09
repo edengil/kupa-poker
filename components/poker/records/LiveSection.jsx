@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { sectionTitle } from "../../../lib/poker/festive";
-import { formatPaymentDelay } from "../../../lib/poker/paymentSpeed";
-import { formatSurvivalMs } from "../../../lib/poker/bustRecords";
+import { C } from "@/lib/poker/colors";
+import { sectionTitle } from "@/lib/poker/festive";
+import { formatPaymentDelay } from "@/lib/poker/paymentSpeed";
+import { formatSurvivalMs } from "@/lib/poker/bustRecords";
 import { RecordCard } from "./RecordCard";
 
 /* תשלום מהיר, תנודתיות, אמינות הגעה ושיאי יציאה מערבי לייב — חולץ מ־RecordsTab. */

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { brassCta } from "../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { brassCta } from "@/lib/poker/festive";
 import { X } from "./icons";
 
 /**

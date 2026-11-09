@@ -9,7 +9,7 @@
    ============================================================================ */
 
 import React from "react";
-import { reportDiag } from "../lib/diagReport";
+import { reportDiag } from "@/lib/diagReport";
 
 export default class AppErrorBoundary extends React.Component {
   constructor(props) {

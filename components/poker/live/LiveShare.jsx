@@ -2,8 +2,8 @@
 
 import { Send, X } from "../icons";
 import { ShareSheet } from "../ShareSheet";
-import { C } from "../../../lib/poker/colors";
-import { toWhatsApp, waOpen } from "../../../lib/poker/helpers";
+import { C } from "@/lib/poker/colors";
+import { toWhatsApp, waOpen } from "@/lib/poker/helpers";
 
 /** כפתורי שליחת דוח הביט מתוך הערב החי. */
 export function LiveBitShare({ onSendUpdate, onPreview }) {

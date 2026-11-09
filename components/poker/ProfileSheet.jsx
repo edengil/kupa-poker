@@ -1,23 +1,23 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { fmt, MONTHS } from "../../lib/poker/format";
-import { AL, canon, r2 } from "../../lib/poker/helpers";
-import { availableYears, playerBalanceBreakdown } from "../../lib/poker/totals";
+import { C } from "@/lib/poker/colors";
+import { fmt, MONTHS } from "@/lib/poker/format";
+import { AL, canon, r2 } from "@/lib/poker/helpers";
+import { availableYears, playerBalanceBreakdown } from "@/lib/poker/totals";
 import { IconBtn, Stat } from "./ui";
 import { TrendingUp, X } from "./icons";
 import { CumChart } from "./CumChart";
 import { PersonalStatsCard } from "./PersonalStatsCard";
 import { BalanceBreakdown } from "./BalanceBreakdown";
-import { computePersonalStats } from "../../lib/poker/personalStats";
-import { playerRivals } from "../../lib/poker/headToHead";
-import { badgesForPlayer } from "../../lib/poker/badges";
-import { monthlyBadgesForPlayer } from "../../lib/poker/monthlyBadges";
-import { playerOfNightWins } from "../../lib/poker/playerOfNight";
-import { playerEmail, normalizePlayerEmail } from "../../lib/poker/emailRsvp";
-import { playerPhone, normalizePlayerPhone } from "../../lib/poker/phones";
-import { skillRatingFor, SKILL_MIN_NIGHTS } from "../../lib/poker/skillRating";
+import { computePersonalStats } from "@/lib/poker/personalStats";
+import { playerRivals } from "@/lib/poker/headToHead";
+import { badgesForPlayer } from "@/lib/poker/badges";
+import { monthlyBadgesForPlayer } from "@/lib/poker/monthlyBadges";
+import { playerOfNightWins } from "@/lib/poker/playerOfNight";
+import { playerEmail, normalizePlayerEmail } from "@/lib/poker/emailRsvp";
+import { playerPhone, normalizePlayerPhone } from "@/lib/poker/phones";
+import { skillRatingFor, SKILL_MIN_NIGHTS } from "@/lib/poker/skillRating";
 
 /* עריכת אימייל לשחקן — מוצג רק לבעלים (פרופיל בצפייה בלבד לא מקבל onSave). */
 function EmailEditor({ current, onSave }) {

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { C as festiveC } from "../lib/poker/colors";
-import { getConfig, onConfig, setConfig } from "../lib/poker/config";
+import { C as festiveC } from "@/lib/poker/colors";
+import { getConfig, onConfig, setConfig } from "@/lib/poker/config";
 import { newSlug } from "./newSlug";
 
 const C = {

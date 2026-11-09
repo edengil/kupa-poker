@@ -1,17 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { fmt, fmtGap } from "../../lib/poker/format";
-import { AL, balance, canon } from "../../lib/poker/helpers";
+import { C } from "@/lib/poker/colors";
+import { fmt, fmtGap } from "@/lib/poker/format";
+import { AL, balance, canon } from "@/lib/poker/helpers";
 import { Empty, IconBtn, StatusChip } from "./ui";
 import { ChevronDown, Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
-import { nightSummaryText, settlementTextForSession } from "../../lib/nightShare";
-import { resolveBrowserInviteUrl, withSettlementLink } from "../../lib/settlementInvite";
+import { nightSummaryText, settlementTextForSession } from "@/lib/nightShare";
+import { resolveBrowserInviteUrl, withSettlementLink } from "@/lib/settlementInvite";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SessionEditSheet } from "./SessionEditSheet";
-import { confirmationStatusText, confirmationsStartOpen, latestNightConfirmations } from "../../lib/nightConfirmations";
+import { confirmationStatusText, confirmationsStartOpen, latestNightConfirmations } from "@/lib/nightConfirmations";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
 export function SessionsTab({ db, commit, isAdmin }) {

@@ -152,8 +152,9 @@ describe("חיווט — נעילות סטטיות על המקור", () => {
   });
 
   it("OwnerApp ו־PublicApp חולקים את getSessionWithTimeout מהמודול המשותף", () => {
-    expect(ownerSrc).toContain('from "../lib/sessionTimeout"');
-    expect(publicSrc).toContain('from "../lib/sessionTimeout"');
+    /* גל 8 (8.3): הייבואים ל־lib עברו לכינוי @/lib — הנעילה בודקת את הצורה הקנונית. */
+    expect(ownerSrc).toContain('from "@/lib/sessionTimeout"');
+    expect(publicSrc).toContain('from "@/lib/sessionTimeout"');
     expect(publicSrc).toContain("getSessionWithTimeout(supabase)");
     /* הקריאה הגולמית שהייתה נתקעת בספארי כבר לא קיימת באפקט הצופה */
     expect(publicSrc).not.toContain("await supabase.auth.getSession()");

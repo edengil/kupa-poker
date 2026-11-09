@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { fmt } from "../../../lib/poker/format";
-import { sectionTitle } from "../../../lib/poker/festive";
-import { formatNightClock, fmtPct } from "../../../lib/poker/extraRecords";
-import { durWords } from "../../../lib/poker/helpers";
+import { C } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
+import { sectionTitle } from "@/lib/poker/festive";
+import { formatNightClock, fmtPct } from "@/lib/poker/extraRecords";
+import { durWords } from "@/lib/poker/helpers";
 import { RecordCard, recordDate as dt } from "./RecordCard";
 
 /* קצב, קנייה ואירוח (recs.extra) — חולץ מ־RecordsTab. */

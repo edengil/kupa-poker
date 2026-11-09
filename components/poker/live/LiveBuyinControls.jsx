@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { potForBuyin } from "../../../lib/poker/helpers";
+import { C } from "@/lib/poker/colors";
+import { potForBuyin } from "@/lib/poker/helpers";
 
 /**
  * פקדי קנייה בלייב — חולצו מ־LiveTab.jsx (פיצול 2026-10-16):

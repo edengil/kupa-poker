@@ -1,7 +1,7 @@
 "use client";
 
-import { C } from "../../../lib/poker/colors";
-import { brassCta, sectionEyebrow } from "../../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { brassCta, sectionEyebrow } from "@/lib/poker/festive";
 import { inputStyle } from "../ui";
 import { Coins, Plus, UserPlus } from "../icons";
 

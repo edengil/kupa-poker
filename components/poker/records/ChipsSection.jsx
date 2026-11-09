@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { sectionTitle } from "../../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { sectionTitle } from "@/lib/poker/festive";
 import { RecordCard, recordDate as dt } from "./RecordCard";
 
 /* שיאי ג׳יטונים — חולץ מ־RecordsTab. */

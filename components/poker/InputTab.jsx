@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { buildSettlement } from "../../lib/report";
-import { playersFromSession } from "../../lib/nightShare";
-import { settle, isCashOnly, transferVerb } from "../../lib/settlement";
-import { C } from "../../lib/poker/colors";
-import { fmt, MONTHS } from "../../lib/poker/format";
-import { AL, balance, canon, toWhatsApp } from "../../lib/poker/helpers";
-import { parseDate, parseEntries } from "../../lib/poker/parse";
+import { buildSettlement } from "@/lib/report";
+import { playersFromSession } from "@/lib/nightShare";
+import { settle, isCashOnly, transferVerb } from "@/lib/settlement";
+import { C } from "@/lib/poker/colors";
+import { fmt, MONTHS } from "@/lib/poker/format";
+import { AL, balance, canon, toWhatsApp } from "@/lib/poker/helpers";
+import { parseDate, parseEntries } from "@/lib/poker/parse";
 import { BalanceMeter } from "./chrome";
 import { SegBar, Select, Tag } from "./ui";
 import { CalendarDays, CheckCircle2 } from "./icons";
@@ -15,7 +15,7 @@ import { ShareSheet } from "./ShareSheet";
 import { AliasCard } from "./AliasCard";
 import { BackupCard } from "./BackupCard";
 import { GapsBoard } from "./GapsBoard.jsx";
-import { checkNightBalance, confirmSaveIfUnbalanced } from "../../lib/poker/nightBalance";
+import { checkNightBalance, confirmSaveIfUnbalanced } from "@/lib/poker/nightBalance";
 
 /* טאב הזנה — ערבים חדשים / חודש / שנתי. עריכת ערב קיים בטאב הערבים. */
 export function InputTab({ db, commit, years, groupId = null }) {

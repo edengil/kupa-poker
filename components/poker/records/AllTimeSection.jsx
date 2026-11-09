@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { fmt, MONTHS } from "../../../lib/poker/format";
+import { C } from "@/lib/poker/colors";
+import { fmt, MONTHS } from "@/lib/poker/format";
 import { RecordCard, recordDate as dt } from "./RecordCard";
 
 /* שיאי כל הזמנים — חולץ מ־RecordsTab. */

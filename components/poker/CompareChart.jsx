@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { C, SERIES_COLORS } from "../../lib/poker/colors";
+import { C, SERIES_COLORS } from "@/lib/poker/colors";
 
 /**
  * גרף קווים מצטברים של כמה שחקנים על ציר ערבים אחד.

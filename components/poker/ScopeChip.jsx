@@ -1,5 +1,5 @@
 import React from "react";
-import { C } from "../../lib/poker/colors";
+import { C } from "@/lib/poker/colors";
 
 /** כפתור סינון עגול — בשימוש בטאבי שיאים וסיכומים. */
 export function ScopeChip({ active, onClick, children }) {

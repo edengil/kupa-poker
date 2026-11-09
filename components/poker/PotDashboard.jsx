@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { r2 } from "../../lib/poker/helpers";
-import { fmtGap } from "../../lib/poker/format";
-import { potOverview } from "../../lib/paymentTracking";
-import { withActual } from "../../lib/poker/potEdits";
-import { flushStore } from "../../lib/store";
+import { C } from "@/lib/poker/colors";
+import { r2 } from "@/lib/poker/helpers";
+import { fmtGap } from "@/lib/poker/format";
+import { potOverview } from "@/lib/paymentTracking";
+import { withActual } from "@/lib/poker/potEdits";
+import { flushStore } from "@/lib/store";
 
 /**
  * דשבורד קופת חיסכון — אדמין בלבד (מודל 25.10).

@@ -1,9 +1,9 @@
 import {
   applyCoupleFill,
   DEFAULT_FILL_CHIPS,
-} from "../../../lib/poker/coupleFills";
-import { applyManualTip, removeManualTip } from "../../../lib/manualTips";
-import { appendAction } from "../../../lib/liveActionLog";
+} from "@/lib/poker/coupleFills";
+import { applyManualTip, removeManualTip } from "@/lib/manualTips";
+import { appendAction } from "@/lib/liveActionLog";
 
 /* פעולות הטיפים והמילוי הזוגי של טאב הלייב — חולצו מ־LiveTab
    (גל 8, 8.2) כמפעל שמקבל את מצב הקומפוננטה ואת מגדיריו ומחזיר את

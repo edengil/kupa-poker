@@ -3,27 +3,27 @@
 import React, { useMemo, useState } from "react";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SendSettlementLink } from "./SendSettlementLink";
-import { C } from "../../lib/poker/colors";
-import { festiveCardSoft, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
-import { settlementTextForSession, potActualFor } from "../../lib/nightShare";
-import { paymentPlan, markTransfer, markReceipt, markPotPaid } from "../../lib/paymentTracking";
-import { r2 } from "../../lib/poker/helpers";
-import { settlementVersionLabel } from "../../lib/savedSettlement";
-import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "../../lib/nightConfirmations";
-import { latestSession, pastSettlementSessions } from "../../lib/lastSession";
-import { allTransfersPaid } from "../../lib/settlementClosed";
-import { canMarkTransfer, couplePartner } from "../../lib/paymentAccess";
-import { announceSettlementClosed } from "../../lib/announceSettlementClosed";
-import { notifyPaymentConfirmed } from "../../lib/poker/notifyTransfersClient";
-import { flushStore } from "../../lib/store";
-import { AL, canon } from "../../lib/poker/helpers";
+import { C } from "@/lib/poker/colors";
+import { festiveCardSoft, festiveGlow, sectionEyebrow } from "@/lib/poker/festive";
+import { settlementTextForSession, potActualFor } from "@/lib/nightShare";
+import { paymentPlan, markTransfer, markReceipt, markPotPaid } from "@/lib/paymentTracking";
+import { r2 } from "@/lib/poker/helpers";
+import { settlementVersionLabel } from "@/lib/savedSettlement";
+import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "@/lib/nightConfirmations";
+import { latestSession, pastSettlementSessions } from "@/lib/lastSession";
+import { allTransfersPaid } from "@/lib/settlementClosed";
+import { canMarkTransfer, couplePartner } from "@/lib/paymentAccess";
+import { announceSettlementClosed } from "@/lib/announceSettlementClosed";
+import { notifyPaymentConfirmed } from "@/lib/poker/notifyTransfersClient";
+import { flushStore } from "@/lib/store";
+import { AL, canon } from "@/lib/poker/helpers";
 import {
   playerOfNightCandidates,
   playerOfNightTally,
   voteForPlayer,
-} from "../../lib/poker/playerOfNight";
+} from "@/lib/poker/playerOfNight";
 import { ChevronDown } from "./icons";
-import { playerPhone } from "../../lib/poker/phones";
+import { playerPhone } from "@/lib/poker/phones";
 import { StatusChip } from "./ui";
 
 /**

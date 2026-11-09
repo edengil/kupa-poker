@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { r2 } from "../../lib/poker/helpers";
-import { potActualFor, potRecordedFor } from "../../lib/nightShare";
-import { withoutWithdrawal } from "../../lib/poker/potEdits";
+import { C } from "@/lib/poker/colors";
+import { r2 } from "@/lib/poker/helpers";
+import { potActualFor, potRecordedFor } from "@/lib/nightShare";
+import { withoutWithdrawal } from "@/lib/poker/potEdits";
 
 /**
  * ניהול קופת החיסכון — אדמין בלבד.

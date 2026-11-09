@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { summaryCardData } from "../../lib/poker/summaryCard";
-import { buildSummaryCardSvg } from "../../lib/poker/summaryCardSvg";
-import { summaryPeriods, periodToScope } from "../../lib/poker/summaryPeriods";
+import { C } from "@/lib/poker/colors";
+import { summaryCardData } from "@/lib/poker/summaryCard";
+import { buildSummaryCardSvg } from "@/lib/poker/summaryCardSvg";
+import { summaryPeriods, periodToScope } from "@/lib/poker/summaryPeriods";
 import { SummaryCardButton } from "./SummaryCardButton";
 import { Empty } from "./ui";
-import { sectionTitle } from "../../lib/poker/festive";
+import { sectionTitle } from "@/lib/poker/festive";
 
 /* טאב סיכומים — כרטיסיות מעוצבות לתקופות שהסתיימו בלבד.
    סינון: חודשים / רבעונים / חציונים / שנים. */

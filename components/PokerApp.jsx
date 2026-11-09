@@ -7,43 +7,43 @@
    טאבים כבדים נטענים lazy כדי שהמסך הראשון (טבלה) יעלה מהר.
    ============================================================================ */
 import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback, useRef, ViewTransition, startTransition } from "react";
-import { store, subscribeStoreKey } from "../lib/store";
-import { reportBeacon } from "../lib/diagReport";
-import { C } from "../lib/poker/colors";
+import { store, subscribeStoreKey } from "@/lib/store";
+import { reportBeacon } from "@/lib/diagReport";
+import { C } from "@/lib/poker/colors";
 import { Header, TabBar, Style, TABBAR_H } from "./poker/chrome";
 import { Banner } from "./poker/Banner";
 import { TableTab } from "./poker/TableTab";
-import { normalize } from "../lib/poker/db";
-import { setPlayerEmail } from "../lib/poker/emailRsvp";
-import { setPlayerPhone } from "../lib/poker/phones";
-import { brokenRecords } from "../lib/poker/brokenRecords";
+import { normalize } from "@/lib/poker/db";
+import { setPlayerEmail } from "@/lib/poker/emailRsvp";
+import { setPlayerPhone } from "@/lib/poker/phones";
+import { brokenRecords } from "@/lib/poker/brokenRecords";
 import { RecordsAlert } from "./poker/RecordsAlert.jsx";
 import { SavingsPotCard } from "./poker/SavingsPotCard.jsx";
-import { normalizeRecordAlertLines } from "../lib/poker/recordsAlert";
-import { DB_KEY, loadConfig } from "../lib/poker/config";
-import { applyChipBackfill } from "../lib/poker/chipBackfill";
-import { applyTipBackfill } from "../lib/poker/tipBackfill";
+import { normalizeRecordAlertLines } from "@/lib/poker/recordsAlert";
+import { DB_KEY, loadConfig } from "@/lib/poker/config";
+import { applyChipBackfill } from "@/lib/poker/chipBackfill";
+import { applyTipBackfill } from "@/lib/poker/tipBackfill";
 import { PersonalHighlightsCard } from "./poker/PersonalHighlightsCard";
 import { PersonalStatsCard } from "./poker/PersonalStatsCard";
 import { MonthHeroesCard } from "./poker/MonthHeroesCard";
 import { RecentFormCard } from "./poker/RecentFormCard";
-import { matchViewerToPlayer } from "../lib/poker/personalHighlights";
-import { AL } from "../lib/poker/helpers";
-import { isGroupAdmin } from "../lib/paymentAccess";
+import { matchViewerToPlayer } from "@/lib/poker/personalHighlights";
+import { AL } from "@/lib/poker/helpers";
+import { isGroupAdmin } from "@/lib/paymentAccess";
 import { NightFocus } from "./poker/NightFocus";
 import { TransferConfirmPopup } from "./poker/TransferConfirmPopup";
-import { receiptConfirmPrompt, transferConfirmPrompt } from "../lib/nightConfirmations";
-import { collectNotices, noticesForViewer } from "../lib/notifications";
-import { loadSeenIds, markSeenIds, saveSeenIds, unseenNotices } from "../lib/noticeSeen";
-import { markReceipt, markTransfer } from "../lib/paymentTracking";
+import { receiptConfirmPrompt, transferConfirmPrompt } from "@/lib/nightConfirmations";
+import { collectNotices, noticesForViewer } from "@/lib/notifications";
+import { loadSeenIds, markSeenIds, saveSeenIds, unseenNotices } from "@/lib/noticeSeen";
+import { markReceipt, markTransfer } from "@/lib/paymentTracking";
 import { NotificationsSheet } from "./poker/NotificationsSheet";
-import { noticeDeliveryDecision } from "../lib/noticeDelivery";
-import { getNoticeDeliveryState } from "../lib/pushClient";
-import { allTransfersPaid } from "../lib/settlementClosed";
-import { announceSettlementClosed } from "../lib/announceSettlementClosed";
-import { flushStore } from "../lib/store";
+import { noticeDeliveryDecision } from "@/lib/noticeDelivery";
+import { getNoticeDeliveryState } from "@/lib/pushClient";
+import { allTransfersPaid } from "@/lib/settlementClosed";
+import { announceSettlementClosed } from "@/lib/announceSettlementClosed";
+import { flushStore } from "@/lib/store";
 import { EGFooter } from "./Logo";
-import { track } from "../lib/analytics";
+import { track } from "@/lib/analytics";
 
 /* localStorage בטוח ל־SSR — null כשאין חלון דפדפן. */
 const safeStorage = () =>

@@ -9,17 +9,17 @@ import {
   edenNameIn,
   potPlanFor,
   POT_SINK_NAME,
-} from "../../lib/nightShare";
-import { savedSettlement } from "../../lib/savedSettlement";
-import { saveManualPayments } from "../../lib/paymentTracking";
-import { settlementEditNotice } from "../../lib/settlementEditNotice";
+} from "@/lib/nightShare";
+import { savedSettlement } from "@/lib/savedSettlement";
+import { saveManualPayments } from "@/lib/paymentTracking";
+import { settlementEditNotice } from "@/lib/settlementEditNotice";
 import {
   resolveBrowserInviteUrl,
   settlementUpdateMessage,
-} from "../../lib/settlementInvite";
-import { postToGroup } from "../../lib/postToGroup";
-import { flushStore } from "../../lib/store";
-import { AL } from "../../lib/poker/helpers";
+} from "@/lib/settlementInvite";
+import { postToGroup } from "@/lib/postToGroup";
+import { flushStore } from "@/lib/store";
+import { AL } from "@/lib/poker/helpers";
 
 /**
  * עריכת חלוקה ידנית לערב שמור — נשמרת ב־session.manualSettlement

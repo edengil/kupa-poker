@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { waShare } from "../../lib/poker/helpers";
-import { postToGroup } from "../../lib/postToGroup";
-import { resolveBrowserInviteUrl, settlementLinkMessage } from "../../lib/settlementInvite";
+import { C } from "@/lib/poker/colors";
+import { waShare } from "@/lib/poker/helpers";
+import { postToGroup } from "@/lib/postToGroup";
+import { resolveBrowserInviteUrl, settlementLinkMessage } from "@/lib/settlementInvite";
 import { CheckCircle2, Copy, Send, Share2 } from "./icons";
 
 /**

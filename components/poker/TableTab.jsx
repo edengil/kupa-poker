@@ -1,17 +1,17 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { C } from "../../lib/poker/colors";
-import { fmt, fmtGap, MONTHS } from "../../lib/poker/format";
-import { AL, r2, toWhatsApp } from "../../lib/poker/helpers";
-import { periodTotals, yearNum } from "../../lib/poker/totals";
+import { C } from "@/lib/poker/colors";
+import { fmt, fmtGap, MONTHS } from "@/lib/poker/format";
+import { AL, r2, toWhatsApp } from "@/lib/poker/helpers";
+import { periodTotals, yearNum } from "@/lib/poker/totals";
 import { Empty, GroupLabel, IconBtn, SegBar, Select } from "./ui";
 import { Award, Crown, Share2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
 import { LastSettlementCard, SettlementHistory } from "./LastSettlementCard";
-import { latestSession } from "../../lib/lastSession";
-import { computeLeague } from "../../lib/poker/leaguePoints";
-import { seasonWrapText } from "../../lib/poker/seasonWrap";
+import { latestSession } from "@/lib/lastSession";
+import { computeLeague } from "@/lib/poker/leaguePoints";
+import { seasonWrapText } from "@/lib/poker/seasonWrap";
 
 function Ledger({ totals, official, readOnly = false }) {
   const winners = totals.filter((t) => t.amount > 0),

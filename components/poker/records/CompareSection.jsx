@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
-import { C, SERIES_COLORS } from "../../../lib/poker/colors";
-import { fmt } from "../../../lib/poker/format";
-import { festiveCardSoft, sectionTitle } from "../../../lib/poker/festive";
-import { COMPARE_MAX } from "../../../lib/poker/compareChart";
+import { C, SERIES_COLORS } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
+import { festiveCardSoft, sectionTitle } from "@/lib/poker/festive";
+import { COMPARE_MAX } from "@/lib/poker/compareChart";
 import { CompareChart } from "../CompareChart";
 
 /* השוואת שחקנים — קווי מצטבר על ציר ערבים — חולץ מ־RecordsTab. */

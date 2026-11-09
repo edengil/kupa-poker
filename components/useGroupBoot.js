@@ -12,13 +12,13 @@ import {
   LIVE_KEY,
   DB_KEY,
   CONFIG_KEY,
-} from "../lib/store";
-import { liveFingerprint } from "../lib/liveMerge";
-import { createBroadcaster } from "../lib/realtime";
-import { resolveRootLanding } from "../lib/rootLanding";
-import { getSessionWithTimeout } from "../lib/sessionTimeout";
-import { loadConfig } from "../lib/poker/config";
-import { reportDiag } from "../lib/diagReport";
+} from "@/lib/store";
+import { liveFingerprint } from "@/lib/liveMerge";
+import { createBroadcaster } from "@/lib/realtime";
+import { resolveRootLanding } from "@/lib/rootLanding";
+import { getSessionWithTimeout } from "@/lib/sessionTimeout";
+import { loadConfig } from "@/lib/poker/config";
+import { reportDiag } from "@/lib/diagReport";
 import { newSlug } from "./newSlug";
 
 /* זרימת ה־boot של מסך הבעלים — חולצה מ־OwnerApp (גל 8, 8.2):

@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { fmt } from "../../../lib/poker/format";
-import { sectionTitle } from "../../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
+import { sectionTitle } from "@/lib/poker/festive";
 import { ScopeChip } from "../ScopeChip";
 import { SummaryCardButton } from "../SummaryCardButton";
 import { RecordCard, recordDate as dt } from "./RecordCard";

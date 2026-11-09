@@ -1,7 +1,7 @@
 "use client";
 
-import { C } from "../../../lib/poker/colors";
-import { fmt } from "../../../lib/poker/format";
+import { C } from "@/lib/poker/colors";
+import { fmt } from "@/lib/poker/format";
 
 /* לוח ריבאיים בזמן אמת — מי קנה מחדש הכי הרבה וכמה נכנס לקופה עד עכשיו. */
 export function LiveRebuysBoard({ board }) {

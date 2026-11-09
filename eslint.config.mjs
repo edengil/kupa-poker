@@ -1,5 +1,6 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
+import localRules from "./eslint-rules/no-relative-lib-import.mjs";
 
 // מעבר מ־.eslintrc.json (eslint 9+ דורש קונפיג שטוח; ה־lint היה שבור — B7, 18.10)
 export default defineConfig([
@@ -18,6 +19,23 @@ export default defineConfig([
     // הפעלה מפורשת סוגרת את החור: ריצה ראשונה מצאה אפס ממצאים אמיתיים בקוד.
     rules: {
       "no-undef": "error",
+    },
+  },
+  {
+    // גל 8 (8.3) — אחידות ייבואים: מודולי lib נטענים דרך הכינוי "@/lib/…"
+    // בכל אזורי היישום (app/components/scripts/e2e). ייבוא יחסי פנימה
+    // לתיקייה או החוצה ממנה נשאר חוקי; יחסי בתוך lib עצמו ובבדיקות
+    // נשאר כמו שהוא (לא ב־files של הבלוק הזה). הכלל המקומי שומר שייבוא
+    // יחסי שחוצה אל lib לא יחזור.
+    files: [
+      "app/**/*.{js,jsx,ts,tsx}",
+      "components/**/*.{js,jsx,ts,tsx}",
+      "scripts/**/*.{js,mjs}",
+      "e2e/**/*.{js,mjs}",
+    ],
+    plugins: { local: localRules },
+    rules: {
+      "local/no-relative-lib-import": "error",
     },
   },
   {

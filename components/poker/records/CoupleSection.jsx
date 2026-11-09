@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { C } from "../../../lib/poker/colors";
-import { sectionTitle } from "../../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { sectionTitle } from "@/lib/poker/festive";
 import { RecordCard } from "./RecordCard";
 
 /* מילוי זוגי — חולץ מ־RecordsTab. */

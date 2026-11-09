@@ -3,22 +3,22 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PokerApp, { PokerTable } from "./PokerApp";
 import AppErrorBoundary from "./AppErrorBoundary";
-import { getSupabase } from "../lib/supabaseClient";
-import { getSessionWithTimeout } from "../lib/sessionTimeout";
-import { hasAuthError, AUTH_ERROR_MESSAGE } from "../lib/authError";
-import { configureStore, makeReadOnlyStore, publishStoreKey, DB_KEY } from "../lib/store";
-import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "../lib/realtime";
-import { snapshotForViewer, viewerCps } from "../lib/publicShare";
-import { DEFAULT_BUYIN } from "../lib/report";
+import { getSupabase } from "@/lib/supabaseClient";
+import { getSessionWithTimeout } from "@/lib/sessionTimeout";
+import { hasAuthError, AUTH_ERROR_MESSAGE } from "@/lib/authError";
+import { configureStore, makeReadOnlyStore, publishStoreKey, DB_KEY } from "@/lib/store";
+import { subscribeToGroup, fetchSnapshot, joinPresence, logView, trackVisit } from "@/lib/realtime";
+import { snapshotForViewer, viewerCps } from "@/lib/publicShare";
+import { DEFAULT_BUYIN } from "@/lib/report";
 import { PushPrompt } from "./PushPrompt";
-import { markPaymentViaRpc, rpcMarkTarget } from "../lib/paymentTracking";
-import { reportDiag } from "../lib/diagReport";
-import { votePlayerViaRpc } from "../lib/poker/playerOfNight";
+import { markPaymentViaRpc, rpcMarkTarget } from "@/lib/paymentTracking";
+import { reportDiag } from "@/lib/diagReport";
+import { votePlayerViaRpc } from "@/lib/poker/playerOfNight";
 import InstallButton from "./InstallButton";
 import { RsvpCard } from "./Rsvp";
 import { EGMark, EGByline, EGSplash } from "./Logo";
-import { authShell, brassCta } from "../lib/poker/festive";
-import { C as festiveC } from "../lib/poker/colors";
+import { authShell, brassCta } from "@/lib/poker/festive";
+import { C as festiveC } from "@/lib/poker/colors";
 
 const C = {
   feltDeep: festiveC.feltDeep,

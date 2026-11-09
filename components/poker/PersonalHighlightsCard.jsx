@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { C } from "../../lib/poker/colors";
-import { festiveCard, festiveGlow, sectionEyebrow } from "../../lib/poker/festive";
+import { C } from "@/lib/poker/colors";
+import { festiveCard, festiveGlow, sectionEyebrow } from "@/lib/poker/festive";
 import {
   computePersonalHighlights,
   isFemalePlayer,
-} from "../../lib/poker/personalHighlights";
+} from "@/lib/poker/personalHighlights";
 
 const PLACE_TONE = { 1: C.brass, 2: "#C0C7D1", 3: "#C48A5A" };
 

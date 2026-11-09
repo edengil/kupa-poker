@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { C } from "../../lib/poker/colors";
-import { festiveCardSoft, sectionEyebrow } from "../../lib/poker/festive";
-import { computePersonalStats, personalStatRows } from "../../lib/poker/personalStats";
+import { C } from "@/lib/poker/colors";
+import { festiveCardSoft, sectionEyebrow } from "@/lib/poker/festive";
+import { computePersonalStats, personalStatRows } from "@/lib/poker/personalStats";
 
 const TONE = { win: C.win, loss: C.loss, dim: C.dim };
 

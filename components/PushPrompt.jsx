@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useSyncExternalStore } from "react";
-import { C } from "../lib/poker/colors";
-import { brassCta } from "../lib/poker/festive";
-import { matchViewerToPlayer } from "../lib/poker/personalHighlights";
-import { getPushSupport, getPushSubscription, subscribePush } from "../lib/pushClient";
-import { PUSH_PROMPT_KEY, nextPushPrompt } from "../lib/pushPrompt";
+import { C } from "@/lib/poker/colors";
+import { brassCta } from "@/lib/poker/festive";
+import { matchViewerToPlayer } from "@/lib/poker/personalHighlights";
+import { getPushSupport, getPushSubscription, subscribePush } from "@/lib/pushClient";
+import { PUSH_PROMPT_KEY, nextPushPrompt } from "@/lib/pushPrompt";
 
 const visitId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let decidedThisLoad = false;

@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { C } from "../lib/poker/colors";
-import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "../lib/poker/festive";
-import { wazeShortUrl } from "../lib/poker/hosts";
-import { castRsvpVote } from "../lib/rsvpVote";
+import { C } from "@/lib/poker/colors";
+import { festiveCard, festiveGlow, brassCta, sectionEyebrow } from "@/lib/poker/festive";
+import { wazeShortUrl } from "@/lib/poker/hosts";
+import { castRsvpVote } from "@/lib/rsvpVote";
 
 /* ============================================================================
    אישורי הגעה לערב מתוכנן.
