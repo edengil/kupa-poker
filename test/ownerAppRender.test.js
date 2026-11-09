@@ -45,7 +45,8 @@ vi.mock("../components/Logo", () => ({
   EGSplash: () => "splash",
 }));
 
-import OwnerApp, { ShareBar } from "../components/OwnerApp.jsx";
+import OwnerApp from "../components/OwnerApp.jsx";
+import { ShareBar } from "../components/ShareBar.jsx";
 
 describe("OwnerApp — רינדור נתיב הבעלים (רגרסיית 24.10)", () => {
   it("ShareBar של הבעלים המחובר מתרנדר בלי לזרוק (כולל קריאת ה־useMemo)", () => {
