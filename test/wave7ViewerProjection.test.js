@@ -178,7 +178,7 @@ describe("wave7 7.3 — הקרנת צופה SQL↔JS", () => {
   let db;
   beforeAll(async () => {
     db = new PGlite();
-    await db.exec(`create role anon; create role authenticated;
+    await db.exec(`create role anon; create role authenticated; create role service_role;
       create table public.groups (id uuid primary key, name text, slug text,
         data jsonb, live jsonb, config jsonb, updated_at timestamptz default now());
       grant usage on schema public to anon, authenticated;`);
@@ -284,6 +284,38 @@ describe("wave7 7.3 — הקרנת צופה SQL↔JS", () => {
     expect(sqlPlain.payments.potPaid).toBeUndefined();
     expect(jsPlain.payments.potPaid).toBeUndefined();
     canonEq(sqlPlain, jsPlain);
+  });
+
+  it("potPaid עם plan חסר (null): מוסר בשני הצדדים (JS+SQL)", async () => {
+    /* נעילה למקרה שציין הבודק: payments עם potPaid אבל בלי תוכנית
+       שמורה כלל (plan=null) — נתיב החזרה־כמו־שהוא בשני הצדדים חייב
+       עדיין להסיר את potPaid, ושאר שדות ה־payments נשמרים זהים. */
+    const sess = {
+      id: "nullplan-night", iso: "2026-11-02", endedAt: 1300,
+      entries: [{ name: "דן ינקלויץ", amount: 40 }],
+      payments: {
+        plan: null,
+        paid: { "0": true },
+        received: {},
+        confirmations: [],
+        potPaid: true,
+      },
+    };
+    const { rows } = await db.query(
+      `select public.project_session_for_viewer($1::jsonb) as s`,
+      [JSON.stringify(sess)]
+    );
+    const sqlSess = rows[0].s;
+    const js = snapshotForViewer({
+      data: { sessions: [sess] },
+      config: { shareHistory: true, chipsPerShekel: 2 },
+    });
+    const jsSess = js.data.sessions[0];
+    expect(sqlSess.payments.potPaid).toBeUndefined();
+    expect(jsSess.payments.potPaid).toBeUndefined();
+    expect(sqlSess.payments.plan).toBeNull();
+    expect(jsSess.payments.plan).toBeNull();
+    canonEq(sqlSess, jsSess);
   });
 
   it("project_session_for_viewer ישירות: זהה לערב המוקרן של ה־JS", async () => {

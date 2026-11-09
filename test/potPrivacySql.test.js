@@ -118,7 +118,7 @@ describe("wave1 pot privacy SQL", () => {
   let db;
   beforeAll(async () => {
     db = new PGlite();
-    await db.exec(`create role anon; create role authenticated;
+    await db.exec(`create role anon; create role authenticated; create role service_role;
       create table public.groups (id uuid primary key, name text, slug text,
         data jsonb, live jsonb, config jsonb, updated_at timestamptz default now());
       grant usage on schema public to anon, authenticated;`);

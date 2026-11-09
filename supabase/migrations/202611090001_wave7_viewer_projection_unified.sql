@@ -12,12 +12,11 @@
 --     וגם אינליין מעל התוצאה — מאוחדת להסרה אחת, בתוך
 --     project_session_for_viewer בלבד. filter קורא ל־project לכל ערב
 --     ולא מוסיף הסרות משלו.
---  2. filter_shared_group_data: גם ענף ה־shareHistory=false עובר דרך
---     project_session_for_viewer (אותו ערב־אחרון, אותה הקרנה) — כך
---     הסרת sid מאירועי הקנייה של הערב האחרון חלה גם בנתיב הזה,
---     בדיוק כמו ב־snapshotForViewer של ה־JS (sessionsForViewer +
---     sessionForViewer עם stripEventSids). עד היום ה־sid דלף בנתיב
---     הזה כשהיה בידי לקוח שקורא ל־filter ישירות.
+--  2. ענף ה־shareHistory=false: אין כאן חידוש בנתיב הזה — הענף כבר
+--     עבר דרך project_session_for_viewer עוד ב־202610300004
+--     (שורות 80–85), ולכן הסרת ה־sid חלה בו כבר אז. החידוש הוא
+--     הסרת הסרת־ההקפאה הכפולה (סעיף 1) ואיחוד רשימת־ההסרה במקום
+--     אחד: filter לא מוסיף הסרות משלו מעל project.
 --
 -- כלל potPaid האחיד והמוצהר: potPaid נשמר באחסון תמיד (סימון ציבורי
 -- לא מוחק אותו — mark_group_payment במיזוג השמרני), ומוסר מכל הקרנת
@@ -78,7 +77,6 @@ begin
 end;
 $$;
 
-revoke all on function public.filter_shared_group_data(jsonb, jsonb) from public, anon;
-grant execute on function public.filter_shared_group_data(jsonb, jsonb) to authenticated;
+revoke all on function public.filter_shared_group_data(jsonb, jsonb) from public, anon, authenticated, service_role;
 
 commit;
