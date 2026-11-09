@@ -212,7 +212,7 @@ function App({
       if (raw) {
         ({ db: d, filled } = parseStoredDb(raw));
       } else {
-        const { buildSeedDb } = await import("../lib/poker/seed");
+        const { buildSeedDb } = await import("@/lib/poker/seed");
         d = buildSeedDb(); // ברירת מחדל בזיכרון בלבד — לא נכתב אוטומטית
       }
       if (alive) {

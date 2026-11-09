@@ -27,6 +27,8 @@ const RULE = {
       ImportDeclaration: check,
       ExportAllDeclaration: check,
       ExportNamedDeclaration: check,
+      // ייבוא דינמי: import("…") — אותו זיהוי נתיב, node.source הוא הליטרל.
+      ImportExpression: check,
     };
   },
 };
