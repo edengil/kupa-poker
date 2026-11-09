@@ -165,7 +165,8 @@ export function RsvpCard({ supabase, groupId, plan }) {
 
   /* הצלחה מוצגת רק כשההצבעה נחתה במסד ואומתה בקריאה חוזרת
      (castRsvpVote) — עד גל 5 גם כתיבה שנכשלה הפכה ל"נתראה בשולחן!"
-     (ממצא ביקורת 25). */
+     (ממצא ביקורת 25). גל 6 (6.2): על כשל — גם alert כמו בסימון תשלום,
+     לא רק הבאנר השקט. */
   const vote = async (status) => {
     if (!me || busy) return;
     setBusy(true);
@@ -182,6 +183,7 @@ export function RsvpCard({ supabase, groupId, plan }) {
     } else {
       setJustVoted(null);
       setVoteError(true);
+      alert("ההצבעה לא נשמרה — בדקו חיבור ונסו שוב");
     }
     setBusy(false);
   };
