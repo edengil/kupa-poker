@@ -138,12 +138,15 @@ describe("מסכי התחברות — כשל התחברות מוצג, לא שק�
 
 describe("חיווט — נעילות סטטיות על המקור", () => {
   const ownerSrc = readFileSync(new URL("../components/OwnerApp.jsx", import.meta.url), "utf8");
+  /* גל 8 (8.2): אפקט ה־boot חולץ מ־OwnerApp ל־useGroupBoot — נעלי השער
+     נבדקות מול מקור ה־hook, באותו סדר ובאותן מחרוזות. */
+  const bootSrc = readFileSync(new URL("../components/useGroupBoot.js", import.meta.url), "utf8");
   const publicSrc = readFileSync(new URL("../components/PublicApp.jsx", import.meta.url), "utf8");
 
   it("אפקט ה־boot של OwnerApp בודק signedOut בגוף — לפני כל עלייה מהמטמון", () => {
-    expect(ownerSrc).toContain("if (signedOut) return;");
-    const gateAt = ownerSrc.indexOf("if (signedOut) return;");
-    const cacheBootAt = ownerSrc.indexOf("if (cachedRow?.id && cachedRow?.slug)");
+    expect(bootSrc).toContain("if (signedOut) return;");
+    const gateAt = bootSrc.indexOf("if (signedOut) return;");
+    const cacheBootAt = bootSrc.indexOf("if (cachedRow?.id && cachedRow?.slug)");
     expect(gateAt).toBeGreaterThan(-1);
     expect(cacheBootAt).toBeGreaterThan(gateAt);
   });

@@ -193,14 +193,18 @@ describe("fetchLastViewedGroupResult — הבחנת כשל מ״אין צפיות
 
 describe("חיווט OwnerApp — נעילות סטטיות", () => {
   const src = readFileSync(new URL("../components/OwnerApp.jsx", import.meta.url), "utf8");
+  /* גל 8 (8.2): זרימת ה־boot חולצה מ־OwnerApp ל־useGroupBoot — הטענות על
+     ה־boot נבדקות מול מקור ה־hook; הטענות על OwnerApp עצמו (אין .insert,
+     מסך השגיאה) נשארות על OwnerApp. */
+  const bootSrc = readFileSync(new URL("../components/useGroupBoot.js", import.meta.url), "utf8");
 
   it("ה־boot קורא ל־resolveRootLanding עם המשתמש וה־slug-maker", () => {
-    expect(src).toContain("resolveRootLanding(supabase, user.id, newSlug)");
+    expect(bootSrc).toContain("resolveRootLanding(supabase, user.id, newSlug)");
   });
 
   it("תוצאת צופה מנתבת למשטח הצפייה של הקבוצה", () => {
-    expect(src).toContain('landing.kind === "viewer"');
-    expect(src).toContain("window.location.replace(`/g/${landing.slug}`)");
+    expect(bootSrc).toContain('landing.kind === "viewer"');
+    expect(bootSrc).toContain("window.location.replace(`/g/${landing.slug}`)");
   });
 
   it("ב־OwnerApp עצמו אין יותר יצירת קבוצה — היצירה רק בתוך resolveRootLanding", () => {

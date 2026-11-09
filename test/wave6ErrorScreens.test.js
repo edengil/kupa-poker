@@ -58,6 +58,9 @@ describe("6.3 — מעברי מקור: נתיב ציבורי ומסכי שגיא
     "utf8"
   );
   const owner = readFileSync(new URL("../components/OwnerApp.jsx", import.meta.url), "utf8");
+  /* גל 8 (8.2): זרימת ה־boot חולצה ל־useGroupBoot — קריאת reportDiag על
+     כשל נחיתה חיה שם; מסך השגיאה עצמו נשאר ב־OwnerApp. */
+  const boot = readFileSync(new URL("../components/useGroupBoot.js", import.meta.url), "utf8");
 
   it("/g בודק קיום בשרת וקורא notFound על חסר", () => {
     expect(page).toContain("groupExists");
@@ -77,7 +80,7 @@ describe("6.3 — מעברי מקור: נתיב ציבורי ומסכי שגיא
   it("מסך שגיאת השורש לא מציג טקסט מסד גולמי", () => {
     expect(owner).not.toContain("{message || \"משהו השתבש\"}");
     expect(owner).toContain("לא הצלחנו לטעון את הקבוצה כרגע");
-    expect(owner).toContain('reportDiag("root-landing"');
+    expect(boot).toContain('reportDiag("root-landing"');
     expect(owner).toContain("מזהה אירוע");
   });
 });
