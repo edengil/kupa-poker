@@ -7,10 +7,8 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { describe, it, expect } from "vitest";
-import {
-  SavingsPotCard,
-  withoutWithdrawal,
-} from "../components/poker/SavingsPotCard.jsx";
+import { SavingsPotCard } from "../components/poker/SavingsPotCard.jsx";
+import { withoutWithdrawal } from "../lib/poker/potEdits.js";
 
 const W = [
   { amount: 30, reason: "מפת פוקר ירוקה", at: "2026-10-10T22:08:48.735Z" },

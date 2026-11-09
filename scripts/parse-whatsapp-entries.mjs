@@ -611,9 +611,12 @@ const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPat
 
 if (isMain) {
   const input = process.argv[2] || path.join(ROOT, "_scratch_wa", "_chat.txt");
-  const output = process.argv[3] || path.join(ROOT, "components", "poker", "entryTimings.js");
-  const spansOut = process.argv[4] || path.join(ROOT, "components", "poker", "chatNightSpans.js");
-  const hostsOut = process.argv[5] || path.join(ROOT, "components", "poker", "chatHosts.js");
+  /* גל 8 (8.3): שלושת קבצי הנתונים הנגזרים גרים בתיקיית data ייעודית
+     תחת lib/poker — ברירות המחדל כאן חייבות להצביע לשם, אחרת ריצת
+     חידוש תכתוב עותקים חדשים במיקום הישן והאתר ימשיך לקרוא את הישנים. */
+  const output = process.argv[3] || path.join(ROOT, "lib", "poker", "data", "entryTimings.js");
+  const spansOut = process.argv[4] || path.join(ROOT, "lib", "poker", "data", "chatNightSpans.js");
+  const hostsOut = process.argv[5] || path.join(ROOT, "lib", "poker", "data", "chatHosts.js");
   if (!fs.existsSync(input)) {
     console.error("חסר קובץ צ'אט:", input);
     process.exit(1);

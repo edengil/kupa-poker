@@ -6,7 +6,7 @@ import { AL, canon, r2 } from "./helpers.js";
 import { fmt } from "./format.js";
 import { ENTRY } from "../report.js";
 import { sessionDurationMs } from "./durationRecords.js";
-import { chatNightsFor, CHAT_ENTRY_NIGHTS } from "./entryTimings.js";
+import { chatNightsFor, CHAT_ENTRY_NIGHTS } from "./data/entryTimings.js";
 import { resolveEntryChips, resolveEntryBuyin } from "./reconstructChips.js";
 import {
   computePartnerEdges,

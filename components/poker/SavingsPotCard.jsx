@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { C } from "../../lib/poker/colors";
 import { r2 } from "../../lib/poker/helpers";
 import { potActualFor, potRecordedFor } from "../../lib/nightShare";
+import { withoutWithdrawal } from "../../lib/poker/potEdits";
 
 /**
  * ניהול קופת החיסכון — אדמין בלבד.
@@ -14,11 +15,6 @@ import { potActualFor, potRecordedFor } from "../../lib/nightShare";
  * ומתעדכנת מעצמה (הכרעת עדן, 25.10.2026).
  */
 
-/** מחזיר עותק של רשימת המשיכות בלי הרשומה שבאינדקס המקורי (בלי לשנות את המקור). */
-export function withoutWithdrawal(withdrawals, originalIndex) {
-  const list = Array.isArray(withdrawals) ? withdrawals : [];
-  return list.filter((_, idx) => idx !== originalIndex);
-}
 export function SavingsPotCard({ db, commit, isAdmin }) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");

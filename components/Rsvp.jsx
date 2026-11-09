@@ -31,7 +31,7 @@ export const planLabel = (plan) => {
 };
 
 /** מיקום + הערות — תומך גם בתוכניות ישנות שבהן note שימש למיקום */
-export function planPlace(plan) {
+function planPlace(plan) {
   if (!plan) return { location: "", note: "" };
   if (plan.location) return { location: plan.location, note: plan.note || "" };
   /* תוכניות ישנות: כתובת מארח נשמרה ב-note */

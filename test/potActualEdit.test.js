@@ -8,7 +8,7 @@
    אותה (frozenReal + מפת הרשום) במקום להשאיר אותה חשופה לפער
    מנהל/צופה; מחיקת הבפועל משחררת רק את סימון ההקפאה. */
 import { describe, it, expect } from "vitest";
-import { withActual } from "../components/poker/PotDashboard.jsx";
+import { withActual } from "../lib/poker/potEdits.js";
 import { NIGHT_24_10 } from "./fixtures/night-2026-10-24.js";
 import {
   resolveSettlement,

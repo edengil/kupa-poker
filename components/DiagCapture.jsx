@@ -25,7 +25,7 @@ function describeArg(a) {
   }
 }
 
-export function installDiagCapture() {
+function installDiagCapture() {
   if (installed || typeof window === "undefined") return;
   installed = true;
 
