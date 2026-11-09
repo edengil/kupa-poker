@@ -283,7 +283,7 @@ export function ProfileSheet({ db, name, onClose, onSaveEmail, onSavePhone }) {
           }}
         >
           <h2 style={{ margin: 0, fontSize: 21, fontWeight: 800 }}>{cn}</h2>
-          <IconBtn onClick={onClose}>
+          <IconBtn onClick={onClose} aria-label="סגירת פרופיל שחקן">
             <X size={17} />
           </IconBtn>
         </div>

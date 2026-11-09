@@ -223,7 +223,7 @@ export function TableTab({ db, commit, years, readOnly = false, scope, setScope,
                 🎁 סיכום שנה
               </button>
             )}
-            <IconBtn onClick={() => setShare(true)}>
+            <IconBtn onClick={() => setShare(true)} aria-label="שיתוף טבלת מאזנים">
               <Share2 size={15} />
             </IconBtn>
           </span>

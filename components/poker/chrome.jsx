@@ -219,13 +219,13 @@ export function BalanceMeter({ bal }) {
         <span style={{ color: C.win }}>
           מגיע{" "}
           <b style={{ fontVariantNumeric: "tabular-nums" }}>
-            {pos.toLocaleString()}
+            {pos.toLocaleString("en-US")}
           </b>
         </span>
         <span style={{ color: C.loss }}>
           חייב{" "}
           <b style={{ fontVariantNumeric: "tabular-nums" }}>
-            {neg.toLocaleString()}
+            {neg.toLocaleString("en-US")}
           </b>
         </span>
       </div>

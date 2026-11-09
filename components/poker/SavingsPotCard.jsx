@@ -117,6 +117,7 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            aria-label="סכום משיכה מהקופה"
             placeholder="סכום בש״ח"
             style={{
               padding: "6px 12px",
@@ -131,6 +132,7 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
             type="text"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            aria-label="סיבת המשיכה"
             placeholder="סיבה (למשל: קניית שתייה)"
             style={{
               padding: "6px 12px",
@@ -147,7 +149,8 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
               onClick={doWithdraw}
               style={{
                 fontSize: 13,
-                padding: "6px 16px",
+                padding: "10px 16px",
+                minHeight: 32,
                 borderRadius: 8,
                 cursor: "pointer",
                 border: "none",
@@ -163,7 +166,8 @@ export function SavingsPotCard({ db, commit, isAdmin }) {
               onClick={() => setShowForm(false)}
               style={{
                 fontSize: 13,
-                padding: "6px 12px",
+                padding: "10px 12px",
+                minHeight: 32,
                 borderRadius: 8,
                 cursor: "pointer",
                 border: `1px solid ${C.line}`,

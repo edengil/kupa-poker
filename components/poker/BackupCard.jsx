@@ -222,6 +222,7 @@ export function BackupCard({ db, commit, groupId = null }) {
           type="file"
           accept=".json,application/json"
           onChange={onFile}
+          aria-label="בחירת קובץ גיבוי לייבוא"
           data-testid="backup-import-input"
           style={{ display: "none" }}
         />

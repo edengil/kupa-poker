@@ -12,12 +12,14 @@ import { ChevronDown } from "./icons";
    רק קריאים יותר וניתנים לשימוש חוזר.
    ============================================================================ */
 
-/** כפתור אייקון קטן (שיתוף / עריכה / מחיקה). danger צובע באדום. */
+/** כפתור אייקון קטן (שיתוף / עריכה / מחיקה). danger צובע באדום.
+    aria-label חובה: הכפתור מכיל אייקון בלבד, בלי טקסט גלוי (גל 6.4). */
 export function IconBtn({ children, onClick, danger, ...rest }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={rest["aria-label"] || "פעולה"}
       {...rest}
       style={{
         background: C.feltDeep,
@@ -175,11 +177,13 @@ export function NavBtn({ children, onClick, disabled }) {
   );
 }
 
-/** כפתור עגול קטן (+/− ליד שחקן בלייב). */
-export function RoundBtn({ children, onClick }) {
+/** כפתור עגול קטן (+/− ליד שחקן בלייב). aria-label חובה (גל 6.4). */
+export function RoundBtn({ children, onClick, ...rest }) {
   return (
     <button
       onClick={onClick}
+      aria-label={rest["aria-label"] || "פעולה"}
+      {...rest}
       style={{
         background: C.feltDeep,
         border: `1px solid ${C.line}`,
@@ -259,8 +263,9 @@ export const inputStyle = {
 
 /** בחירה מעוצבת (select מותאם) עם חץ מותאם. options = [[value, label], ...]. */
 export function Select({ value, onChange, options, label, grow }) {
+  const id = React.useId();
   return (
-    <label
+    <div
       style={{
         display: "flex",
         flexDirection: "column",
@@ -268,9 +273,10 @@ export function Select({ value, onChange, options, label, grow }) {
         flex: grow ? 1 : "0 0 auto",
       }}
     >
-      <span style={{ fontSize: 11.5, color: C.dim }}>{label}</span>
+      <label htmlFor={id} style={{ fontSize: 11.5, color: C.dim }}>{label}</label>
       <div style={{ position: "relative" }}>
         <select
+          id={id}
           value={value}
           onChange={(e) => onChange(isNaN(+e.target.value) ? e.target.value : +e.target.value)}
           style={{
@@ -304,6 +310,6 @@ export function Select({ value, onChange, options, label, grow }) {
           }}
         />
       </div>
-    </label>
+    </div>
   );
 }

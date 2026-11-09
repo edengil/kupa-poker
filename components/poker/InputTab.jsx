@@ -114,6 +114,7 @@ export function InputTab({ db, commit, years, groupId = null }) {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
+        aria-label="הדבקת סיכום הערב"
         rows={9}
         placeholder={
           "סיכום פוקר 1.8\nעדן מגיע 125\nאופיר מגיע 180\n\nאורן חייבת 230\nדן חייב 300"

@@ -146,7 +146,7 @@ export function ShareSheet({
             </div>
             <b style={{ fontSize: 16, color: C.cream }}>{title}</b>
           </div>
-          <IconBtn onClick={onClose}>
+          <IconBtn onClick={onClose} aria-label="סגירת חלון השיתוף">
             <X size={17} />
           </IconBtn>
         </div>
@@ -175,6 +175,7 @@ export function ShareSheet({
         <textarea
           readOnly
           value={body}
+          aria-label="טקסט לשיתוף"
           rows={Math.min(16, body.split("\n").length + 1)}
           onFocus={(e) => e.target.select()}
           style={{

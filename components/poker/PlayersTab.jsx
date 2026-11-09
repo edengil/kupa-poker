@@ -119,7 +119,7 @@ export function PlayersTab({ db, onPlayer }) {
           </button>
         ))}
         {scope !== "all" && (
-          <select value={y} onChange={(e) => setY(+e.target.value)} style={sel}>
+          <select aria-label="שנה" value={y} onChange={(e) => setY(+e.target.value)} style={sel}>
             {years.map((yy) => (
               <option key={yy} value={yy}>
                 {yy}
@@ -128,7 +128,7 @@ export function PlayersTab({ db, onPlayer }) {
           </select>
         )}
         {scope === "month" && (
-          <select value={mo} onChange={(e) => setMo(+e.target.value)} style={sel}>
+          <select aria-label="חודש" value={mo} onChange={(e) => setMo(+e.target.value)} style={sel}>
             {MONTHS.map((m, i) => (
               <option key={m} value={i + 1}>
                 {m}

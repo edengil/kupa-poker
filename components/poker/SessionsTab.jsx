@@ -106,7 +106,7 @@ export function SessionsTab({ db, commit, isAdmin }) {
                 >
                   חלוקה ותשלומים
                 </button>
-                <IconBtn onClick={() => openShare(s)}>
+                <IconBtn onClick={() => openShare(s)} aria-label={`שיתוף ערב ${s.d}.${s.mo}.${s.y}`}>
                   <Share2 size={15} />
                 </IconBtn>
                 <IconBtn
@@ -119,6 +119,7 @@ export function SessionsTab({ db, commit, isAdmin }) {
                 <IconBtn
                   onClick={() => setPendingDelete({ id: s.id, label: `${s.d}.${s.mo}.${s.y}` })}
                   danger
+                  aria-label={`מחיקת ערב ${s.d}.${s.mo}.${s.y}`}
                   data-testid={`session-delete-${s.id}`}
                 >
                   <Trash2 size={15} />

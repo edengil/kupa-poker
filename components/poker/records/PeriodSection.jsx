@@ -45,6 +45,7 @@ export function PeriodSection({ db, periods, periodKind, setPeriodKind, effMonth
       </select>
     ) : (
       <select
+        aria-label="שנת תקופה"
         value={effPeriodYear}
         onChange={(e) => setPeriodYear(Number(e.target.value))}
         style={{

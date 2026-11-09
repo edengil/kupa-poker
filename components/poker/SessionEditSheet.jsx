@@ -116,6 +116,7 @@ export function SessionEditSheet({ db, session, commit, onClose }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={10}
+          aria-label="עריכת טקסט הערב"
           data-testid="session-edit-text"
           dir="rtl"
           style={{

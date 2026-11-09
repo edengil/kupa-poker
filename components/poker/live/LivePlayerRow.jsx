@@ -252,7 +252,7 @@ export function LivePlayerRow({
               {fmt(net)}₪
             </b>
           )}
-          <IconBtn onClick={() => rm(i)} danger>
+          <IconBtn onClick={() => rm(i)} danger aria-label={`הסרת ${p.name} מהלייב`}>
             <X size={14} />
           </IconBtn>
         </div>
@@ -299,6 +299,7 @@ export function LivePlayerRow({
             data-testid="live-tip-input"
             type="number"
             inputMode="numeric"
+            aria-label={`סכום טיפ ל${p.name}`}
             min="1"
             value={tipAmt}
             onChange={(e) => setTipAmt(e.target.value.replace(/[^\d]/g, ""))}
@@ -463,7 +464,7 @@ export function LivePlayerRow({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <RoundBtn onClick={() => bump(i, -addAmt)}>
+          <RoundBtn onClick={() => bump(i, -addAmt)} aria-label={`הפחתת קנייה ל${p.name}`}>
             <Minus size={14} />
           </RoundBtn>
           <div style={{ textAlign: "center", minWidth: 70 }}>
@@ -489,6 +490,7 @@ export function LivePlayerRow({
                 data-testid={`live-buyin-input-${p.name}`}
                 type="number"
                 inputMode="decimal"
+                aria-label={`סכום קנייה ל${p.name}`}
                 autoFocus
                 value={buyinDraft}
                 onChange={(e) => setBuyinDraft(e.target.value)}
@@ -522,7 +524,7 @@ export function LivePlayerRow({
               {playerChips(p, cps)} ג&apos;יטונים
             </div>
           </div>
-          <RoundBtn onClick={() => bump(i, addAmt)}>
+          <RoundBtn onClick={() => bump(i, addAmt)} aria-label={`הוספת קנייה ל${p.name}`}>
             <Plus size={14} />
           </RoundBtn>
         </div>

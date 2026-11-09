@@ -92,6 +92,7 @@ function PotRow({ session, potTransfer, potPaid, busy, markPot, editingPot, setE
               type="number"
               value={potValue}
               onChange={(e) => setPotValue(e.target.value)}
+              aria-label="סכום קופת חיסכון רשום"
               style={{
                 width: 70,
                 padding: "0px 6px",
@@ -107,7 +108,8 @@ function PotRow({ session, potTransfer, potPaid, busy, markPot, editingPot, setE
               onClick={savePot}
               style={{
                 fontSize: 11,
-                padding: "2px 8px",
+                padding: "6px 10px",
+                minHeight: 26,
                 borderRadius: 6,
                 cursor: "pointer",
                 border: "none",
@@ -123,7 +125,8 @@ function PotRow({ session, potTransfer, potPaid, busy, markPot, editingPot, setE
               onClick={() => setEditingPot(false)}
               style={{
                 fontSize: 11,
-                padding: "2px 8px",
+                padding: "6px 10px",
+                minHeight: 26,
                 borderRadius: 6,
                 cursor: "pointer",
                 border: `1px solid ${C.line}`,

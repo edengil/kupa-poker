@@ -282,9 +282,9 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
               תכנון הערב הבא
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              <input type="date" value={iso} min={todayIso}
+              <input type="date" value={iso} min={todayIso} aria-label="תאריך הערב"
                 onChange={(e) => setIso(e.target.value)} style={{ ...field, flex: 1.4 }} />
-              <input type="time" value={time}
+              <input type="time" value={time} aria-label="שעת הערב"
                 onChange={(e) => setTime(e.target.value)} style={{ ...field, flex: 1 }} />
             </div>
             <div style={{ fontSize: 12, fontWeight: 600, color: C.dim, marginBottom: 6 }}>
@@ -310,6 +310,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
+              aria-label="מיקום הערב"
               placeholder="כתובת / מיקום — לא חובה"
               style={{ ...field, width: "100%", boxSizing: "border-box", marginBottom: 10 }}
             />
@@ -319,6 +320,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              aria-label="הערות לערב"
               placeholder="למשל: להביא חטיפים, חניה בחצר, לבוש חופשי…"
               rows={2}
               style={{
@@ -610,6 +612,7 @@ export function PlanCard({ db, commit, renderRsvps, onPlanShared }) {
                           <textarea
                             value={importText}
                             onChange={(e) => setImportText(e.target.value)}
+                            aria-label="ייבוא אימיילים של שחקנים"
                             placeholder={"אופיר סנה: ofir@example.com\nאיציק תפילין: itzik@example.com"}
                             rows={4}
                             style={{ width: "100%", boxSizing: "border-box", background: C.feltDeep, color: C.cream, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", fontSize: 16, fontFamily: "inherit" }}

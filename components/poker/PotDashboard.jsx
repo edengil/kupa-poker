@@ -208,7 +208,8 @@ export function PotDashboard({ db, commit, isAdmin }) {
     color: C.feltDeep,
     border: "none",
     borderRadius: 8,
-    padding: "4px 10px",
+    padding: "6px 12px",
+    minHeight: 28,
     fontSize: 12,
     fontWeight: 700,
     cursor: "pointer",
@@ -219,7 +220,8 @@ export function PotDashboard({ db, commit, isAdmin }) {
     color: C.dim,
     border: `1px solid ${C.line}`,
     borderRadius: 8,
-    padding: "4px 10px",
+    padding: "6px 12px",
+    minHeight: 28,
     fontSize: 12,
     cursor: "pointer",
     fontFamily: "inherit",
@@ -231,6 +233,7 @@ export function PotDashboard({ db, commit, isAdmin }) {
         type="number"
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
+        aria-label="סכום קופה לעריכה"
         style={inputStyle}
       />
       <button type="button" onClick={onSave} style={saveBtnStyle}>

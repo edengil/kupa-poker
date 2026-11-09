@@ -82,7 +82,7 @@ export function AliasCard({ db, commit }) {
                 <span>
                   {k} <span style={{ color: C.dim }}>←</span> <b>{v}</b>
                 </span>
-                <IconBtn onClick={() => rm(k)} danger>
+                <IconBtn onClick={() => rm(k)} danger aria-label={`מחיקת כינוי ${k}`}>
                   <Trash2 size={14} />
                 </IconBtn>
               </div>
@@ -92,6 +92,7 @@ export function AliasCard({ db, commit }) {
             <input
               value={from}
               onChange={(e) => setFrom(e.target.value)}
+              aria-label="שם בטקסט"
               placeholder="שם בטקסט"
               style={inputStyle}
             />
@@ -99,6 +100,7 @@ export function AliasCard({ db, commit }) {
             <input
               value={to}
               onChange={(e) => setTo(e.target.value)}
+              aria-label="שם אמיתי"
               placeholder="שם אמיתי"
               style={inputStyle}
             />
