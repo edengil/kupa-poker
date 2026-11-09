@@ -9,7 +9,6 @@ import { fmt } from "../../lib/poker/format";
 import { r2, AL, canon, waSend, potForBuyin } from "../../lib/poker/helpers";
 import { applyTipTotalsToPlayers, canonLivePlayers, liveAlreadySaved } from "../../lib/liveMerge";
 import { pickLiveMeta } from "../../lib/liveMeta";
-import { applyManualTip, removeManualTip } from "../../lib/manualTips";
 import { computeLiveRebuys } from "../../lib/poker/liveRebuys";
 import { appendAction, labelAction, undoLast } from "../../lib/liveActionLog";
 import { parseBuyinEditInput, applyBuyinEdit, applyBuyinEditWithChanges } from "../../lib/liveBuyinEdit";
@@ -20,10 +19,7 @@ import { detectLiveRecords, liveRecordAnnouncement } from "../../lib/poker/liveR
 import { postToGroup } from "../../lib/postToGroup";
 import { getConfig, onConfig, setConfig, LIVE_KEY } from "../../lib/poker/config";
 import { brokenRecords } from "../../lib/poker/brokenRecords";
-import {
-  applyCoupleFill,
-  DEFAULT_FILL_CHIPS,
-} from "../../lib/poker/coupleFills";
+import { createLiveTipActions } from "./live/liveTipActions";
 import { IconBtn, Empty, RoundBtn, inputStyle } from "./ui";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { LiveDistributionPanel } from "./live/LiveDistributionPanel";
@@ -630,59 +626,21 @@ export function LiveTab({
     });
   }
 
-  /* מילוי זוגי: כל לחיצה = 30 ג'יטונים מהערימה של from לשותף.
-     תפריט מאפשר לבחור כיוון (אני→שותף / שותף→אני). בלי תווית "תרומה". */
-  function doCoupleFill(fromName) {
-    const res = applyCoupleFill(players, fromName, DEFAULT_FILL_CHIPS);
-    if (!res.ok) {
-      if (res.reason === "missing_partner") {
-        alert("בן/בת הזוג לא בשולחן — אי אפשר לרשום מילוי.");
-      } else if (res.reason === "partner_cashed") {
-        alert("אחד מבני הזוג כבר יצא והשני עדיין במשחק — מילוי זוגי אפשרי רק כששניהם באותו מצב.");
-      }
-      return;
-    }
-    setPlayers(res.players);
-    setCoupleFills((f) => [...f, res.event]);
-    setActionLog((log) =>
-      appendAction(log, {
-        t: "fill",
-        from: res.event.from,
-        to: res.event.to,
-        chips: res.event.chips,
-        // זהות האירוע — הביטול מסיר את המילוי הזה בדיוק (גל 4, 4.4)
-        fillAt: res.event.at,
-      })
-    );
-    setMenuIdx(null);
-  }
-
-  /* הוספת טיפ ידנית מהאפליקציה — גיבוי כשהבוט נפל. אותה סמנטיקה כמו הבוט
-     (אירוע ליומן + הורדה מהיציאה אם כבר נרשמה), בלי שום הכרזה לקבוצה.
-     נשמר בנתיב מצב־הלייב הרגיל (tips שב־LIVE_KEY) ומתמזג לפי מזהה אירוע. */
-  function addManualTip(i) {
-    const p = players[i];
-    if (!p) return;
-    const res = applyManualTip({ players, tips, name: p.name, amount: tipAmt, aliases: A });
-    if (!res.ok) return;
-    setPlayers(res.players);
-    setTips(res.tips);
-    setActionLog((log) =>
-      appendAction(log, { t: "tipAdd", name: p.name, event: res.event })
-    );
-    setTipPickerIdx(null);
-    setTipAmt("");
-  }
-  function deleteManualTip(tipId, { restoreCashout = true } = {}) {
-    const res = removeManualTip({ players, tips, tipId, aliases: A, restoreCashout });
-    if (!res.ok) return;
-    setPlayers(res.players);
-    setTips(res.tips);
-    setActionLog((log) =>
-      appendAction(log, { t: "tipDel", name: res.event.name, event: res.event, cashoutRestored: restoreCashout })
-    );
-    setTipDelConfirm(null);
-  }
+  /* פעולות הטיפים והמילוי הזוגי חולצו ל־live/liveTipActions (גל 8, 8.2) */
+  const { doCoupleFill, addManualTip, deleteManualTip } = createLiveTipActions({
+    players,
+    tips,
+    tipAmt,
+    aliases: A,
+    setPlayers,
+    setTips,
+    setCoupleFills,
+    setActionLog,
+    setMenuIdx,
+    setTipPickerIdx,
+    setTipAmt,
+    setTipDelConfirm,
+  });
 
   return (
     <div style={{ marginTop: 4 }}>
