@@ -114,9 +114,9 @@ describe("גל 5 — פיקסצ'ר הלייב המלא", () => {
     expectMetaIntact(live);
     expectPotInvariant(live);
 
-    /* 4. טיפ לשחקן שכבר יצא — היציאה יורדת, החותמות שורדות. */
+    /* 4. טיפ לשחקן שכבר יצא — רישום בלבד: היציאה לא זזה, החותמות שורדות. */
     live = apply(live, [{ kind: "tip", name: "אופיר", chips: 20 }], "w5-seq-3");
-    expect(live.players[1].cashout).toBe("430");
+    expect(live.players[1].cashout).toBe("450");
     expectMetaIntact(live);
     expectPotInvariant(live);
   });

@@ -53,11 +53,11 @@ describe("tip commands", () => {
     expect(reply).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
   });
 
-  it("subtracts tip from cashout when already closed", () => {
+  it("records the tip without touching the cashout when already closed (רישום בלבד)", () => {
     let live = applyCommands(null, [{ kind: "add", name: "אופיר", amount: 100 }], "m1").live;
     live = applyCommands(live, [{ kind: "cashout", name: "אופיר", chips: 250 }], "m2").live;
     live = applyCommands(live, [{ kind: "tip", name: "אופיר", chips: 10 }], "m3").live;
-    expect(live.players[0].cashout).toBe("240");
+    expect(live.players[0].cashout).toBe("250");
     expect(live.players[0].tipsGiven).toBe(10);
   });
 

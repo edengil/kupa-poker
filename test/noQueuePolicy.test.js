@@ -60,7 +60,7 @@ describe("קנייה ענקית חלה מיד — בלי תקרה ובלי ממ�
   });
 });
 
-describe("טיפ ענק חל מיד — מחמאה + דלתא מזומן 4.2 כרגיל", () => {
+describe("טיפ ענק חל מיד — מחמאה כרגיל, והיציאה לא נגעה (רישום בלבד)", () => {
   it("טיפ של 99,999 ג'יטונים חל מיד, בלי ממתין", () => {
     let live = apply(null, [{ kind: "add", name: "קובי סעדה", amount: 100 }], "b1a").live;
     const out = apply(live, [{ kind: "tip", name: "קובי סעדה", chips: 99999 }], "b1b");
@@ -70,12 +70,12 @@ describe("טיפ ענק חל מיד — מחמאה + דלתא מזומן 4.2 כ�
     expect(out.reply).not.toContain("ממתין לאישור");
   });
 
-  it("טיפ ענק על שחקן שכבר סגור מוריד מהיציאה (דלתא, קלאמפ ב־0)", () => {
+  it("טיפ ענק על שחקן שכבר סגור לא נוגע ביציאה (רישום בלבד)", () => {
     let live = apply(null, [{ kind: "add", name: "קובי סעדה", amount: 100 }], "b2a").live;
     live = apply(live, [{ kind: "cashout", name: "קובי סעדה", chips: 500 }], "b2b").live;
     live = apply(live, [{ kind: "tip", name: "קובי סעדה", chips: 3000 }], "b2c").live;
     expect(P(live).tipsGiven).toBe(3000);
-    expect(P(live).cashout).toBe("0"); // 500 − 3000, קלאמפ ב־0 — בדיוק כמו טיפ רגיל
+    expect(P(live).cashout).toBe("500");
     expect(live.pendingApprovals || []).toHaveLength(0);
   });
 });

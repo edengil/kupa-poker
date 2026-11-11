@@ -157,6 +157,69 @@ describe("nightBalance", () => {
     expect(c.warnings.some((w) => w.includes("ג'יטונים"))).toBe(true);
   });
 
+  it("tip chips are added back to the count — not a shortage (ערב 9.11)", () => {
+    // יציאות 2,894 מול 2,993 שהונפקו, ו־108 ג'יטוני טיפ: הפער האמיתי +9
+    // — עודף, לא חוסר: שום קיצוץ לא נובע ממנו (decided in buildNightRecord).
+    const c = checkNightBalance({
+      entries: [
+        { amount: 110 },
+        { amount: 475 },
+        { amount: -585 },
+      ],
+      cashSumChips: 2894,
+      potChips: 2993,
+      tipsChips: 108,
+      cps: 2,
+    });
+    expect(c.chipsGap).toBe(9);
+    expect(c.chipsGapShekels).toBe(4.5);
+  });
+
+  it("tips exactly cover the missing chips — no gap at all", () => {
+    const c = checkNightBalance({
+      entries: [
+        { amount: 10 },
+        { amount: -10 },
+      ],
+      cashSumChips: 92,
+      potChips: 100,
+      tipsChips: 8,
+      cps: 2,
+    });
+    expect(c.chipsGap).toBe(0);
+    expect(c.warnings.some((w) => w.includes("ג'יטונים"))).toBe(false);
+  });
+
+  it("a real shortage below the tips still warns", () => {
+    const c = checkNightBalance({
+      entries: [
+        { amount: 10 },
+        { amount: -10 },
+      ],
+      cashSumChips: 180,
+      potChips: 200,
+      tipsChips: 15,
+      cps: 2,
+    });
+    expect(c.ok).toBe(false);
+    expect(c.chipsGap).toBe(-5);
+    expect(c.chipsGapShekels).toBe(-2.5);
+    expect(c.warnings.some((w) => w.includes("ג'יטונים"))).toBe(true);
+  });
+
+  it("tipsChips omitted behaves exactly as before (default 0)", () => {
+    const c = checkNightBalance({
+      entries: [
+        { amount: 10 },
+        { amount: -10 },
+      ],
+      cashSumChips: 190,
+      potChips: 200,
+      cps: 2,
+    });
+    expect(c.chipsGap).toBe(-10);
+  });
+
   it("accepts netSum override", () => {
     const c = checkNightBalance({ netSum: 0.001 });
     expect(c.ok).toBe(true);

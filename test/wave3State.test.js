@@ -4,7 +4,8 @@ import { blank, playerPotSum, undo } from "../lib/wa/state";
 import { pickLiveMeta } from "../lib/liveMeta.js";
 
 /* גל 3א — שלמות־מצב (ממצאי ביקורת 4־שארית, 5, 21, 22 + תצפיות גל 2):
-   - ביטול טיפ אחרי יציאה מחזיר גם את סכום היציאה (צילום־לפני).
+   - טיפ אחרי יציאה הוא רישום בלבד (עדן, 11.11); ביטולו מדויק, וביטול של
+     רשומת מורשת עם cashDelta עדיין מחזיר את סכום היציאה.
    - ביטול הגדלת־ממתין משחזר את מצב הממתין שלפני ההגדלה.
    - מסירת בקשת־ממתין אחרי אישור לא מכפילה קנייה; הסרת שחקן מפרקת את
      הקופה שלו, כך שהאינווריאנט savingsPot == ‏Σ pot נשמר בכל צעד.
@@ -27,31 +28,48 @@ function expectPotInvariant(live) {
   expect(live.savingsPot).toBeCloseTo(sumPots, 10);
 }
 
-describe("גל 3א — ביטול טיפ אחרי יציאה מחזיר את סכום היציאה (ממצא 4)", () => {
-  it("מסירה חוזרת של הודעת טיפ: היציאה חוזרת ל־300 לפני החלה־מחדש, סוף זהה", () => {
+describe("גל 3א — טיפ אחרי יציאה: רישום בלבד, ביטול/עריכה מדויקים (ממצא 4)", () => {
+  it("מסירה חוזרת של הודעת טיפ: היציאה תמיד 300 והטיפ נספר פעם אחת", () => {
     let live = apply(null, [{ kind: "add", name: "קובי", amount: 50 }], "w3-tip-1");
     live = apply(live, [{ kind: "cashout", name: "קובי", chips: 300 }], "w3-tip-2");
     live = apply(live, [{ kind: "tip", name: "קובי", chips: 20 }], "w3-tip-3");
-    expect(live.players[0].cashout).toBe("280");
+    expect(live.players[0].cashout).toBe("300");
     expect(live.players[0].tipsGiven).toBe(20);
-    // מסירה חוזרת של אותה הודעת טיפ — לפני התיקון היציאה נשארה 280
-    // וההחלה־מחדש הורידה שוב ל־260, בעוד הטיפ נספר פעם אחת.
+    // מסירה חוזרת של אותה הודעת טיפ — הביטול וההחלה־מחדש לא מזיזים כלום:
+    // היציאה לא נגעה מעולם (רישום בלבד) והטיפ נספר פעם אחת.
     live = apply(live, [{ kind: "tip", name: "קובי", chips: 20 }], "w3-tip-3");
-    expect(live.players[0].cashout).toBe("280");
+    expect(live.players[0].cashout).toBe("300");
     expect(live.players[0].tipsGiven).toBe(20);
     expect(live.tips).toHaveLength(1);
     live = apply(live, [{ kind: "tip", name: "קובי", chips: 20 }], "w3-tip-3");
-    expect(live.players[0].cashout).toBe("280");
+    expect(live.players[0].cashout).toBe("300");
     expect(live.players[0].tipsGiven).toBe(20);
   });
 
-  it("עריכת הודעת טיפ לסכום אחר: היציאה משקפת רק את הטיפ החדש", () => {
+  it("עריכת הודעת טיפ לסכום אחר: רק ה־tipsGiven משקף את הטיפ החדש", () => {
     let live = apply(null, [{ kind: "add", name: "קובי", amount: 50 }], "w3-tip-4");
     live = apply(live, [{ kind: "cashout", name: "קובי", chips: 300 }], "w3-tip-5");
     live = apply(live, [{ kind: "tip", name: "קובי", chips: 20 }], "w3-tip-6");
     live = apply(live, [{ kind: "tip", name: "קובי", chips: 50 }], "w3-tip-6");
-    expect(live.players[0].cashout).toBe("250");
+    expect(live.players[0].cashout).toBe("300");
     expect(live.players[0].tipsGiven).toBe(50);
+    expect(live.tips).toHaveLength(1);
+  });
+
+  it("רשומת מורשת עם cashDelta: הביטול עדיין מחזיר את הדלתא ליציאה", () => {
+    let live = apply(null, [{ kind: "add", name: "קובי", amount: 50 }], "w3-leg-1");
+    live = apply(live, [{ kind: "cashout", name: "קובי", chips: 300 }], "w3-leg-2");
+    live = apply(live, [{ kind: "tip", name: "קובי", chips: 20 }], "w3-leg-3");
+    /* מדמה לייב שנכתב במשטר הישן: הטיפ הוריד 20 מהיציאה (280) והרשומה
+       נושאת cashDelta. שותלים את מצב המורשת ומבטלים דרך מסירה חוזרת. */
+    live.players[0].cashout = "280";
+    const rec = live.applied["w3-leg-3"].map((e) =>
+      e.t === "tip" ? { ...e, cashDelta: 20 } : e
+    );
+    live.applied["w3-leg-3"] = rec;
+    live = apply(live, [{ kind: "tip", name: "קובי", chips: 20 }], "w3-leg-3");
+    expect(live.players[0].cashout).toBe("300");
+    expect(live.players[0].tipsGiven).toBe(20);
     expect(live.tips).toHaveLength(1);
   });
 });

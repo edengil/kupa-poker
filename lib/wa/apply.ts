@@ -556,10 +556,11 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       continue;
     }
 
-    /* טיפ מג'יטונים של השחקן (לא מהקופה).
-       tipsGiven מצטבר לסטטיסטיקה; cashout ב־₪ נשאר כפי שנרשם.
-       אם כבר יש cashout מספרי — מורידים מהערימה שנרשמה (הטיפ יצא ממנה).
-       שיאי ג'יטונים ביציאה משתמשים ב-cashout אחרי ההורדה. */
+    /* טיפ מג'יטונים של השחקן (לא מהקופה) — רישום בלבד (עדן, 11.11):
+       tipsGiven מצטבר לסטטיסטיקה והאירוע נכנס ליומן, אבל ה־cashout לא
+       משתנה בשום מצב, גם אם השחקן כבר סגור עם יציאה מספרית. הטיפים
+       עוברים בין השחקנים ונשארים בשולחן — היציאה הנספרת היא האמת, וג'יטוני
+       הטיפ מוחזרים לספירה בבדיקת איזון הג'יטונים בשמירה (nightBalance). */
     if (cmd.kind === "tip") {
       if (found.index === -1) {
         problems.push(`${cmd.name} לא בשולחן`);
@@ -604,18 +605,10 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         state.tipComplimentLast = last;
       }
       const tipsGiven = r2((+p.tipsGiven || 0) + amount);
-      let next = { ...p, tipsGiven };
-      /* דלתא של היציאה כשהטיפ מוריד ממנה (כמו cashDelta באפליקציה,
-         lib/manualTips.js): הביטול מחזיר את הדלתא על הערך הנוכחי, לא
-         צילום — תיקון cashout מאוחר יותר לא נדרס. נרשמת רק כשהטיפ באמת
-         הוריד מהערימה (קלאמפ ב־0 מקטין את הדלתא). */
-      let cashDelta: number | undefined;
-      if (p.cashout !== "" && p.cashout != null) {
-        const before = +p.cashout || 0;
-        const after = Math.max(0, before - amount);
-        next.cashout = String(after);
-        cashDelta = r2(before - after);
-      }
+      const next = { ...p, tipsGiven };
+      /* רישום בלבד: ה־cashout לא משתנה, ולכן גם אין cashDelta ברשומה.
+         ביטול של רשומת מורשת (עם cashDelta / cashoutBefore מהמשטר הישן)
+         עדיין משחזר את היציאה בדיוק כמו קודם — ראו את ענף ה־"tip" ב־undo. */
       state.players[found.index] = next;
       state.tips = [...(state.tips || []), { id: tipId, name: p.name, amount, at: Date.now() }];
       record.push({
@@ -627,7 +620,6 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         lastBefore,
         female,
         bagV: 2,
-        ...(cashDelta !== undefined ? { cashDelta } : {}),
       });
       // BOT_MARK מתווסף אוטומטית על כל ack
       if (resolveAlias(p.name, aliases) === KOBI) acks.push(KOBI_TIP_OPENER);

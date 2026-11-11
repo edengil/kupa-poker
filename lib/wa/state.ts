@@ -381,15 +381,16 @@ export function opTipId(item: WaPendingApproval): string {
 }
 
 interface OpApplyFacts {
-  /* הטיפ באמת ירד מהיציאה הנוכחית של השחקן (היה סגור בזמן ההחלה). */
+  /* תאימות חתימה בלבד: הטיפ הוא רישום בלבד (עדן, 11.11) ולעולם לא נוגע
+     ביציאה — השדה תמיד false. */
   tipHitCashout: boolean;
 }
 
-/** מחיל ממתין־טיפ על השחקן: tipsGiven + רשומת טיפ ביומן, ודלתא על היציאה
- * אם השחקן כבר סגור — בדיוק לוגיקת הטיפ הרגילה (כמו cashDelta
- * באפליקציה). מחזיר עובדות להודעת האישור; ה־tipId נקבע מראש לפי
- * opTipId. צילום השקית/אחרון נשלף על ידי הקורא דרך nextTipCompliment,
- * לא כאן — כאן רק כותבים את התוצאה. */
+/** מחיל ממתין־טיפ על השחקן: tipsGiven + רשומת טיפ ביומן — רישום בלבד,
+ * בדיוק כמו לוגיקת הטיפ הרגילה: ה־cashout לא משתנה גם אם השחקן כבר
+ * סגור. מחזיר עובדות להודעת האישור; ה־tipId נקבע מראש לפי opTipId.
+ * צילום השקית/אחרון נשלף על ידי הקורא דרך nextTipCompliment, לא כאן —
+ * כאן רק כותבים את התוצאה. */
 export function applyOpTip(
   state: WaLiveState,
   playerIndex: number,
@@ -406,22 +407,14 @@ export function applyOpTip(
     state.tipComplimentBag = compliment.bag;
     state.tipComplimentLast = compliment.last;
   }
-  let next = { ...p, tipsGiven: r2((+p.tipsGiven || 0) + amount) };
-  let tipHitCashout = false;
-  if (p.cashout !== "" && p.cashout != null) {
-    const before = +p.cashout || 0;
-    const after = Math.max(0, before - amount);
-    next = { ...next, cashout: String(after) };
-    tipHitCashout = after !== before;
-  }
-  state.players[playerIndex] = next;
+  state.players[playerIndex] = { ...p, tipsGiven: r2((+p.tipsGiven || 0) + amount) };
   if (!(state.tips || []).some((t) => t.id === tipId)) {
     state.tips = [
       ...(state.tips || []),
       { id: tipId, name: p.name, amount, at: Date.now() },
     ];
   }
-  return { tipHitCashout };
+  return { tipHitCashout: false };
 }
 
 /** מחיל ממתין־יציאה: סוגר את השחקן עם ג'יטוני הממתין ומנקה ממנו את
@@ -671,10 +664,11 @@ export function undo(state: WaLiveState, entries: UndoEntry[]): Map<string, stri
       state.players[i] = {
         ...state.players[i],
         tipsGiven,
-        /* הטיפ הוריד מהיציאה — הביטול מחזיר את הדלתא על הערך הנוכחי
-           (כמו באפליקציה, lib/manualTips.js): תיקון יציאה שנעשה אחרי
-           הטיפ לא נדרס. רשומות ישנות שנשמרו עם צילום־מוחלט (cashoutBefore)
-           עדיין משוחזרות בדיוק כמו קודם; רשומה בלי אף אחד מהם: לא נוגעים. */
+        /* רשומת מורשת שהטיפ בה הוריד מהיציאה — הביטול מחזיר את הדלתא על
+           הערך הנוכחי: תיקון יציאה שנעשה אחרי הטיפ לא נדרס. רשומות ישנות
+           שנשמרו עם צילום־מוחלט (cashoutBefore) עדיין משוחזרות בדיוק כמו
+           קודם. רשומות חדשות (טיפ = רישום בלבד, בלי דלתא ובלי צילום):
+           היציאה לא נגעה מעולם — לא נוגעים בה. */
         ...(e.cashDelta !== undefined
           ? {
               cashout:

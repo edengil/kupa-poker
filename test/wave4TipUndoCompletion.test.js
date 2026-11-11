@@ -3,11 +3,12 @@ import { applyCommands } from "../lib/whatsapp.js";
 import { undo, blank } from "../lib/wa/state.ts";
 
 /* ============================================================================
-   גל 4 · פריט 4.2 — השלמת האימות של תיקון גל 1א (שער 0.3): נתיב הדלתא
-   בבוט כבר היה תקין; כאן נסגרים שלושת הפערים שנשארו פתוחים:
+   גל 4 · פריט 4.2 — השלמת האימות של תיקון גל 1א (שער 0.3). עודכן 11.11
+   לסמנטיקת «טיפ הוא רישום בלבד»: ה־cashout לא זז מטיפים בכלל, ולכן גם
+   ה־undo והפאז נמדדים מול מודל־רישום:
    (א) תרחיש C5 השני של השער — טיפ לפני cashout ואז ביטול.
-   (ב) פאז שימור־ג'יטונים על רצפי apply/עריכה/מסירה־חוזרת, במודל־דלתא
-       עצמאי (כולל קלאמפ: הדלתא היא מה שבאמת ירד מהערימה).
+   (ב) פאז שימור־ג'יטונים על רצפי apply/עריכה/מסירה־חוזרת, במודל־רישום
+       עצמאי (tipsGiven = סכום הטיפים הפעילים; cashout רק מפקודות יציאה).
    (ג) החלק הקוסמטי של הממצא המקורי — שחזור שקית המחמאה בביטול:
        הרשומה הישנה שמרה צילום של שדה המורשת, אבל השליפה חיה במפתחות
        המגדריים (BagM/BagF) — הביטול לא החזיר את השקית האמיתית. עכשיו כן.
@@ -36,7 +37,7 @@ describe("4.2(א) — טיפ לפני cashout, ביטול, ואז cashout (תר�
   });
 });
 
-describe("4.2(ב) — פאז שימור־ג'יטונים במודל־דלתא עצמאי", () => {
+describe("4.2(ב) — פאז שימור־ג'יטונים במודל־רישום עצמאי (טיפ = רישום בלבד)", () => {
   function mulberry32(seed) {
     let a = seed >>> 0;
     return () => {
@@ -47,12 +48,13 @@ describe("4.2(ב) — פאז שימור־ג'יטונים במודל־דלתא ע
     };
   }
 
-  it("300 רצפים: tipsGiven = Σ טיפים פעילים; cashout לפי מודל הדלתא", () => {
+  it("300 רצפים: tipsGiven = Σ טיפים פעילים; ה־cashout זז רק בפקודות יציאה", () => {
     const rnd = mulberry32(20261108);
     for (let seq = 0; seq < 300; seq++) {
       const name = "קובי סעדה";
       let live = apply(null, [{ kind: "add", name, amount: 100 }], `seat${seq}`).live;
-      // מודל עצמאי: cashout נומרי או null; לכל הודעת טיפ פעילה — סכום ודלתא
+      // מודל עצמאי: cashout נומרי או null — משתנה רק בפקודת יציאה מפורשת;
+      // לכל הודעת טיפ פעילה — הסכום בלבד (רישום לא נוגע ביציאה, גם מעל הערימה)
       const model = { cashout: null, tips: new Map() };
       const X = 100 + Math.floor(rnd() * 900);
       live = apply(live, [{ kind: "cashout", name, chips: X }], `out${seq}`).live;
@@ -62,32 +64,19 @@ describe("4.2(ב) — פאז שימור־ג'יטונים במודל־דלתא ע
       for (let s = 0; s < steps; s++) {
         const roll = rnd();
         if (roll < 0.55 || !msgIds.length) {
-          // טיפ חדש מהודעה חדשה (לפעמים מעל הערימה — קלאמפ)
+          // טיפ חדש מהודעה חדשה (לפעמים מעל הערימה — עדיין רישום בלבד)
           const amt = 1 + Math.floor(rnd() * 200);
           const mid = `s${seq}m${s}`;
           live = apply(live, [{ kind: "tip", name, chips: amt }], mid).live;
-          let delta = 0;
-          if (model.cashout != null) {
-            delta = model.cashout - Math.max(0, model.cashout - amt);
-            model.cashout = Math.max(0, model.cashout - amt);
-          }
-          model.tips.set(mid, { amount: amt, delta });
+          model.tips.set(mid, amt);
           msgIds.push(mid);
         } else if (roll < 0.8) {
           // עריכה/מסירה־חוזרת של הודעת טיפ קיימת לסכום חדש (כולל 0 = ביטול)
           const mid = msgIds[Math.floor(rnd() * msgIds.length)];
-          const old = model.tips.get(mid);
           const amt = Math.floor(rnd() * 200);
           live = apply(live, [{ kind: "tip", name, chips: amt }], mid).live;
-          // ביטול הישן במודל: הדלתא חוזרת על הערך הנוכחי
-          if (old && model.cashout != null) model.cashout += old.delta;
           if (amt > 0) {
-            let delta = 0;
-            if (model.cashout != null) {
-              delta = model.cashout - Math.max(0, model.cashout - amt);
-              model.cashout = Math.max(0, model.cashout - amt);
-            }
-            model.tips.set(mid, { amount: amt, delta });
+            model.tips.set(mid, amt);
           } else {
             model.tips.delete(mid);
           }
@@ -98,7 +87,7 @@ describe("4.2(ב) — פאז שימור־ג'יטונים במודל־דלתא ע
           model.cashout = v;
         }
         const p = P(live, name);
-        const sumActive = [...model.tips.values()].reduce((sum, t) => sum + t.amount, 0);
+        const sumActive = [...model.tips.values()].reduce((sum, t) => sum + t, 0);
         expect(p.tipsGiven).toBe(sumActive);
         expect(p.cashout).toBe(model.cashout == null ? "" : String(model.cashout));
         expect(live.tips).toHaveLength(model.tips.size);

@@ -54,11 +54,16 @@ export function buildNightRecord({
     });
   /* כולל מי שסגר באפס — קודם סוננו החוצה כש־chips=0 */
   if (!entries.length) return { status: "empty" };
-  /* אזהרה רכה לפני שמירה לא־מאוזנת — לא חוסם קניות/ישיבה באמצע המשחק */
+  /* אזהרה רכה לפני שמירה לא־מאוזנת — לא חוסם קניות/ישיבה באמצע המשחק.
+     ג'יטוני הטיפ של הערב (סכום tipsGiven, בג'יטונים — שני מסלולי הטיפ
+     רושמים בג'יטונים) חוזרים לספירת האיזון: הם לא יושבים ביציאה של אף
+     שחקן אבל אינם חוסר (עדן, 11.11 — שחזור ערב 9.11 בפיקסצ'ר). */
+  const tipsChips = entries.reduce((s, e) => s + (+e.tipsGiven || 0), 0);
   const balCheck = checkNightBalance({
     entries,
     cashSumChips,
     potChips,
+    tipsChips,
     cps,
   });
   if (!confirmSaveIfUnbalanced(balCheck)) return { status: "aborted" };
