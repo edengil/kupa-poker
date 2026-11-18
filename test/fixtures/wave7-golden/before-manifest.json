@@ -1,0 +1,32 @@
+{
+  "before-report-m_2026-09.txt": {
+    "sha256": "a94b80c6bd56333b51349770a2c0b87a8a50a85faff8e8ccfa11c410c7382169",
+    "bytes": 1166
+  },
+  "before-report-m_2026-10.txt": {
+    "sha256": "05fc9bec03d6ce28eeba6f27b3b6df18a6acfaabb76aef478fd484f80bfc2c6a",
+    "bytes": 1155
+  },
+  "before-report-q_2026-Q3.txt": {
+    "sha256": "35d0f08cc43238a1953e5d556b5b48e3dfac17c7b1cad355d238fe6387e7ea09",
+    "bytes": 1172
+  },
+  "before-report-q_2026-Q4.txt": {
+    "sha256": "e8f22d18697d4186af43234044cdf464e05443799925233a37e7aa7ead69eccf",
+    "bytes": 1159
+  },
+  "before-report-h_2026-H2.txt": {
+    "sha256": "6156e5b6dc350f1496ba20a2e7888e529cb4063ddbbf614ec462d3c380d9cb19",
+    "bytes": 1389
+  },
+  "before-report-y_2026.txt": {
+    "sha256": "f2e642d387772eb41a367539843d564b3d704292cdc21a27e44eff657b2d40d5",
+    "bytes": 1357
+  },
+  "before-app.json": {
+    "sha256": "509614a9646d6c20ef5ccd5cd621eaee6f1a135c89443598790d572ab953425b"
+  },
+  "before-dueReports.json": {
+    "sha256": "6ceee3d472c08db97cd9a9c4bead654877b30b4d7f5588cc16b822d7984134c1"
+  }
+}

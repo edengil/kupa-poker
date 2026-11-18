@@ -20,7 +20,7 @@ import { effectiveReportAliases } from "../lib/poker/period.js";
 import { NIGHT_24_10 } from "./fixtures/night-2026-10-24.js";
 import { NIGHT_26_9 } from "./fixtures/night-2026-09-26.js";
 
-const GOLD = new URL("../../workspace/goals/goal-19/hidden_files/wave7-golden/", `file://${process.cwd()}/`);
+const GOLD = new URL("./fixtures/wave7-golden/", import.meta.url);
 const read = (name) => readFileSync(new URL(name, GOLD), "utf8");
 
 export const GOLDEN_DB = {

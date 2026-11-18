@@ -1,0 +1,9 @@
+# התראות תלויות — עדכוני גרסאות npm פעם בחודש בלבד (סקירת קוד 12.11,
+# פריט 3). עדכוני אבטחה (Dependabot alerts + security updates) מופעלים
+# בהגדרות הריפו ב־GitHub ולא דרך הקובץ הזה.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"

@@ -3,8 +3,11 @@ import { resetPreview } from "./helpers.js";
 
 /**
  * באדג' התראות בסגנון פייסבוק: סופר רק התראות שטרם נצפו.
- * גל 5, פריט 5.2: המגירה מסמנת כנצפו רק פריטים שהוצגו בפועל — בתצוגת
- * ה־preview כל הפריטים נכנסים למסך בפתיחה, ולכן הבאדג' מתאפס ונשמר כך.
+ * גל 5, פריט 5.2: המגירה מסמנת כנצפו רק פריטים שהוצגו בפועל (נכנסו לאזור
+ * הגלילה הנראה בשיעור 0.6) — זו כוונת המוצר, לא תקלה: פתיחת מגירה בלבד
+ * לא מאפסת את הבאדג' אם חלק מהפריטים נשארו מתחת לקפל, והבאדג' נשאר על
+ * מה שלא נראה עד שגוללים אליו. לכן הבדיקה גוללת את הרשימה עד סופה —
+ * רק אחרי שכל פריט הוצג בפועל הבאדג' מתאפס, ונשמר כך גם אחרי רענון.
  * מפתח ה־seen כולל רכיב קבוצה (אין דיכוי חוצה־קבוצות).
  */
 test.describe("התראות — באדג' נצפה", () => {
@@ -23,7 +26,7 @@ test.describe("התראות — באדג' נצפה", () => {
     await page.getByTestId("preview-banner").waitFor({ state: "visible" });
   });
 
-  test("באדג' מראה N, פתיחת מגירה מאפסת, סגירה ורענון שומרים 0", async ({ page }) => {
+  test("באדג' מראה N, גלילה על כל הפריטים מאפסת, סגירה ורענון שומרים 0", async ({ page }) => {
     const badge = page.getByTestId("notifications-count");
     await expect(badge).toBeVisible({ timeout: 20_000 });
     const n = Number(await badge.textContent());
@@ -31,7 +34,15 @@ test.describe("התראות — באדג' נצפה", () => {
 
     await page.getByTestId("notifications-button").click();
     await expect(page.getByTestId("notifications-sheet")).toBeVisible();
-    // נצפה — הבאדג' נעלם מיד בפתיחה
+
+    // מציגים בפועל כל פריט ברשימה (גלילה אליו) — רק פריט שהוצג מסומן
+    // כנצפה, ורק כשכולם הוצגו הבאדג' מתאפס.
+    const items = page.locator("[data-notice-id]");
+    const count = await items.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      await items.nth(i).scrollIntoViewIfNeeded();
+    }
     await expect(badge).toBeHidden();
 
     await page.getByTestId("notifications-close").click();

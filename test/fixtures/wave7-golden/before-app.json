@@ -1,0 +1,745 @@
+{
+  "months": [
+    {
+      "kind": "month",
+      "y": 2026,
+      "mo": 10,
+      "key": "2026-10",
+      "label": "אוקטובר 2026"
+    },
+    {
+      "kind": "month",
+      "y": 2026,
+      "mo": 9,
+      "key": "2026-9",
+      "label": "ספטמבר 2026"
+    }
+  ],
+  "quarters": [
+    {
+      "kind": "quarter",
+      "y": 2026,
+      "q": 3,
+      "key": "2026-Q3",
+      "label": "רבעון 3 · 2026"
+    }
+  ],
+  "halves": [],
+  "years": [],
+  "totals": {
+    "month 2026-9": {
+      "totals": [
+        {
+          "name": "עדן גיל",
+          "amount": 200
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": 150
+        },
+        {
+          "name": "אופיר סנה",
+          "amount": 95
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 40
+        },
+        {
+          "name": "דור לירז",
+          "amount": -125
+        },
+        {
+          "name": "אורן גיל",
+          "amount": -160
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -200
+        }
+      ],
+      "official": false,
+      "recCount": 1
+    },
+    "month 2026-10": {
+      "totals": [
+        {
+          "name": "אופיר סנה",
+          "amount": 515
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 320
+        },
+        {
+          "name": "דור לירז",
+          "amount": 110
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 100
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -150
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -400
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -530
+        }
+      ],
+      "official": false,
+      "recCount": 1
+    },
+    "quarter 2026-3": {
+      "totals": [
+        {
+          "name": "עדן גיל",
+          "amount": 200
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": 150
+        },
+        {
+          "name": "אופיר סנה",
+          "amount": 95
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 40
+        },
+        {
+          "name": "דור לירז",
+          "amount": -125
+        },
+        {
+          "name": "אורן גיל",
+          "amount": -160
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -200
+        }
+      ],
+      "official": false,
+      "recCount": 1
+    },
+    "quarter 2026-4": {
+      "totals": [
+        {
+          "name": "אופיר סנה",
+          "amount": 515
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 320
+        },
+        {
+          "name": "דור לירז",
+          "amount": 110
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 100
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -150
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -400
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -530
+        }
+      ],
+      "official": false,
+      "recCount": 1
+    },
+    "half 2026-2": {
+      "totals": [
+        {
+          "name": "אופיר סנה",
+          "amount": 610
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 160
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 140
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "דור לירז",
+          "amount": -15
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -250
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -330
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -350
+        }
+      ],
+      "official": false,
+      "recCount": 2
+    },
+    "year 2026": {
+      "totals": [
+        {
+          "name": "אופיר סנה",
+          "amount": 610
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 160
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 140
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "דור לירז",
+          "amount": -15
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -250
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -330
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -350
+        }
+      ],
+      "official": false,
+      "recCount": 2
+    },
+    "all": {
+      "totals": [
+        {
+          "name": "אופיר סנה",
+          "amount": 610
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 160
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 140
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "דור לירז",
+          "amount": -15
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -250
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -330
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -350
+        }
+      ],
+      "official": false,
+      "recCount": 2
+    }
+  },
+  "cards": {
+    "month9": {
+      "kind": "month",
+      "y": 2026,
+      "mo": 9,
+      "q": null,
+      "h": null,
+      "label": "ספטמבר 2026",
+      "title": "סיכום חודש ספטמבר 2026",
+      "nights": 1,
+      "players": 7,
+      "totalMoved": 485,
+      "king": {
+        "name": "עדן גיל",
+        "amount": 200
+      },
+      "podium": [
+        {
+          "name": "עדן גיל",
+          "amount": 200
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": 150
+        },
+        {
+          "name": "אופיר סנה",
+          "amount": 95
+        }
+      ],
+      "standings": [
+        {
+          "name": "עדן גיל",
+          "amount": 200
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": 150
+        },
+        {
+          "name": "אופיר סנה",
+          "amount": 95
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 40
+        },
+        {
+          "name": "דור לירז",
+          "amount": -125
+        },
+        {
+          "name": "אורן גיל",
+          "amount": -160
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -200
+        }
+      ],
+      "bestNight": {
+        "name": "עדן גיל",
+        "amount": 200,
+        "date": "26.9.26"
+      },
+      "stormyNight": {
+        "moved": 485,
+        "date": "26.9.26"
+      },
+      "mostNights": {
+        "name": "אופיר סנה",
+        "nights": 1
+      }
+    },
+    "month10": {
+      "kind": "month",
+      "y": 2026,
+      "mo": 10,
+      "q": null,
+      "h": null,
+      "label": "אוקטובר 2026",
+      "title": "סיכום חודש אוקטובר 2026",
+      "nights": 1,
+      "players": 8,
+      "totalMoved": 1045,
+      "king": {
+        "name": "אופיר סנה",
+        "amount": 515
+      },
+      "podium": [
+        {
+          "name": "אופיר סנה",
+          "amount": 515
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 320
+        },
+        {
+          "name": "דור לירז",
+          "amount": 110
+        }
+      ],
+      "standings": [
+        {
+          "name": "אופיר סנה",
+          "amount": 515
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 320
+        },
+        {
+          "name": "דור לירז",
+          "amount": 110
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 100
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -150
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -400
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -530
+        }
+      ],
+      "bestNight": {
+        "name": "אופיר סנה",
+        "amount": 515,
+        "date": "24.10.26"
+      },
+      "stormyNight": {
+        "moved": 1045,
+        "date": "24.10.26"
+      },
+      "mostNights": {
+        "name": "אופיר סנה",
+        "nights": 1
+      }
+    },
+    "q3": {
+      "kind": "quarter",
+      "y": 2026,
+      "mo": null,
+      "q": 3,
+      "h": null,
+      "label": "רבעון 3 · 2026",
+      "title": "סיכום רבעון 3 · 2026",
+      "nights": 1,
+      "players": 7,
+      "totalMoved": 485,
+      "king": {
+        "name": "עדן גיל",
+        "amount": 200
+      },
+      "podium": [
+        {
+          "name": "עדן גיל",
+          "amount": 200
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": 150
+        },
+        {
+          "name": "אופיר סנה",
+          "amount": 95
+        }
+      ],
+      "standings": [
+        {
+          "name": "עדן גיל",
+          "amount": 200
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": 150
+        },
+        {
+          "name": "אופיר סנה",
+          "amount": 95
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 40
+        },
+        {
+          "name": "דור לירז",
+          "amount": -125
+        },
+        {
+          "name": "אורן גיל",
+          "amount": -160
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -200
+        }
+      ],
+      "bestNight": {
+        "name": "עדן גיל",
+        "amount": 200,
+        "date": "26.9.26"
+      },
+      "stormyNight": {
+        "moved": 485,
+        "date": "26.9.26"
+      },
+      "mostNights": {
+        "name": "אופיר סנה",
+        "nights": 1
+      }
+    },
+    "q4": {
+      "kind": "quarter",
+      "y": 2026,
+      "mo": null,
+      "q": 4,
+      "h": null,
+      "label": "רבעון 4 · 2026",
+      "title": "סיכום רבעון 4 · 2026",
+      "nights": 1,
+      "players": 8,
+      "totalMoved": 1045,
+      "king": {
+        "name": "אופיר סנה",
+        "amount": 515
+      },
+      "podium": [
+        {
+          "name": "אופיר סנה",
+          "amount": 515
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 320
+        },
+        {
+          "name": "דור לירז",
+          "amount": 110
+        }
+      ],
+      "standings": [
+        {
+          "name": "אופיר סנה",
+          "amount": 515
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 320
+        },
+        {
+          "name": "דור לירז",
+          "amount": 110
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 100
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -150
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -400
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -530
+        }
+      ],
+      "bestNight": {
+        "name": "אופיר סנה",
+        "amount": 515,
+        "date": "24.10.26"
+      },
+      "stormyNight": {
+        "moved": 1045,
+        "date": "24.10.26"
+      },
+      "mostNights": {
+        "name": "אופיר סנה",
+        "nights": 1
+      }
+    },
+    "h2": {
+      "kind": "half",
+      "y": 2026,
+      "mo": null,
+      "q": null,
+      "h": 2,
+      "label": "חציון 2 · 2026",
+      "title": "סיכום חציון 2 · 2026",
+      "nights": 2,
+      "players": 8,
+      "totalMoved": 1530,
+      "king": {
+        "name": "אופיר סנה",
+        "amount": 610
+      },
+      "podium": [
+        {
+          "name": "אופיר סנה",
+          "amount": 610
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 160
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 140
+        }
+      ],
+      "standings": [
+        {
+          "name": "אופיר סנה",
+          "amount": 610
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 160
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 140
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "דור לירז",
+          "amount": -15
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -250
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -330
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -350
+        }
+      ],
+      "bestNight": {
+        "name": "אופיר סנה",
+        "amount": 515,
+        "date": "24.10.26"
+      },
+      "stormyNight": {
+        "moved": 1045,
+        "date": "24.10.26"
+      },
+      "mostNights": {
+        "name": "אופיר סנה",
+        "nights": 2
+      }
+    },
+    "year": {
+      "kind": "year",
+      "y": 2026,
+      "mo": null,
+      "q": null,
+      "h": null,
+      "label": "2026",
+      "title": "סיכום שנת 2026",
+      "nights": 2,
+      "players": 8,
+      "totalMoved": 1530,
+      "king": {
+        "name": "אופיר סנה",
+        "amount": 610
+      },
+      "podium": [
+        {
+          "name": "אופיר סנה",
+          "amount": 610
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 160
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 140
+        }
+      ],
+      "standings": [
+        {
+          "name": "אופיר סנה",
+          "amount": 610
+        },
+        {
+          "name": "אורן גיל",
+          "amount": 160
+        },
+        {
+          "name": "דן ינקלויץ",
+          "amount": 140
+        },
+        {
+          "name": "ירין מלאך",
+          "amount": 0
+        },
+        {
+          "name": "דור לירז",
+          "amount": -15
+        },
+        {
+          "name": "קובי סעדה",
+          "amount": -250
+        },
+        {
+          "name": "עדן גיל",
+          "amount": -330
+        },
+        {
+          "name": "נתנאל כהן",
+          "amount": -350
+        }
+      ],
+      "bestNight": {
+        "name": "אופיר סנה",
+        "amount": 515,
+        "date": "24.10.26"
+      },
+      "stormyNight": {
+        "moved": 1045,
+        "date": "24.10.26"
+      },
+      "mostNights": {
+        "name": "אופיר סנה",
+        "nights": 2
+      }
+    }
+  }
+}
