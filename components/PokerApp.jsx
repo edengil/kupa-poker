@@ -537,7 +537,7 @@ function App({
               <SavingsPotCard db={db} commit={commit} isAdmin={isAdmin} />
             </>
           ) : tab === "sessions" ? (
-            <SessionsTab db={db} commit={commit} isAdmin={isAdmin} />
+            <SessionsTab db={db} commit={commit} isAdmin={isAdmin} viewerName={viewerName} />
           ) : tab === "pot" && isAdmin && !readOnly ? (
             <PotDashboard db={db} commit={commit} isAdmin={isAdmin} />
           ) : tab === "table" ? (

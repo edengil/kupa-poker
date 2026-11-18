@@ -110,8 +110,8 @@ describe("persisted manual settlement", () => {
     const notice = settlementEditNotice(marked);
     expect(notice.show).toBe(true);
     expect(notice.markedCount).toBe(1);
-    expect(notice.text).toContain("אפשר לערוך את החלוקה");
-    expect(notice.text).toContain("יאופס");
+    expect(notice.text).toContain("נעולה לעריכה");
+    expect(notice.text).toContain("תיחסם");
 
     const withManual = saveManualPayments(session, [payment]);
     const stale = {

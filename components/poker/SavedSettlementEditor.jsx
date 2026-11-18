@@ -11,7 +11,11 @@ import {
   POT_SINK_NAME,
 } from "@/lib/nightShare";
 import { savedSettlement } from "@/lib/savedSettlement";
-import { saveManualPayments } from "@/lib/paymentTracking";
+import {
+  saveManualPayments,
+  markedTransfersBlockingSave,
+  markedSaveBlockMessage,
+} from "@/lib/paymentTracking";
 import { settlementEditNotice } from "@/lib/settlementEditNotice";
 import {
   resolveBrowserInviteUrl,
@@ -24,7 +28,8 @@ import { AL } from "@/lib/poker/helpers";
 /**
  * עריכת חלוקה ידנית לערב שמור — נשמרת ב־session.manualSettlement
  * ומתחברת לסימוני «שולם». העורך נפתח גם אחרי שסומנו תשלומים; סימון נשמר
- * רק אם אותה העברה נשארת בדיוק כפי שהייתה, וכל שמירה מקדמת גרסה.
+ * אם אותה העברה נשארת בדיוק כפי שהייתה, וכל שמירה מקדמת גרסה. העברה
+ * מסומנת נעולה: שמירה שמשנה אותה נחסמת עד שמבטלים את סימונה (החלטה 4).
  */
 export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
   const session = db.sessions.find((s) => s.id === sessionId);
@@ -71,13 +76,19 @@ export function SavedSettlementEditor({ db, sessionId, commit, onClose }) {
       }
       onClose={onClose}
       onChange={(payments, meta) => {
+        /* נעילת החלטה 4 (18.11): שמירה שמשנה העברה מסומנת נחסמת כאן,
+           בשער העורך — השגיאה מוצגת בבונה דרך ערוץ ה־err הקיים, והשמירה
+           לא מתבצעת. ביטול הסימון (מכרטיס הערב/החלוקה) פותח את העריכה. */
+        const preferCreditors = meta?.preferCreditors ?? saved.preferCreditors;
+        const blocked = markedTransfersBlockingSave(session, payments, { preferCreditors });
+        if (blocked.length) {
+          throw new Error(markedSaveBlockMessage(blocked));
+        }
         commit({
           ...db,
           sessions: db.sessions.map((s) =>
             s.id === session.id
-              ? saveManualPayments(s, payments, {
-                  preferCreditors: meta?.preferCreditors ?? saved.preferCreditors,
-                })
+              ? saveManualPayments(s, payments, { preferCreditors })
               : s
           ),
         });

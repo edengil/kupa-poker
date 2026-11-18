@@ -134,11 +134,18 @@ export function LiveSettlementBuilder({
     setBalances(next);
     setManualPayments(kept);
     if (preferChanged) {
-      onChange?.([], { preferCreditors: prefer });
+      /* שער שמירה (למשל נעילת העברה מסומנת בעורך שמור) עלול לזרוק —
+         תופסים ומציגים כ־err במקום לקרוס בתוך האפקט. */
+      let saveErr = "";
+      try {
+        onChange?.([], { preferCreditors: prefer });
+      } catch (e) {
+        saveErr = e.message || "לא ניתן לשמור את החלוקה";
+      }
       setFromName("");
       setToName("");
       setAmount("");
-      setErr("");
+      setErr(saveErr);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferKey, players, cps, opening.shortfall]);
@@ -260,7 +267,13 @@ export function LiveSettlementBuilder({
     const kept = manualPayments.slice(0, -1);
     let next = { ...opening.balances };
     for (const p of kept) next = applyManualPayment(next, p);
-    onChange?.(kept, { preferCreditors: prefer });
+    try {
+      onChange?.(kept, { preferCreditors: prefer });
+    } catch (e) {
+      /* שער שמירה חסם (למשל נעילת העברה מסומנת) — לא מעדכנים מצב מקומי */
+      setErr(e.message || "לא ניתן לשמור את החלוקה");
+      return;
+    }
     setManualPayments(kept);
     setBalances(next);
     setErr("");

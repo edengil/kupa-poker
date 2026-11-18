@@ -27,7 +27,10 @@ test.describe("אישור העברה", () => {
     await expect(panel.getByText("ממתין").first()).toBeVisible();
     await expect(panel.getByText("שולם")).toHaveCount(0);
     await expect(panel.getByText("התקבל")).toHaveCount(0);
-    await expect(panel.locator("input[type=checkbox]")).toHaveCount(0);
+    /* מסך ה־preview הוא מנהל — מהכרטיס אפשר לסמן (18.11): יש צ'קבוקס
+       לכל שורת שחקן. ערב ההדגמה בלי קופה — אין שורת קופה. */
+    await expect(panel.locator("input[type=checkbox]")).not.toHaveCount(0);
+    await expect(panel.getByTestId("night-confirm-pot-row")).toHaveCount(0);
     await expect(panel.getByTestId("night-confirm-toggle")).toHaveAttribute("aria-expanded", "true");
     await expect(panel.getByTestId("night-confirm-state-0")).toBeVisible();
     await expect(panel.getByText(/אל /).first()).toBeVisible();
