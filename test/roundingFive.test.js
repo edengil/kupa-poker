@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { settleWithPot, resolveSettlement, POT_SINK_NAME, RESIDUAL_SINK_NAME } from "../lib/nightShare.js";
 import { paymentPlan, validateTransfers, saveManualPayments } from "../lib/paymentTracking.js";
+import { roundedNets, floor5, ceil5 } from "../lib/settlement";
 
 const W = (name, amount) => ({ name, buyin: 0, cashout: String(amount) });
 const D = (name, amount) => ({ name, buyin: amount, cashout: "0" });
@@ -179,6 +180,22 @@ describe("קיצוץ חוסר בחמישיות עם עדן בין הזוכים",
     expect(gave["קובי סעדה"]).toBe(250);
     expectAllFive(res);
   });
+
+  it("רגרסיה: קיצוץ המועדף מחושב מול החוסר האמיתי G בלבד — לא מול G+F", () => {
+    // תביעות 575 (עדן 420, דן 155), חובות 580 (קובי), קופה 113.
+    // חוסר אמיתי G = ‏108; שבר־קופה F = ‏2 (הנושא קובי: 3 ישירות, שבר 2);
+    // הקיצוץ הכולל K = ‏110. חלקו המדויק של עדן ב־G הוא 78.9 → נחתך 75
+    // בלבד. אילו חושב מול K היה נחתך 80 — כלומר סופג חלק מהשבר, בניגוד
+    // להכרעה שעדן/אורן לעולם לא סופגים את השבר. דן סופג את היתרה (35).
+    const res = settleWithPot([W("עדן גיל", 420), W("דן ינקלויץ", 155), D("קובי סעדה", 580)], 1, 113);
+    const { got } = sums(res.transfers);
+    expect(420 - got["עדן גיל"]).toBe(75); // קיצוץ עדן
+    expect(got["עדן גיל"]).toBe(345);
+    expect(155 - got["דן ינקלויץ"]).toBe(35); // קיצוץ דן
+    expect(got["דן ינקלויץ"]).toBe(120);
+    expect(res.potFunded).toBe(113); // הקופה מדויקת
+    expectAllFive(res); // כל ההעברות חמישיות + הוולידטור שקט
+  });
 });
 
 describe("פיצול זוג ביחידות־5", () => {
@@ -262,6 +279,40 @@ describe("פאז — האסרט הגורף על תצורות אקראיות", ()
       const pot = Math.round(players.reduce((s, p) => s + p.buyin, 0) * 0.05);
       const res = settleWithPot(players, 2, pot);
       expectAllFive(res);
+      // קיצוץ של זוכה מועדף (עדן/אורן) לעולם לא עובר את floor5(חלקו
+      // המדויק בחוסר האמיתי G) — הוא לא סופג דבר מהשבר F. היוצא מן
+      // הכלל היחיד: פינת נפילה, שבה כל הזוכים הרגילים נחתכו ל־100%
+      // מתביעותיהם והמועדפים סופגים אחרונים.
+      {
+        const PRIV = new Set(["עדן גיל", "אורן גיל"]);
+        const claimOf = new Map();
+        let sumClaims = 0, sumDebts = 0;
+        for (const row of roundedNets(players, 2)) {
+          if (row.net > 0) {
+            const c = PRIV.has(row.name) ? ceil5(row.net) : floor5(row.net);
+            claimOf.set(row.name, c);
+            sumClaims += c;
+          } else if (row.net < 0) {
+            sumDebts += PRIV.has(row.name) ? floor5(-row.net) : ceil5(-row.net);
+          }
+        }
+        const G = sumClaims + pot - sumDebts;
+        const finalOf = new Map(res.nets.map((n) => [n.name, n.net]));
+        const cutOf = (name) => (claimOf.get(name) || 0) - Math.max(0, finalOf.get(name) || 0);
+        const totalCuts = [...claimOf.keys()].reduce((s, n) => s + cutOf(n), 0);
+        if (totalCuts > 0 && sumClaims > 0) {
+          const regsExhausted = [...claimOf.keys()]
+            .filter((n) => !PRIV.has(n))
+            .every((n) => cutOf(n) >= (claimOf.get(n) || 0));
+          if (!regsExhausted) {
+            for (const n of claimOf.keys()) {
+              if (!PRIV.has(n)) continue;
+              const cap = G > 0 ? floor5((G * claimOf.get(n)) / sumClaims) : 0;
+              expect(cutOf(n), `iter ${iter}: קיצוץ ${n}`).toBeLessThanOrEqual(cap);
+            }
+          }
+        }
+      }
       const rawDebts = res.nets.reduce((s, n) => s + Math.max(0, -n.raw), 0);
       if (rawDebts >= pot + 10) expect(res.potFunded).toBe(pot);
       // אף חייב לא משלם מעבר להתחייבותו בתוכנית (nets = ההתחייבות)
