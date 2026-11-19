@@ -191,22 +191,24 @@ export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false, isA
 }
 
 /** מד איזון מגיע/חייב בהזנת ערב.
-    בפער שלילי (חייב > מגיע) רק החלק ששווה לקופת הערב הוא באמת כסף
-    קופת החיסכון (5% מהקניות; השחקנים מקבלים ג׳יטונים בשווי 95%)
-    שנשמר אצל עדן גיל; שארית הפער מעבר לקופה היא חוסר אמיתי ומוצגת
-    כפער. הקורא מעביר את הקופה הצפויה ב־pot (potRecordedFor של הערב
-    הנערך); בלי pot — תצוגת פער ניטרלית, בלי שום טענת קופה.
+    בפער שלילי (חייב > מגיע) הקורא מעביר את קופת הערב הצפויה ב־pot
+    (potRecordedFor של הערב הנערך — 5% מהקניות, שנשמרת אצל עדן גיל),
+    והיא מוצגת תמיד במלואה. השארית (פער + קופה) מוצגת כפער חתום
+    בשני הכיוונים: שלילית = חוסר אמיתי מעבר לקופה, חיובית = עודף
+    מעבר לקופה; ✓ (סגור מדויק) רק כשהשארית 0. בלי pot — תצוגת פער
+    ניטרלית, בלי שום טענת קופה.
     מוצג רק במסכי ההזנה/עריכה — מוסתר מצופי הלינק הציבורי. */
 export function BalanceMeter({ bal, pot = null }) {
   const { pos, neg, gap } = bal;
   const total = Math.max(pos, neg, 1);
   const ok = gap === 0;
   const potKnown = pot != null && Number.isFinite(Number(pot));
-  const potPart =
-    gap < 0 && potKnown ? Math.min(Math.abs(gap), Math.max(0, r2(Number(pot)))) : 0;
-  /* הפער שנשאר אחרי חלק הקופה: שלילי = חוסר אמיתי מעבר לקופה */
-  const rest = r2(gap + potPart);
-  const settled = ok || (potPart > 0 && rest === 0);
+  const potVal = potKnown ? Math.max(0, r2(Number(pot))) : 0;
+  const showPot = gap < 0 && potVal > 0;
+  /* השארית: הפער בתוספת הקופה המלאה — שלילי = חוסר מעבר לקופה,
+     חיובי = עודף מעבר לקופה */
+  const rest = showPot ? r2(gap + potVal) : gap;
+  const settled = ok || (showPot && rest === 0);
   return (
     <div
       style={{
@@ -271,10 +273,10 @@ export function BalanceMeter({ bal, pot = null }) {
           ? "הערב סגור מדויק"
           : gap > 0
             ? `פער ${fmtGap(gap)} (עודף מגיע)`
-            : potPart > 0
+            : showPot
               ? rest === 0
-                ? `קופת חיסכון: ${potPart.toLocaleString("en-US")}₪ (נשמרת אצל עדן גיל)`
-                : `קופת חיסכון: ${potPart.toLocaleString("en-US")}₪ (נשמרת אצל עדן גיל) · פער ${fmtGap(rest)}`
+                ? `קופת חיסכון: ${potVal.toLocaleString("en-US")}₪ (נשמרת אצל עדן גיל)`
+                : `קופת חיסכון: ${potVal.toLocaleString("en-US")}₪ (נשמרת אצל עדן גיל) · פער ${fmtGap(rest)}`
               : `פער ${fmtGap(gap)}`}
       </div>
     </div>

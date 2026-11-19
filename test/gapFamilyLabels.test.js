@@ -2,28 +2,56 @@
    פער גולמי בשני משטחים, למרות שהקופה היא 5% מהקניות והפער מושג אחר.
    הבדיקות מעגנות: (א) כרטיס הערב בטאב הערבים מציג למנהל את הפער
    הקנוני (nightGap, כולל טיפים) כפער — ולעולם לא כקופת חיסכון;
-   (ב) מד האיזון קורא «קופת חיסכון» רק לחלק הפער ששווה לקופה
-   שהקורא סיפק, ואת השארית מציג כפער; בלי קופה — תצוגה ניטרלית. */
+   (ב) מד האיזון מציג את הקופה המלאה שהקורא סיפק, והשארית
+   (פער + קופה) מוצגת כפער חתום בשני הכיוונים; ✓ רק כשהשארית 0;
+   בלי קופה — תצוגה ניטרלית. */
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { describe, it, expect } from "vitest";
 import { BalanceMeter } from "../components/poker/chrome.jsx";
 import { SessionsTab } from "../components/poker/SessionsTab.jsx";
 
-describe("BalanceMeter — קופה רק עד גובה הקופה הצפויה", () => {
+/* האייקונים הם SVG מקומיים בלי class — מזהים לפי ה־path הייחודי:
+   משולש אזהרה: M10.3 3.9; עיגול עם וי (settled): m9 12 2 2 4-4. */
+const ICON_WARN = "M10.3 3.9";
+const ICON_SETTLED = "m9 12 2 2 4-4";
+
+describe("BalanceMeter — הקופה במלואה, השארית כפער חתום", () => {
   const render = (bal, pot) =>
     renderToString(React.createElement(BalanceMeter, { bal, pot }));
 
-  it("פער שלילי ששווה בדיוק לקופה — כולו קופת חיסכון", () => {
+  it("פער שלילי ששווה בדיוק לקופה — כולו קופת חיסכון, עם settled", () => {
     const html = render({ pos: 950, neg: 1000, gap: -50 }, 50);
     expect(html).toContain("קופת חיסכון: 50₪ (נשמרת אצל עדן גיל)");
     expect(html).not.toContain("פער");
+    expect(html).toContain(ICON_SETTLED);
+    expect(html).not.toContain(ICON_WARN);
   });
 
-  it("פער שלילי גדול מהקופה — הקופה בנפרד והשארית פער/חוסר", () => {
+  it("פער שלילי גדול מהקופה — הקופה בנפרד והשארית פער/חוסר, בלי settled", () => {
     const html = render({ pos: 850, neg: 1000, gap: -150 }, 50);
     expect(html).toContain("קופת חיסכון: 50₪ (נשמרת אצל עדן גיל)");
     expect(html).toContain("פער חוסר 100");
+    expect(html).toContain(ICON_WARN);
+    expect(html).not.toContain(ICON_SETTLED);
+  });
+
+  it("קופה גדולה מהפער — הקופה המלאה מוצגת והשארית פלוס, בלי settled", () => {
+    const html = render({ pos: 970, neg: 1000, gap: -30 }, 50);
+    expect(html).toContain("קופת חיסכון: 50₪ (נשמרת אצל עדן גיל)");
+    expect(html).not.toContain("קופת חיסכון: 30₪");
+    expect(html).toContain("פער פלוס 20");
+    expect(html).toContain(ICON_WARN);
+    expect(html).not.toContain(ICON_SETTLED);
+  });
+
+  it("צורת 17.11 — פער −67.5, קופה 70 ⇒ קופה 70 ופער פלוס 2.5, בלי settled", () => {
+    const html = render({ pos: 1332.5, neg: 1400, gap: -67.5 }, 70);
+    expect(html).toContain("קופת חיסכון: 70₪ (נשמרת אצל עדן גיל)");
+    expect(html).not.toContain("קופת חיסכון: 67.5₪");
+    expect(html).toContain("פער פלוס 2.5");
+    expect(html).toContain(ICON_WARN);
+    expect(html).not.toContain(ICON_SETTLED);
   });
 
   it("בלי קופה מהקורא — תצוגת פער ניטרלית, בלי טענת קופה", () => {
