@@ -302,18 +302,21 @@ export function computePersonalStats(db: StatsDb | null | undefined, playerName:
       }
     }
     if (!has) continue;
-    let tips = 0;
+    /* סך הטיפים של השחקן בערב — הכלל הקנוני האחד (כמו tipTotalsByName):
+       max(סכום אירועי היומן של השחקן, ה־tipsGiven שלו). היומן וה־tipsGiven
+       הם שני רישומים של אותם טיפים (כל מסלולי הכתיבה כותבים את שניהם),
+       לכן לא סוכמים ולא בוחרים גלובלית. עד התיקון (ביקורת משפחת־הפער,
+       ממצא 2) היה כאן כלל רביעי: היומן + tipsGiven רק אם אין לשחקן אף
+       אירוע ביומן — ואותו ערב הציג סך טיפים אחר בסטטיסטיקת השחקן. */
+    let journalTips = 0;
     for (const t of s.tips || []) {
-      if (canon(t.name, A) === name) tips = r2(tips + (+t.amount || 0));
+      if (canon(t.name, A) === name) journalTips = r2(journalTips + (+t.amount || 0));
     }
+    let givenTips = 0;
     for (const e of s.entries || []) {
-      if (canon(e.name, A) === name && e.tipsGiven) {
-        /* tipsGiven על הרשומה — אם אין יומן טיפים, זה המקור */
-        if (!(s.tips || []).some((t) => canon(t.name, A) === name)) {
-          tips = r2(tips + (+e.tipsGiven || 0));
-        }
-      }
+      if (canon(e.name, A) === name) givenTips = Math.max(givenTips, +e.tipsGiven || 0);
     }
+    const tips = Math.max(journalTips, givenTips);
     nights.push({
       iso: s.iso,
       d: s.d,
