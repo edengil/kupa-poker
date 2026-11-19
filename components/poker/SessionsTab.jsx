@@ -3,11 +3,11 @@
 import React, { useState } from "react";
 import { C } from "@/lib/poker/colors";
 import { fmt, fmtGap } from "@/lib/poker/format";
-import { AL, balance, canon, r2 } from "@/lib/poker/helpers";
+import { AL, canon, r2 } from "@/lib/poker/helpers";
 import { Empty, IconBtn, StatusChip } from "./ui";
 import { ChevronDown, Pencil, Share2, Trash2 } from "./icons";
 import { ShareSheet } from "./ShareSheet";
-import { nightSummaryText, settlementTextForSession, potRecordedFor, potActualFor } from "@/lib/nightShare";
+import { nightSummaryText, settlementTextForSession, potRecordedFor, potActualFor, nightGap } from "@/lib/nightShare";
 import { resolveBrowserInviteUrl, withSettlementLink } from "@/lib/settlementInvite";
 import { SavedSettlementEditor } from "./SavedSettlementEditor";
 import { SessionEditSheet } from "./SessionEditSheet";
@@ -181,7 +181,12 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
       }}
     >
       {list.map((s) => {
-        const b = balance(s.entries);
+        /* פער הערב הקנוני (כלל 11.11 — nightGap, יציאות + טיפים מול
+           המונפקים). לא balance().gap הגולמי: הוא תויג כאן בעבר בטעות
+           «קופת חיסכון», אבל הקופה היא ה־5% מהקניות (potRecordedFor) —
+           מושג אחר, עם שורת הקופה הייעודית שלו. לערב סכום־בלבד הפער
+           הקנוני זהה לסכום הנטו, כמו תמיד. */
+        const gap = nightGap(s);
         const winners = (s.entries || []).filter((e) => e.amount > 0);
         const even = (s.entries || []).filter((e) => e.amount === 0);
         const debtors = (s.entries || []).filter((e) => e.amount < 0);
@@ -191,7 +196,7 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
             key={s.id}
             style={{
               background: C.card,
-              border: `1px solid ${b.gap === 0 ? C.line : `${C.brass}88`}`,
+              border: `1px solid ${gap === 0 ? C.line : `${C.brass}88`}`,
               borderRadius: 12,
               padding: 13,
             }}
@@ -271,14 +276,12 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
               style={{
                 marginTop: 9,
                 fontSize: 12.5,
-                color: b.gap === 0 ? C.dim : b.gap < 0 ? C.dim : C.brass,
+                color: gap === 0 ? C.dim : gap < 0 ? C.dim : C.brass,
               }}
             >
-              {b.gap === 0 || (b.gap < 0 && !isAdmin)
+              {gap === 0 || (gap < 0 && !isAdmin)
                 ? "✓ מאוזן"
-                : b.gap < 0
-                  ? `קופת חיסכון ${Math.abs(b.gap).toLocaleString("en-US")}₪`
-                  : `⚠ פער ${fmtGap(b.gap)}`}
+                : `⚠ פער ${fmtGap(gap)}`}
               {even.length > 0 ? ` · ${even.length} סגרו באפס` : ""}
             </div>
             {s.id === latestId && view && (

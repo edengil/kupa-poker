@@ -6,6 +6,7 @@ import { fmt } from "@/lib/poker/format";
 import { AL, balance, canon, toWhatsApp } from "@/lib/poker/helpers";
 import { parseDate, parseEntries } from "@/lib/poker/parse";
 import { BalanceMeter } from "./chrome";
+import { potRecordedFor } from "@/lib/nightShare";
 import { Tag } from "./ui";
 import { checkNightBalance, confirmSaveIfUnbalanced } from "@/lib/poker/nightBalance";
 import { applySessionEdit } from "@/lib/sessionEdit";
@@ -154,7 +155,9 @@ export function SessionEditSheet({ db, session, commit, onClose }) {
                 <>לא זוהה תאריך — הוסף שורה כמו «סיכום פוקר 1.8»</>
               )}
             </div>
-            <BalanceMeter bal={bal} />
+            {/* הקופה הצפויה של הערב הנערך — כדי שהמד יקרא «קופת חיסכון»
+                רק לחלק הפער ששווה לה, ואת השארית יראה כפער. */}
+            <BalanceMeter bal={bal} pot={potRecordedFor(session)} />
             <div
               style={{
                 marginTop: 10,
