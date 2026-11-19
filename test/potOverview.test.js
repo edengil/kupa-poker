@@ -48,7 +48,7 @@ describe("דשבורד קופה", () => {
     expect(e.actual).toBe(76.25); // ברירת מחדל: בפועל = רשום
     expect(e.gap).toBe(-75); // פער הערב — שורה נפרדת, לא חלק מהקופה
     expect(e.edenGross).toBe(-280);
-    expect(e.edenPaid).toBe(280); // מודל 25.10: עדן משלם מלא, העודף לא מנותב דרכו
+    expect(e.edenPaid).toBe(276); // עיגול לחמישיות (19.11): הקופה בתוכנית 76, עדן מממן אותה — סך בין־אנשים 200 (תקרה), שבר 4 נספג בקיצוץ הזוכים (דן −5)
     expect(e.edenWon).toBe(0);
     expect(o.totalRecorded).toBe(76.25);
     expect(o.totalActual).toBe(76.25);

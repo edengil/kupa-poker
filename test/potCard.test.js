@@ -132,8 +132,9 @@ describe("עריכת בפועל מהכרטיס (withActual) — סימונים �
     expect(plan.potPaid).toBe(true);
     const receivedBy = {};
     for (const t of plan.transfers) receivedBy[t.to] = (receivedBy[t.to] || 0) + t.amount;
-    // תחת הרשום: אופיר 244, דור 41 (סה"כ 285). ההגדלה היא חוסר מימון
-    // נוסף של 15 שמתחלק בין המרוויחים — סה"כ השחקנים 270.
+    // תחת הרשום: אופיר 245, דור 40 (סה"כ 285; בחמישיות מאז 19.11).
+    // ההגדלה היא חוסר מימון נוסף של 15 שמתחלק בין המרוויחים —
+    // סה"כ השחקנים 270.
     expect(receivedBy["אופיר סנה"] + receivedBy["דור לירז"]).toBe(270);
     expect(adminSessionConfirmations(edited).potRow.amount).toBe(80);
     expect(adminSessionConfirmations(edited).potRow.closed).toBe(true);
@@ -145,11 +146,12 @@ describe("עריכת בפועל מהכרטיס (withActual) — סימונים �
     const plan = paymentPlan(edited);
     expect(plan.potTransfer.amount).toBe(50);
     expect(plan.potPaid).toBe(true);
-    // ההעברה קובי סעדה ← דור לירז 41 לא השתנתה — הסימון שלה שרד ועבר
+    // ההעברה קובי סעדה ← דור לירז 40 לא השתנתה — הסימון שלה שרד ועבר
     // לאינדקס החדש שלה; העברות שהזדהותן השתנתה איבדו סימון (נדידה לפי
-    // זהות בלבד, כמו בכל המערכת).
+    // זהות בלבד, כמו בכל המערכת). (תחת עיגול החמישיות של 19.11 התוכנית
+    // האוטומטית של הערב היא אופיר 245 / דור 40 — ההקפאה שומרת אותן.)
     const survivorIdx = plan.transfers.findIndex(
-      (t) => t.from === "קובי סעדה" && t.to === "דור לירז" && t.amount === 41
+      (t) => t.from === "קובי סעדה" && t.to === "דור לירז" && t.amount === 40
     );
     expect(survivorIdx).toBeGreaterThan(-1);
     expect(plan.paid[survivorIdx]).toBe(true);
@@ -181,7 +183,7 @@ describe("נעילת העברה מסומנת (החלטה 4)", () => {
       { from: "קובי סעדה", to: "אופיר סנה", amount: 60, id: "x4" },
     ]);
     expect(blocked).toEqual([
-      expect.objectContaining({ from: "קובי סעדה", to: "אופיר סנה", amount: 109, received: true }),
+      expect.objectContaining({ from: "קובי סעדה", to: "אופיר סנה", amount: 110, received: true }),
     ]);
   });
 

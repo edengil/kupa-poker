@@ -87,7 +87,11 @@ describe("זיכוי העודף לעדן (19.11) — מסלול אוטומטי",
     expect(eden.raw).toBe(0);
   });
 
-  it("ערב קופה־בלבד (העודף שווה בדיוק לקופה) — זהה לקודם, אין זיכוי", () => {
+  it("ערב קופה־בלבד בלי עודף: חוב 343 של עדן מתעגל ל־340, והפער נספג בקיצוץ חמישיות לדן", () => {
+    // תחת שלב 1 הערב היה מאוזן בדיוק (343 = 250 + 93). תחת עיגול
+    // החמישיות (שלב 2): חובו של עדן (מועדף) מעוגל למטה 343←340, נוצר
+    // חוסר 3, ושבר מימון הקופה שלו הוא 2 — הקיצוץ הכולל לדן (הזוכה
+    // הרגיל היחיד) הוא 5, והוא סופג את שניהם. אין עודף ואין זיכוי.
     const session = {
       iso: "2026-10-24", cps: 1, savings5: true, savingsPot: 93,
       entries: [
@@ -97,10 +101,12 @@ describe("זיכוי העודף לעדן (19.11) — מסלול אוטומטי",
     };
     const resolved = resolveSettlement(session);
     expect(resolved.transfers).toEqual([
-      { from: "עדן גיל", to: "דן ינקלויץ", amount: 250 },
+      { from: "עדן גיל", to: "דן ינקלויץ", amount: 245 },
       { from: "עדן גיל", to: POT_SINK_NAME, amount: 93, pot: true },
     ]);
-    expect(resolved.expected.find((e) => e.name === "עדן גיל").net).toBe(-343);
+    const eden = resolved.expected.find((e) => e.name === "עדן גיל");
+    expect(eden.net).toBe(-338); // משלם 245 + 93
+    expect(eden.raw).toBe(-343); // הגולמי לא זז
     expect(paymentPlan(session).problems).toEqual([]);
   });
 

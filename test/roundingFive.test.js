@@ -1,0 +1,278 @@
+/* עיגול לחמישיות — הכרעת עדן 19.11.2026, שלב 2 (הקצאה משותפת P1).
+   חל רק במסלול האוטומטי של עידן־הקופה (settleWithPot):
+   • העיגול ברמת הנטו: זוכה רגיל למטה (122←120), זוכה עדן/אורן למעלה
+     (13←15), חייב רגיל למעלה (137←140, ההפרש לעודף), חייב עדן/אורן
+     למטה (13←10). כל השאריות זורמות לעודף ← עדן (שלב 1).
+   • כל העברה בין אנשים היא כפולה של 5; רגל הקופה נשארת מדויקת.
+   • שבר מימון הקופה (<5) וקוונטיזציית החוסר נספגים על ידי הזוכים
+     הרגילים בלבד — עדן/אורן לעולם לא סופגים; חלקם בקיצוץ מחולק
+     מעוגל למטה לחמישייה. כשאין זוכה רגיל שיכול לספוג (פינת נפילה) —
+     עדן סופג כהפחתת זיכוי העודף (או כקיצוץ מזכאותו בחוסר).
+   • פיצולי זוג (fromSplit) ביחידות־5 בשארית־גדולה.
+   • ערבים שמורים/ידניים וטרום־קופה — בלי עיגול, בדיוק כמו תמיד. */
+import { describe, it, expect } from "vitest";
+import { settleWithPot, resolveSettlement, POT_SINK_NAME, RESIDUAL_SINK_NAME } from "../lib/nightShare.js";
+import { paymentPlan, validateTransfers, saveManualPayments } from "../lib/paymentTracking.js";
+
+const W = (name, amount) => ({ name, buyin: 0, cashout: String(amount) });
+const D = (name, amount) => ({ name, buyin: amount, cashout: "0" });
+
+const sums = (transfers) => {
+  const got = {}, gave = {};
+  for (const t of transfers) {
+    got[t.to] = (got[t.to] || 0) + t.amount;
+    if (t.fromSplit) for (const [n, a] of Object.entries(t.fromSplit)) gave[n] = (gave[n] || 0) + a;
+    else gave[t.from] = (gave[t.from] || 0) + t.amount;
+  }
+  return { got, gave };
+};
+
+/** האסרט הגורף: כל העברה שאינה רגל־קופה היא כפולה של 5, וגם כל חלקי הפיצולים. */
+function expectAllFive(res) {
+  for (const t of res.transfers) {
+    if (!t.pot) expect(t.amount % 5, JSON.stringify(t)).toBe(0);
+    if (t.fromSplit) {
+      for (const a of Object.values(t.fromSplit)) expect(a % 5).toBe(0);
+      expect(Object.values(t.fromSplit).reduce((s, v) => s + v, 0)).toBe(t.amount);
+    }
+  }
+  expect(validateTransfers(res.expected, res.transfers)).toEqual([]);
+}
+
+describe("הדוגמאות המנעולות של עדן — עיגול ברמת הנטו", () => {
+  it("זוכה רגיל 122 ← 120 (למטה)", () => {
+    const res = settleWithPot([D("עדן גיל", 120), W("דן ינקלויץ", 122)], 1, 0);
+    expect(sums(res.transfers).got["דן ינקלויץ"]).toBe(120);
+    expectAllFive(res);
+  });
+
+  it("זוכה עדן/אורן 13 ← 15 (למעלה)", () => {
+    const eden = settleWithPot([W("עדן גיל", 13), D("קובי סעדה", 15)], 1, 0);
+    expect(sums(eden.transfers).got["עדן גיל"]).toBe(15);
+    expectAllFive(eden);
+    const oren = settleWithPot([W("אורן גיל", 13), D("קובי סעדה", 15)], 1, 0);
+    expect(sums(oren.transfers).got["אורן גיל"]).toBe(15);
+    expectAllFive(oren);
+  });
+
+  it("חייב עדן/אורן 13 ← 10 (למטה)", () => {
+    const eden = settleWithPot([D("עדן גיל", 13), W("דן ינקלויץ", 10)], 1, 0);
+    expect(sums(eden.transfers).gave["עדן גיל"]).toBe(10);
+    expectAllFive(eden);
+    const oren = settleWithPot([D("אורן גיל", 13), W("דן ינקלויץ", 10)], 1, 0);
+    expect(sums(oren.transfers).gave["אורן גיל"]).toBe(10);
+    expectAllFive(oren);
+  });
+
+  it("חייב רגיל 137 ← 140 (למעלה) — ההפרש לעודף", () => {
+    const res = settleWithPot([D("קובי סעדה", 137), W("דן ינקלויץ", 135)], 1, 0);
+    const { got, gave } = sums(res.transfers);
+    expect(got["דן ינקלויץ"]).toBe(135);
+    expect(gave["קובי סעדה"]).toBe(140); // 135 לזוכה + 5 עודף
+    // עדן לא בערב — העודף הולך לכיור הניטרלי כמקודם (שלב 1)
+    expect(res.residualTransfers).toEqual([
+      { from: "קובי סעדה", to: RESIDUAL_SINK_NAME, amount: 5, residual: true },
+    ]);
+    expectAllFive(res);
+  });
+
+  it("מקרי קצה 1–4: זוכה רגיל ← 0, זוכה מועדף ← 5, חייב רגיל ← 5, חייב מועדף ← 0", () => {
+    const regWin = settleWithPot([D("קובי סעדה", 5), W("דן ינקלויץ", 3)], 1, 0);
+    expect(regWin.transfers.some((t) => t.to === "דן ינקלויץ")).toBe(false); // זכאות 3 ← 0
+    expectAllFive(regWin);
+    const privWin = settleWithPot([D("קובי סעדה", 5), W("עדן גיל", 3)], 1, 0);
+    expect(sums(privWin.transfers).got["עדן גיל"]).toBe(5); // 3 ← 5
+    expectAllFive(privWin);
+    const regDebt = settleWithPot([D("קובי סעדה", 3), W("דן ינקלויץ", 5)], 1, 0);
+    expect(sums(regDebt.transfers).gave["קובי סעדה"]).toBe(5); // חוב 3 ← 5
+    expectAllFive(regDebt);
+    const privDebt = settleWithPot([D("עדן גיל", 3), D("קובי סעדה", 5), W("דן ינקלויץ", 5)], 1, 0);
+    expect(privDebt.transfers.some((t) => t.from === "עדן גיל")).toBe(false); // חוב 3 ← 0
+    expect(sums(privDebt.transfers).got["דן ינקלויץ"]).toBe(5);
+    expectAllFive(privDebt);
+  });
+});
+
+describe("ערב 24.10 במסלול האוטומטי — חשבון החמישיות המלא", () => {
+  const NIGHT_2410 = {
+    id: "live_1792879962020", iso: "2026-10-24", cps: 2, savings5: true, savingsPot: 93,
+    entries: [
+      { name: "עדן גיל", buyin: 550, chips: 40 },
+      { name: "אורן גיל", buyin: 100, chips: 840 },
+      { name: "קובי סעדה", buyin: 400, chips: 0 },
+      { name: "ירין מלאך", buyin: 150, chips: 300 },
+      { name: "דן ינקלויץ", buyin: 150, chips: 500 },
+      { name: "נתנאל כהן", buyin: 150, chips: 0 },
+      { name: "דור לירז", buyin: 100, chips: 420 },
+      { name: "אופיר סנה", buyin: 250, chips: 1530 },
+    ],
+  };
+
+  it("עדן: סך בין־אנשים 435 + קופה 93; שבר 2 נספג על ידי הרגילים בלבד; אורן פטורה ממנו", () => {
+    const resolved = resolveSettlement(NIGHT_2410);
+    const res = resolved.result;
+    expect(paymentPlan(NIGHT_2410).problems).toEqual([]);
+    const { got, gave } = sums(resolved.transfers);
+    // זכאויות סופיות: אופיר 480, אורן 305, דור 105, דן 95
+    expect(got["אופיר סנה"]).toBe(480);
+    expect(got["אורן גיל"]).toBe(305);
+    expect(got["דור לירז"]).toBe(105);
+    expect(got["דן ינקלויץ"]).toBe(95);
+    // הקיצוץ הכולל 60 = חוסר 58 + שבר קופה 2. אורן נחתכה רק 15 —
+    // חלקה היחסי המדויק (17.76) מעוגל למטה; היא לא סופגת מהשבר.
+    // הרגילים נחתכו 45 יחד (אופיר 35, דור 5, דן 5) — כולל השבר.
+    expect(320 - got["אורן גיל"]).toBe(15);
+    expect(515 - got["אופיר סנה"] + (110 - got["דור לירז"]) + (100 - got["דן ינקלויץ"])).toBe(45);
+    // עדן: חוב מעוגל 530 — 435 בין־אנשים (כפולת־5) + 93 לקופה (מדויק)
+    const edenPerson = resolved.transfers
+      .filter((t) => !t.pot && !t.residual)
+      .reduce((s, t) => s + (t.fromSplit ? t.fromSplit["עדן גיל"] || 0 : t.from === "עדן גיל" ? t.amount : 0), 0);
+    expect(edenPerson).toBe(435);
+    expect(gave["עדן גיל"]).toBe(528);
+    const potRows = resolved.transfers.filter((t) => t.pot);
+    expect(potRows).toEqual([{ from: "עדן גיל", to: POT_SINK_NAME, amount: 93, pot: true }]);
+    expect(res.potFunded).toBe(93);
+    expectAllFive(res);
+  });
+});
+
+describe("פינת נפילה — עדן הזוכה היחיד עם קופה (אין זוכה רגיל שיספוג)", () => {
+  it("עודף: שבר הנושא (2) מופחת מזיכוי העודף של עדן; הקופה מדויקת וההעברות חמישיות", () => {
+    // עודף אמיתי 7 (חובות 300, זכייה 200, קופה 93). הנושא הוא קובי
+    // (החייב היחיד): שארית הקופה 3 יוצאת ממנו ישירות, ושברו 2 נשאר
+    // אצלו — זיכוי העודף של עדן הוא 5 בלבד במקום 7.
+    const res = settleWithPot([W("עדן גיל", 200), D("קובי סעדה", 300)], 1, 93);
+    expect(res.potFunded).toBe(93);
+    expect(res.residualTransfers).toEqual([
+      { from: "קובי סעדה", to: "עדן גיל", amount: 5, residual: true },
+    ]);
+    const { got, gave } = sums(res.transfers);
+    expect(got["עדן גיל"]).toBe(205); // 200 זכייה + 5 זיכוי (לא 207)
+    expect(gave["קובי סעדה"]).toBe(298); // שילם 298 מ־300 — השבר 2 אצלו
+    expect(res.expected.find((e) => e.name === "עדן גיל").net).toBe(205);
+    expectAllFive(res);
+  });
+
+  it("חוסר: עדן סופג את הקיצוץ המקוונטט כולל השבר — זכאותו נחתכת בחמישיות", () => {
+    // תביעות 300 + קופה 93 מול חובות 350 → חוסר 43; שבר הנושא (קובי) 2.
+    // אין זוכה רגיל — הקיצוץ הכולל 45 נופל על עדן, הזוכה היחיד.
+    const res = settleWithPot([W("עדן גיל", 300), D("קובי סעדה", 200), D("נתנאל כהן", 150)], 1, 93);
+    expect(res.potFunded).toBe(93);
+    const { got, gave } = sums(res.transfers);
+    expect(got["עדן גיל"]).toBe(255); // 300 − 45
+    expect(gave["קובי סעדה"]).toBe(198); // 195 בהקצאה + 3 שארית קופה ישירה
+    expect(gave["נתנאל כהן"]).toBe(150);
+    expectAllFive(res);
+  });
+});
+
+describe("קיצוץ חוסר בחמישיות עם עדן בין הזוכים", () => {
+  it("חלקו של עדן מעוגל למטה לחמישייה; היתרה עוברת לזוכה הרגיל", () => {
+    // זכאויות מעוגלות: עדן 115 (113 למעלה), דן 205 (207 למטה). חובות
+    // 250, קופה 20 → חוסר 90. חלקו המדויק של עדן 32.3 — נחתך 30 בלבד;
+    // דן סופג 60 (חלקו המדויק 57.7 + היתרה).
+    const res = settleWithPot([W("עדן גיל", 113), W("דן ינקלויץ", 207), D("קובי סעדה", 250)], 1, 20);
+    const { got, gave } = sums(res.transfers);
+    expect(got["עדן גיל"]).toBe(85); // 115 − 30
+    expect(got["דן ינקלויץ"]).toBe(145); // 205 − 60
+    expect(got[POT_SINK_NAME]).toBe(20);
+    expect(gave["קובי סעדה"]).toBe(250);
+    expectAllFive(res);
+  });
+});
+
+describe("פיצול זוג ביחידות־5", () => {
+  it("חובות 95/5 המשלמים 50: הפיצול 50/0 (שארית־גדולה), לא 48/2", () => {
+    // איציק וירדן הם זוג (FILL_COUPLES). ההעברה המשותפת הראשונה היא 50
+    // ביחס חובות 95:5 — פיצול יחסי מדויק היה 47.5/2.5.
+    const res = settleWithPot(
+      [D("איציק תפילין", 95), D("ירדן תפילין", 5), W("דן ינקלויץ", 50), W("אבי כהן", 50)],
+      1,
+      0
+    );
+    const joints = res.transfers.filter((t) => t.joint);
+    expect(joints.length).toBeGreaterThan(0);
+    expect(joints[0].amount).toBe(50);
+    expect(joints[0].fromSplit).toEqual({ "איציק תפילין": 50, "ירדן תפילין": 0 });
+    const { got, gave } = sums(res.transfers);
+    expect(gave["איציק תפילין"]).toBe(95);
+    expect(gave["ירדן תפילין"]).toBe(5);
+    expect(got["דן ינקלויץ"]).toBe(50);
+    expect(got["אבי כהן"]).toBe(50);
+    expectAllFive(res);
+  });
+});
+
+describe("בלי עיגול מחוץ למסלול האוטומטי של עידן־הקופה", () => {
+  it("ערב טרום־קופה: סכומים מדויקים, בלי חמישיות", () => {
+    const session = {
+      iso: "2026-10-09",
+      entries: [
+        { name: "עדן גיל", amount: -137 },
+        { name: "דן ינקלויץ", amount: 137 },
+      ],
+    };
+    const resolved = resolveSettlement(session);
+    expect(resolved.mode).toBe("plain");
+    expect(resolved.transfers).toEqual([{ from: "עדן גיל", to: "דן ינקלויץ", amount: 137 }]);
+  });
+
+  it("חלוקה שמורה/ידנית: תשלום ידני 137 נשמר כמות שהוא, והיתרה לא מתעגלת", () => {
+    const session = {
+      iso: "2026-10-24", cps: 1, savings5: true,
+      entries: [
+        { name: "עדן גיל", amount: -200 },
+        { name: "דן ינקלויץ", amount: 200 },
+      ],
+    };
+    const withManual = saveManualPayments(session, [
+      { from: "עדן גיל", to: "דן ינקלויץ", amount: 137 },
+    ]);
+    const plan = paymentPlan(withManual);
+    expect(plan.problems).toEqual([]);
+    const amounts = plan.transfers.map((t) => t.amount).sort((a, b) => a - b);
+    expect(amounts).toEqual([63, 137]); // 137 ידני + 63 אוטומטי־ידני — בלי עיגול
+  });
+});
+
+describe("פאז — האסרט הגורף על תצורות אקראיות", () => {
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const NAMES = ["עדן גיל", "אורן גיל", "דור לירז", "עדן לירז", "שגיא גיל", "דוד בני גיל", "אופיר סנה", "נתנאל כהן", "איציק תפילין", "ירדן תפילין", "קובי סעדה", "דן ינקלויץ", "נועה לוי", "אבי רון"];
+  const ri = (rnd, n) => Math.floor(rnd() * n);
+
+  it("600 ערבים: הוולידטור שקט, כל העברה בין־אנשים כפולת־5, הקופה ממומנת כשיש חובות", () => {
+    const rnd = mulberry32(19571119);
+    for (let iter = 0; iter < 600; iter++) {
+      const nPlayers = 5 + ri(rnd, 6);
+      const pool = [...NAMES].sort(() => rnd() - 0.5).slice(0, nPlayers);
+      if (!pool.includes("עדן גיל")) pool[0] = "עדן גיל";
+      const players = pool.map((name) => {
+        const buyin = 50 * (1 + ri(rnd, 8));
+        const cashout = String(ri(rnd, buyin * 2 + 400));
+        return { name, buyin, cashout };
+      });
+      const pot = Math.round(players.reduce((s, p) => s + p.buyin, 0) * 0.05);
+      const res = settleWithPot(players, 2, pot);
+      expectAllFive(res);
+      const rawDebts = res.nets.reduce((s, n) => s + Math.max(0, -n.raw), 0);
+      if (rawDebts >= pot + 10) expect(res.potFunded).toBe(pot);
+      // אף חייב לא משלם מעבר להתחייבותו בתוכנית (nets = ההתחייבות)
+      const owe = {};
+      for (const t of res.transfers) {
+        if (t.fromSplit) for (const [n, a] of Object.entries(t.fromSplit)) owe[n] = (owe[n] || 0) + a;
+        else if (t.from) owe[t.from] = (owe[t.from] || 0) + t.amount;
+      }
+      for (const n of res.nets) {
+        if (n.net < 0) expect(owe[n.name] || 0).toBeLessThanOrEqual(-n.net);
+      }
+    }
+  }, 120000);
+});
