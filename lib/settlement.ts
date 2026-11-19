@@ -35,6 +35,13 @@ export interface SettleResult {
 export interface SettleOpts {
   /** זוכים שנשמר להם יותר כשיש חוסר (חותכים קודם מאחרים). */
   preferCreditors?: string[];
+  /**
+   * עיגול לחמישיות, שלב 2 (הכרעת עדן 19.11.2026): פיצול העברה זוגית
+   * ביחידות־5 בשארית־גדולה במקום פיצול יחסי בשקלים שלמים. דלוק רק
+   * במסלול הקופה האוטומטי (settleWithPot); כל שאר המסלולים (שמור, ידני,
+   * טרום־קופה, לייב) ממשיכים בפיצול היחסי המדויק כמו תמיד.
+   */
+  splitUnit5?: boolean;
 }
 
 /* מי שמקבל רק פייבוקס או מזומן, ולא ביט */
@@ -84,6 +91,47 @@ export function proportionalCuts(weights: number[], totalCut: number): number[] 
   if (take <= 0 || total <= 0) return ws.map(() => 0);
   const shares = ws.map((w) => (w / total) * take);
   return roundPreservingSum(shares);
+}
+
+/** עיגול למטה/למעלה לכפולה של 5 (כלל החמישיות, הכרעת עדן 19.11.2026). */
+export const floor5 = (v: number): number => Math.floor(v / 5) * 5;
+export const ceil5 = (v: number): number => Math.ceil(v / 5) * 5;
+
+/**
+ * חלוקת סכום שהוא כפולה של 5 בין משקלים, ביחידות־5 בשארית־גדולה:
+ * כל חלק הוא כפולה של 5, אף חלק לא עובר את התקרה שלו, והסכום הכולל
+ * נשמר בדיוק (כשסך התקרות ≥ הסכום). המימוש האחד של "חלוקה יחסית
+ * ביחידות־5" — פיצולי זוג בחלוקה, פיצולי החלפת־קופה בניתוב, וקיצוצי
+ * החוסר במסלול הקופה האוטומטי.
+ */
+export function distribute5(total: number, weights: number[], caps: number[]): number[] {
+  const out = weights.map(() => 0);
+  if (!(total > 0) || !weights.length) return out;
+  const ws = weights.map((w) => Math.max(0, +w || 0));
+  const wsum = ws.reduce((s, w) => s + w, 0);
+  if (wsum <= 0) return out;
+  const exact = ws.map((w) => (total * w) / wsum);
+  let assigned = 0;
+  const rems = exact.map((x, i) => {
+    out[i] = Math.min(caps[i], floor5(x));
+    assigned += out[i];
+    return { i, rem: x - floor5(x), w: ws[i] };
+  });
+  rems.sort((a, b) => b.rem - a.rem || b.w - a.w || a.i - b.i);
+  let units = Math.round((total - assigned) / 5);
+  while (units > 0) {
+    let progressed = false;
+    for (const { i } of rems) {
+      if (units <= 0) break;
+      if (out[i] + 5 <= caps[i]) {
+        out[i] += 5;
+        units--;
+        progressed = true;
+      }
+    }
+    if (!progressed) break;
+  }
+  return out;
 }
 
 function roundPreservingSum(values: number[]): number[] {
@@ -174,8 +222,12 @@ export function settle(players: SettlePlayer[] = [], cps: number = CPS, opts: Se
     const debtJ = bal[j] < 0 ? -bal[j] : 0;
     const combined = debtI + debtJ;
     if (combined <= 0) return;
-    // חלוקה יחסית — כדי ששניהם יישארו במשחק וימשיכו לשלם יחד למרוויחים הבאים
-    let takeI = Math.round((amount * debtI) / combined);
+    // חלוקה יחסית — כדי ששניהם יישארו במשחק וימשיכו לשלם יחד למרוויחים הבאים.
+    // במצב splitUnit5 (מסלול הקופה האוטומטי בלבד) הפיצול הוא ביחידות־5
+    // בשארית־גדולה, כדי שגם חלקי הפיצול וגם יתרות ההמשך יישארו כפולות־5.
+    let takeI = opts.splitUnit5
+      ? distribute5(amount, [debtI, debtJ], [debtI, debtJ])[0]
+      : Math.round((amount * debtI) / combined);
     takeI = Math.max(0, Math.min(debtI, takeI, amount));
     let takeJ = amount - takeI;
     if (takeJ > debtJ) {
