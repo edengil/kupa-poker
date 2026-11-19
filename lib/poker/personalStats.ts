@@ -292,7 +292,7 @@ export function computePersonalStats(db: StatsDb | null | undefined, playerName:
         buyin = r2(buyin + buy.buyin);
         hasBuyin = true;
       }
-      const resolved = resolveEntryChips(e, { iso: s.iso, aliases: A, nightsMap } as Parameters<typeof resolveEntryChips>[1]);
+      const resolved = resolveEntryChips(e, { iso: s.iso, aliases: A, nightsMap, session: s } as Parameters<typeof resolveEntryChips>[1]);
       if (resolved.chips != null) {
         chips = r2(chips + resolved.chips);
         hasChips = true;
