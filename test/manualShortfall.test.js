@@ -42,10 +42,13 @@ describe("חוסר ידני", () => {
     const pending = plan.transfers.filter((t) => !t.manual);
     expect(pending).toHaveLength(0);
     expect(plan.transfers.filter((t) => t.manual)).toHaveLength(6);
-    // העודף (70₪) רשום בכיור העודף — לא נופל על עדן ולא נעלם. העודף הוא
-    // שורת resolver פנימית; בתוכנית הקנונית (paymentPlan) הוא לא מופיע.
-    const residual = resolveSettlement(sessionWith(ms)).transfers.filter((t) => t.residual);
-    expect(residual.reduce((s, t) => s + t.amount, 0)).toBe(70);
+    // העודף (70₪) הוא כולו שארית של עדן עצמו — בהכרעת 19.11 הוא נספג
+    // כזיכוי על שמו: אין שורות residual כלל, וצפויו הוא −213
+    // (−290 גולמי + 7 ממפת החוסר + 70 זיכוי). שורות עודף הן פנימיות
+    // ל־resolver; בתוכנית הקנונית (paymentPlan) הן לא מופיעות.
+    const resolved = resolveSettlement(sessionWith(ms));
+    expect(resolved.transfers.filter((t) => t.residual)).toEqual([]);
+    expect(resolved.expected.find((e) => e.name === "עדן גיל").net).toBe(-213);
     expect(plan.transfers.some((t) => t.residual)).toBe(false);
   });
 

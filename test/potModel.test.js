@@ -3,7 +3,9 @@
    - "בפועל" (savingsPotActual) ניתן לעריכה, ברירת מחדל = הרשום; יתרת המזומן הראשית = בפועל.
    - חוסר מימון מתחלק בין הזוכים יחסית לרווחים, בשקלים שלמים — לעולם לא מהקופה.
    - הקופה היא חובת הפקדה של עדן: כשהוא חייב, 93₪ מתשלומיו הולכים לקופה והשאר לזוכים.
-   - הנטו הגולמי של עדן לא משתנה; עודף מעבר לקופה נרשם בכיור "עודף ערב".
+   - הנטו הגולמי של עדן לא משתנה. עודף מעבר לקופה: בהכרעת 25.10 נרשם בכיור
+     "עודף ערב"; הכרעת עדן 19.11.2026 החליפה זאת — העודף מזוכה לעדן על שמו
+     בחלוקה (שאריתו שלו נספגת, שאריות אחרים הן העברות residual אליו).
    - חלוקות ידניות ישנות (basis בסגנון playersWithPot) נשמרות כ־legacy בדיוק כמות שהן. */
 import { describe, it, expect } from "vitest";
 import { paymentPlan, potOverview } from "../lib/paymentTracking.js";
@@ -105,7 +107,13 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     expect(got["דן ינקלויץ"]).toBe(100);
     // R3: עם savingsPotActual=70 — ההעברה לקופה בתוכנית היא הבפועל, לא הרשום
     expect(got[POT_SINK_NAME]).toBe(70);
-    expect(gave["עדן גיל"]).toBe(530); // מלוא החוב הגולמי: 437 לזוכים + 70 לקופה + 23 עודף פנימי
+    // הכרעת 19.11: ה־23 (הפרש רשום־בפועל) הם שארית של עדן עצמו — נספגים
+    // כזיכוי על שמו, לא שורת העברה. בהעברות הוא משלם 507 = 437 + 70,
+    // והצפוי שלו הוא −507 (הגולמי −530 נשמר ב־raw/בסטטיסטיקה).
+    expect(gave["עדן גיל"]).toBe(507);
+    expect(
+      resolveSettlement(session).expected.find((e) => e.name === "עדן גיל").net
+    ).toBe(-507);
     expect(gave["קובי סעדה"]).toBe(400);
     expect(gave["נתנאל כהן"]).toBe(150);
     const edenToPot = allTransfers
@@ -118,7 +126,7 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     expect(text).not.toContain("93");
   });
 
-  it("עודף מעבר לקופה הולך לכיור העודף — זוכים וקופה מלאים", () => {
+  it("עודף מעבר לקופה מזוכה לעדן (הכרעת 19.11) — זוכים וקופה מלאים", () => {
     const session = {
       iso: "2026-10-24",
       cps: 1,
@@ -131,11 +139,21 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     };
     const plan = paymentPlan(session);
     expect(plan.problems).toEqual([]);
-    const { got, gave } = sums(resolveSettlement(session).transfers);
+    const resolved = resolveSettlement(session);
+    const { got, gave } = sums(resolved.transfers);
     expect(got["דן ינקלויץ"]).toBe(250);
     expect(got[POT_SINK_NAME]).toBe(93);
-    expect(got[RESIDUAL_SINK_NAME]).toBe(57); // 150 עודף − 93 קופה
-    expect(gave["עדן גיל"]).toBe(400);
+    // 150 עודף − 93 קופה = 57 עודף. עדן הוא החייב היחיד, אז כל ה־57 הם
+    // שאריתו שלו — נספגת: אין שורת כיור ואין שורת residual, והוא משלם
+    // 343 בלבד בהעברות (250 לדן + 93 לקופה). הצפוי שלו −343; הגולמי
+    // −400 נשמר בשדה raw.
+    expect(got[RESIDUAL_SINK_NAME]).toBeUndefined();
+    expect(resolved.transfers.filter((t) => t.residual)).toEqual([]);
+    expect(gave["עדן גיל"]).toBe(343);
+    const edenExpected = resolved.expected.find((e) => e.name === "עדן גיל");
+    expect(edenExpected.net).toBe(-343);
+    expect(edenExpected.raw).toBe(-400);
+    expect(resolved.expected.some((e) => e.name === RESIDUAL_SINK_NAME)).toBe(false);
   });
 
   it("potOverview על הפנקס המתוקן: רשום 163, בפועל 140, יתרות 133/110", () => {

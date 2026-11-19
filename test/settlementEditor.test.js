@@ -159,9 +159,11 @@ describe("ערב 24.10 (manualSettlement שמור) — זוגות נסגרים �
       expect.objectContaining({ from: "עדן גיל", to: POT_SINK_NAME, amount: 70, pot: true })
     );
     expect(gave["עדן גיל"]).toBe(437);
-    // הפרש הרשום־בפועל (23) נשאר כעודף פנימי ב־resolver — לא העברה לשחקן
-    const residual = resolveSettlement(session).transfers.filter((x) => x.residual);
-    expect(residual.reduce((s, x) => s + x.amount, 0)).toBe(23);
+    // הפרש הרשום־בפועל (23) הוא שארית של עדן עצמו — בהכרעת 19.11 הוא
+    // נספג כזיכוי על שמו: אין שורות residual, וצפויו −507 (−530 + 23)
+    const resolvedE = resolveSettlement(session);
+    expect(resolvedE.transfers.filter((x) => x.residual)).toEqual([]);
+    expect(resolvedE.expected.find((e) => e.name === "עדן גיל").net).toBe(-507);
   });
 
   it("עקביות צופה (R1+R3+R4): בלי שדות הקופה מתקבלת אותה תוכנית שחקנים ואותו fingerprint", () => {

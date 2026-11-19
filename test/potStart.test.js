@@ -65,7 +65,8 @@ describe("שער תחילת הקופה (10.10.2026)", () => {
     expect(o.totalRecorded).toBe(0); // לאף ערב אין שדה קופה רשום בפיקסטורה
     const e1010 = o.evenings.find((e) => e.id === "live_1791669733765");
     expect(e1010.gap).toBe(-75); // הפער מוצג כשורה נפרדת, לא כקופה
-    expect(e1010.edenPaid).toBe(290); // מודל 25.10: עדן משלם את מלוא חובו הגולמי
+    // הכרעת 19.11: העודף (75) מזוכה לעדן — תשלומו הצפוי נטו הוא 290 − 75
+    expect(e1010.edenPaid).toBe(215);
     const old = o.evenings.find((e) => e.id === "s-old");
     expect(old.recorded).toBe(0);
     expect(old.edenPaid).toBe(100); // עדן משלם מלא בערב ישן

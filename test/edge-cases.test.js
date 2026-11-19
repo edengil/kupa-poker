@@ -26,7 +26,7 @@ function allWhole(transfers) {
   return transfers.every((t) => Number.isInteger(t.amount) && t.amount > 0);
 }
 
-describe("1. עדן מרוויח + יש עודף — הזכייה גולמית, העודף לכיור", () => {
+describe("1. עדן מרוויח + יש עודף — העודף מזוכה לעדן (הכרעת 19.11)", () => {
   const night = {
     id: "edge-eden-wins",
   iso: "2026-10-10",
@@ -36,18 +36,22 @@ describe("1. עדן מרוויח + יש עודף — הזכייה גולמית, 
       { name: "משה לוי", amount: -70 },
     ],
   };
-  it("העודף (30₪) הולך לכיור העודף — זכיית עדן נשארת 100", () => {
+  it("העודף (30₪) ממוען לעדן על שמו — הוא מקבל 130, הגולמי 100 נשמר ב־raw", () => {
     expect(computedPot(night)).toBe(0); // אין קופה רשומה בפיקסטורה
     expect(nightGap(night)).toBe(-30);
-    // כיור העודף הוא שורת resolver פנימית — לא חלק מהתוכנית הקנונית של paymentPlan
+    // שורות העודף הן שורות resolver פנימיות — לא חלק מהתוכנית הקנונית של paymentPlan
     const { problems } = paymentPlan(night);
-    const { transfers } = resolveSettlement(night);
+    const { transfers, expected } = resolveSettlement(night);
     expect(problems).toEqual([]);
     const { got, gave } = sums(transfers);
-    expect(got["עדן גיל"]).toBe(100); // הגולמי בלבד (מודל 25.10)
-    expect(got["עודף ערב"]).toBe(30);
+    expect(got["עדן גיל"]).toBe(130); // 100 זכייה + 30 עודף (שאריתו של אבי)
+    expect(got["עודף ערב"]).toBeUndefined();
+    expect(transfers.filter((t) => t.residual)).toEqual([
+      { from: "אבי כהן", to: "עדן גיל", amount: 30, residual: true },
+    ]);
     expect(gave["אבי כהן"]).toBe(60);
     expect(gave["משה לוי"]).toBe(70);
+    expect(expected.find((e) => e.name === "עדן גיל").net).toBe(130);
     expect(allWhole(transfers)).toBe(true);
   });
 });
@@ -133,18 +137,24 @@ describe("5. עיגול אגורות — כל ההעברות בשקלים שלמ
       { name: "אבי כהן", amount: 30.1 },
     ],
   };
-  it("עודף 10₪ + אגורות — עדן משלם מלא (100 אחרי עיגול), העודף לכיור, הכל שלם", () => {
+  it("עודף 10₪ + אגורות — שאריתו של עדן נספגת בחובו (משלם 90), הכל שלם", () => {
     expect(computedPot(night)).toBe(0);
     expect(nightGap(night)).toBe(-10);
     const { problems } = paymentPlan(night);
-    const { transfers } = resolveSettlement(night);
+    const { transfers, expected } = resolveSettlement(night);
     expect(allWhole(transfers)).toBe(true);
     expect(problems).toEqual([]);
     const { got, gave } = sums(transfers);
-    expect(gave["עדן גיל"]).toBe(100); // מלוא החוב המעוגל — העודף לא יורד ממנו
+    // הכרעת 19.11: עדן הוא החייב היחיד, אז כל העודף (10) הוא שאריתו —
+    // היא נספגת ומקטינה את חובו הצפוי ל־90 (הגולמי המעוגל 100 ב־raw).
+    expect(gave["עדן גיל"]).toBe(90);
     expect(got["דן ינקלויץ"]).toBe(60);
     expect(got["אבי כהן"]).toBe(30);
-    expect(got["עודף ערב"]).toBe(10);
+    expect(got["עודף ערב"]).toBeUndefined();
+    expect(transfers.filter((t) => t.residual)).toEqual([]);
+    const edenExpected = expected.find((e) => e.name === "עדן גיל");
+    expect(edenExpected.net).toBe(-90);
+    expect(edenExpected.raw).toBe(-100);
   });
 });
 
@@ -159,20 +169,23 @@ describe("6. חלוקה ידנית — עובדת עם לוגיקת הקופה �
     ],
   };
   it("תשלום ידני נשמר (לא נזרק בגלל basis), היתרה מחולקת אוטומטית", () => {
-    // עודף 80₪: עדן חייב 280 גולמי — 100 ידני + 100 אוטומטי + 80 לכיור העודף
+    // עודף 80₪: עדן חייב 280 גולמי — 100 ידני + 100 אוטומטי, וה־80 הם
+    // שאריתו שלו: בהכרעת 19.11 היא נספגת כזיכוי (צפוי −200), לא כיור.
     const withManual = saveManualPayments(night, [
       { from: "עדן גיל", to: "דן ינקלויץ", amount: 100 },
     ]);
     const { problems } = paymentPlan(withManual);
-    const { transfers } = resolveSettlement(withManual);
+    const { transfers, expected } = resolveSettlement(withManual);
     const manual = transfers.filter((t) => t.manual);
     expect(manual).toHaveLength(1);
     expect(manual[0]).toMatchObject({ from: "עדן גיל", to: "דן ינקלויץ", amount: 100 });
     const { got, gave } = sums(transfers);
-    expect(gave["עדן גיל"]).toBe(280); // מלוא החוב הגולמי
+    expect(gave["עדן גיל"]).toBe(200); // 100 ידני + 100 אוטומטי; ה־80 נספגו
     expect(got["דן ינקלויץ"]).toBe(100);
     expect(got["רוני לוי"]).toBe(100);
-    expect(got["עודף ערב"]).toBe(80);
+    expect(got["עודף ערב"]).toBeUndefined();
+    expect(transfers.filter((t) => t.residual)).toEqual([]);
+    expect(expected.find((e) => e.name === "עדן גיל").net).toBe(-200);
     expect(problems).toEqual([]);
   });
 });
@@ -200,7 +213,7 @@ describe("7. העברה זוגית — הפיצול נשמר והוולידטו�
   });
 });
 
-describe("8. זוג (עדן+אורן) עם עודף — שניהם משלמים מלא, העודף לכיור", () => {
+describe("8. זוג (עדן+אורן) עם עודף — העודף מזוכה לעדן (הכרעת 19.11)", () => {
   const night = {
     id: "edge-couple-pot",
   iso: "2026-10-10",
@@ -210,11 +223,11 @@ describe("8. זוג (עדן+אורן) עם עודף — שניהם משלמים 
       { name: "דן ינקלויץ", amount: 250 },
     ],
   };
-  it("העודף (50₪) הולך לכיור; הזוג משלם את מלוא החוב המשותף", () => {
+  it("העודף (50₪) מזוכה לעדן: שאריתו (33) נספגת, שארית אורן (17) עוברת אליו", () => {
     expect(computedPot(night)).toBe(0);
     expect(nightGap(night)).toBe(-50);
     const { problems } = paymentPlan(night);
-    const { transfers } = resolveSettlement(night);
+    const { transfers, expected } = resolveSettlement(night);
     expect(problems).toEqual([]);
     const joint = transfers.find((t) => t.joint);
     expect(joint).toBeTruthy();
@@ -222,8 +235,12 @@ describe("8. זוג (עדן+אורן) עם עודף — שניהם משלמים 
     expect(joint.fromSplit["עדן גיל"] + joint.fromSplit["אורן גיל"]).toBe(250);
     const { got, gave } = sums(transfers);
     expect(got["דן ינקלויץ"]).toBe(250);
-    expect(gave["עדן גיל"]).toBe(200); // מלא — העודף לא יורד ממנו (25.10)
+    // עדן שילם 167 בהעברה המשותפת וקיבל 17 מאורן — מעמדו נטו −150,
+    // בדיוק הצפוי שלו (גולמי −200 + זיכוי 50). אורן שילם מלא: 83 + 17.
+    expect(gave["עדן גיל"]).toBe(167);
     expect(gave["אורן גיל"]).toBe(100); // מלא
-    expect(got["עודף ערב"]).toBe(50);
+    expect(got["עדן גיל"]).toBe(17);
+    expect(got["עודף ערב"]).toBeUndefined();
+    expect(expected.find((e) => e.name === "עדן גיל").net).toBe(-150);
   });
 });
