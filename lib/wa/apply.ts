@@ -2,6 +2,7 @@
 
 import { buildReport, CPS, settleLine } from "../report.js";
 import { nextTipCompliment, formatTipCompliment, tipBagKey, tipLastKey } from "../tipCompliments.js";
+import { formatRebuyJoke, formatPotMilestoneLine, formatOpeningProphecy } from "../tipSummaryCopy.js";
 import { isFemaleName, byGender } from "../gender.js";
 import { BOT_MARK } from "../botMark.js";
 import { buildTipsTable } from "../tipsTable.js";
@@ -203,6 +204,39 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   const record: UndoEntry[] = [];
   const acks = [];
   const problems = [];
+
+  /* שורת הומור לכניסה שלישית ומעלה של אותו שחקן באותו ערב. נקראת רק
+     אחרי שהחותמת הוחלה — buyinEvents כבר כולל את הכניסה הנוכחית. */
+  const pushRebuyJoke = (name: string, player: { buyinEvents?: unknown[] }) => {
+    const joke = formatRebuyJoke(name, (player.buyinEvents || []).length, isFemaleName, now);
+    if (joke) acks.push(joke);
+  };
+
+  /* סך קופת השולחן (סכום הכניסות) — אותה הגדרה כמו בתמונת המצב. */
+  const totalTablePot = () => r2(state.players.reduce((t, p) => t + (+p.buyin || 0), 0));
+
+  /* ציון חציית סף קופה (כפולת 500): לפני < סף ≤ אחרי. כל סף מוכרז פעם
+     אחת בערב — נרשם במצב, כך שביטול+החלה־מחדש של אותה הודעה לא מכריז
+     שוב. כשכמה ספים נחצים בכניסה אחת — מוכרז הגבוה שבהם. */
+  const pushPotMilestone = (before: number, after: number) => {
+    if (!(after > before)) return;
+    const announced = state.potMilestonesAnnounced || [];
+    const crossed: number[] = [];
+    for (let t = 500; t <= after; t += 500) {
+      if (before < t && !announced.includes(t)) crossed.push(t);
+    }
+    if (!crossed.length) return;
+    state.potMilestonesAnnounced = [...announced, ...crossed];
+    acks.push(formatPotMilestoneLine(crossed[crossed.length - 1], now));
+  };
+
+  /* נבואת פתיחה — פעם אחת בערב, בכניסה הראשונה כשהשולחן היה ריק.
+     הדגל במצב שורד ביטול+החלה־מחדש של הודעת הפתיחה. */
+  const pushOpeningProphecy = (wasEmptyTable: boolean) => {
+    if (!wasEmptyTable || state.openingProphecyDone) return;
+    state.openingProphecyDone = true;
+    acks.push(formatOpeningProphecy(now));
+  };
 
 
   for (let ci = 0; ci < cmds.length; ci++) {
@@ -681,6 +715,8 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const fresh = { name, buyin: 0, cashout: "", buyinEvents: [] };
+      const potBefore = totalTablePot();
+      const wasEmptyTable = state.players.length === 0 && !state.startedAt;
       const seated = stampBuyin(state, fresh, cmd.amount, now, sid);
       state.players.push(seated);
       state.startedAt = state.startedAt || Date.now();
@@ -692,6 +728,9 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         ev: stampedEventOf(fresh, seated),
       });
       acks.push(`${name} ${byGender(name, "נכנס", "נכנסה")} ב-${cmd.amount}₪`);
+      pushRebuyJoke(name, seated);
+      pushOpeningProphecy(wasEmptyTable);
+      pushPotMilestone(potBefore, totalTablePot());
       continue;
     }
 
@@ -717,11 +756,17 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     }
 
     const p = state.players[found.index];
+    const potBefore = totalTablePot();
     const next = stampBuyin(state, p, cmd.amount, now, sid);
     const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
     state.players[found.index] = next;
     record.push({ t: "add", name: p.name, delta, ev: stampedEventOf(p, next) });
     acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${next.buyin}₪`);
+    /* רק כשהחותמת באמת הוסיפה אירוע כניסה — הפחתה לא סופרת כניסה */
+    if (stampedEventOf(p, next)) {
+      pushRebuyJoke(p.name, next);
+      pushPotMilestone(potBefore, totalTablePot());
+    }
   }
 
   if (!acks.length && !problems.length) return { live, reply: null };

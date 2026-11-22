@@ -67,6 +67,11 @@ export interface WaLiveState {
   savings5: boolean;
   savingsPot: number;
   potDraft?: string;
+  /* גל הומור: ספי קופה שכבר הוכרזו הערב (כפולות 500) — הכרזה פעם אחת
+     לסף, גם אם ביטול+החלה־מחדש חוצים אותו שוב. */
+  potMilestonesAnnounced?: number[];
+  /* גל הומור: נבואת הפתיחה כבר נשלחה הערב — פעם אחת בלבד. */
+  openingProphecyDone?: boolean;
 }
 
 export interface UndoEntry {
