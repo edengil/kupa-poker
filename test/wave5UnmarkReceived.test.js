@@ -51,7 +51,12 @@ describe("ביטול received — לוגיקה", () => {
 });
 
 describe("ביטול received — כפתור בכרטיס החלוקה", () => {
-  const marked = markReceipt(baseSession, 0, true, "ירין מלאך");
+  /* אישור צפייה (כלל 3): בלי settlementApprovedAt הכרטיס כלל לא מוצג
+     לצופה — הבדיקות כאן הן על כפתור הביטול בערב מאושר. */
+  const marked = {
+    ...markReceipt(baseSession, 0, true, "ירין מלאך"),
+    settlementApprovedAt: "2026-11-06T00:00:00.000Z",
+  };
   const db = { roster: [], aliases: {}, yearly: [], sessions: [marked] };
   const render = (props) =>
     renderToString(

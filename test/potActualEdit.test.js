@@ -1,12 +1,12 @@
-/* A(b) — בדיקות הגנה למסלול מחיקת ה־manualSettlement ב־withActual
-   (PotDashboard) כש־frozenActual קיים:
-   • המסלול מוחק חלוקה שמורה רק כשהיא המפה הקפואה האוטומטית, ורק כשמוחקים
-     את ה«בפועל» — שחרור מכוון חזרה לחישוב האוטומטי.
+/* A(b) + C6 — בדיקות הגנה ל־withActual (PotDashboard):
    • חלוקה שעדן שמר בעצמו (בלי frozenActual) לעולם לא נמחקת בעריכת בפועל.
    • עדכון בפועל על מפה קפואה נוגע רק ב־frozenActual — שאר החלוקה נשמרת.
+   • C6 (גל Pot Boost, 25.11): מחיקת/ניקוי ה«בפועל» לעולם לא מוחק, משחרר
+     או מחליש הקפאה קיימת — לא את ה־manualSettlement, לא frozenActual
+     ולא את המפה. (ההתנהגות הישנה של שחרור־במחיקה בוטלה.)
    גל 2, ממצא 8: עריכת בפועל על חלוקה אמיתית בלי frozenActual מקפיאה
    אותה (frozenReal + מפת הרשום) במקום להשאיר אותה חשופה לפער
-   מנהל/צופה; מחיקת הבפועל משחררת רק את סימון ההקפאה. */
+   מנהל/צופה. */
 import { describe, it, expect } from "vitest";
 import { withActual } from "../lib/poker/potEdits.js";
 import { NIGHT_24_10 } from "./fixtures/night-2026-10-24.js";
@@ -28,10 +28,12 @@ const FROZEN_MS = {
 };
 
 describe("withActual — הגנת מסלול המחיקה", () => {
-  it("מחיקת הבפועל על מפה קפואה משחררת את ה־manualSettlement כולו (חזרה לאוטומטי)", () => {
+  it("מחיקת הבפועל על מפה קפואה לא משחררת ולא מחלישה את ההקפאה (C6, 25.11)", () => {
+    /* ההתנהגות הישנה (מחיקת הבפועל = שחרור כל ה־manualSettlement חזרה
+       לאוטומטי) בוטלה בהכרעת הגל: מחיקה מעדכנת רק את ערך השדה בפנקס. */
     const session = { ...NIGHT_24_10, manualSettlement: FROZEN_MS };
     const out = withActual(session, 0);
-    expect("manualSettlement" in out).toBe(false);
+    expect(out.manualSettlement).toEqual(FROZEN_MS);
     expect(out.savingsPotActual).toBeUndefined();
     // שאר הערב לא נפגע
     expect(out.entries).toEqual(session.entries);
@@ -62,10 +64,14 @@ describe("withActual — הגנת מסלול המחיקה", () => {
     );
     expect(set.manualSettlement.frozenActual).toBe(55);
     expect(set.manualSettlement.frozenReal).toBe(true);
-    // המפה של 24.10 כבר מלאה — ההקפאה משאירה אותה בדיוק כמו שהיא
-    expect(set.manualSettlement.shortfall).toEqual(
-      NIGHT_24_10.manualSettlement.shortfall
-    );
+    /* ההקפאה גוזרת את המפה מהחלוקה הנוכחית במנוע החמישיות — אופיר 35,
+       אורן 10, דור 10. המפה נגזרת, לא נשמרת כמות שהיא; מה שמשנה הוא
+       שהתוכנית לא זזה (נאמת בהמשך הבדיקה). */
+    expect(set.manualSettlement.shortfall).toEqual({
+      "אופיר סנה": 35,
+      "אורן גיל": 10,
+      "דור לירז": 10,
+    });
   });
 
   it("אחרי שמירת עורך (frozenActual כבר לא קיים) מחיקת הבפועל שומרת את החלוקה", () => {
@@ -118,11 +124,12 @@ describe("withActual — פער מנהל/צופה עם חלוקה ידנית ב�
     const admin = receivedByPlayer(raw);
     const viewer = receivedByPlayer(viewerOf(raw));
     expect(admin).not.toEqual(viewer);
-    // המספרים המדויקים של הביקורת (לפי שם)
-    expect(admin["אורן גיל"]).toBe(309);
-    expect(admin["אופיר סנה"]).toBe(498);
-    expect(viewer["אורן גיל"]).toBe(302);
-    expect(viewer["אופיר סנה"]).toBe(486);
+    // מספרי הביקורת המקוריים (309/498/302/486) נמדדו במנוע הישן;
+    // במנוע §8 (עיגול חוסר למעלה לחמישיות) אותם סכומים הם:
+    expect(admin["אורן גיל"]).toBe(310);
+    expect(admin["אופיר סנה"]).toBe(495);
+    expect(viewer["אורן גיל"]).toBe(305);
+    expect(viewer["אופיר סנה"]).toBe(485);
   });
 
   it("אחרי withActual: מנהל וצופה מקבלים אותם סכומי שחקנים, ושורת הקופה היא הבפועל", () => {
@@ -140,13 +147,14 @@ describe("withActual — פער מנהל/צופה עם חלוקה ידנית ב�
     expect(potTotal).toBe(70);
   });
 
-  it("מחיקת הבפועל אחרי הקפאת חלוקה אמיתית שומרת את החלוקה ואת סכומי השחקנים", () => {
+  it("מחיקת הבפועל אחרי הקפאת חלוקה אמיתית שומרת את החלוקה, את ההקפאה ואת סכומי השחקנים (C6)", () => {
     const frozen = withActual(EMPTY_MAP_SESSION, 70);
     const cleared = withActual(frozen, 0);
     expect(cleared.savingsPotActual).toBeUndefined();
     expect(cleared.manualSettlement).toBeTruthy();
-    expect(cleared.manualSettlement.frozenActual).toBeUndefined();
-    expect(cleared.manualSettlement.frozenReal).toBeUndefined();
+    /* C6: גם סימוני ההקפאה נשארים — מחיקה לא משחררת הקפאה. */
+    expect(cleared.manualSettlement.frozenActual).toBe(70);
+    expect(cleared.manualSettlement.frozenReal).toBe(true);
     expect(cleared.manualSettlement.manualPayments).toEqual(
       EMPTY_MAP_SESSION.manualSettlement.manualPayments
     );

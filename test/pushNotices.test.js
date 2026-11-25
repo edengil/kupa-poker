@@ -77,7 +77,7 @@ describe("which notices send a push", () => {
     expect(planNoticePushes({ db, items, subscriptions: [] }).due).toEqual([]);
   });
 
-  it("pushes an open transfer to the payer and the receiver on their own subscriptions", () => {
+  it("pushes an open transfer only to the payer (כלל 7 — המקבל לא מקבל התראת שחקן)", () => {
     const data = {
       ...db,
       sessions: [{
@@ -99,8 +99,8 @@ describe("which notices send a push", () => {
       subscriptions: [sub("אופיר", "אופיר סנה"), sub("קובי", "קובי סעדה")],
     });
     const transfers = plan.due.filter((job) => job.kind === "transfer");
-    expect(transfers.map((job) => job.player).sort()).toEqual(["אופיר סנה", "קובי סעדה"]);
+    expect(transfers.map((job) => job.player).sort()).toEqual(["אופיר סנה"]);
     expect(transfers.find((job) => job.player === "אופיר סנה").body).toContain("מעביר");
-    expect(transfers.find((job) => job.player === "קובי סעדה").body).toContain("מקבל");
+    expect(transfers.find((job) => job.player === "אופיר סנה").body).not.toMatch(/30/);
   });
 });

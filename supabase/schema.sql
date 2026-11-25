@@ -470,9 +470,13 @@ begin
   end if;
   out := p_sess - 'savingsPot' - 'savingsPotActual' - 'coupleFills';
   if out ? 'manualSettlement' and jsonb_typeof(out->'manualSettlement') = 'object' then
-    out := jsonb_set(out, '{manualSettlement}', (out->'manualSettlement') - 'frozenActual' - 'frozenReal' - 'frozenAuto', true);
+    out := jsonb_set(out, '{manualSettlement}', (out->'manualSettlement') - 'frozenActual' - 'frozenReal' - 'frozenAuto' - 'frozenPot', true);
   end if;
-  if out ? 'payments' then
+  -- שער כלל 3 (25.11.2026): ערב בלי settlementApprovedAt — הצופה לא מקבל
+  -- את תוכנית החלוקה בכלל. (קובץ בלבד — לא הוחל על המסד החי בגל הזה.)
+  if not (out ? 'settlementApprovedAt') then
+    out := out - 'payments';
+  elsif out ? 'payments' then
     out := jsonb_set(out, '{payments}', public.project_payments_for_viewer(out->'payments'), true);
   end if;
   if out ? 'entries' and jsonb_typeof(out->'entries') = 'array' then

@@ -46,9 +46,13 @@ describe("5.1 — התראות העברה מכל הערבים הפתוחים", (
     const ids = transfers.map((i) => i.id);
     expect(new Set(ids).size).toBe(ids.length); // אין כפילות על אותו חוב
     expect(ids).toContain("transfer:night-a:0:paid");
-    expect(ids).toContain("transfer:night-a:0:received");
     expect(ids).toContain("transfer:night-b:0:paid");
-    expect(ids).toContain("transfer:night-b:0:received");
+    /* כלל 7 (25.11): אין פריט־שחקן לצד המקבל — צד ה־received קיים רק
+       כפריט־מנהל לעדן (adminOnly). */
+    expect(ids).not.toContain("transfer:night-a:0:received");
+    expect(ids).not.toContain("transfer:night-b:0:received");
+    expect(ids).toContain("transfer:night-a:0:admin:received");
+    expect(ids).toContain("transfer:night-b:0:admin:received");
     /* כל פריט נושא את ה־sessionId של הערב שלו */
     expect(transfers.find((i) => i.id === "transfer:night-a:0:paid").sessionId).toBe("night-a");
     expect(transfers.find((i) => i.id === "transfer:night-b:0:paid").sessionId).toBe("night-b");
@@ -60,8 +64,9 @@ describe("5.1 — התראות העברה מכל הערבים הפתוחים", (
     const items = collectNotices(twoNightsDb(), new Date(2026, 10, 1, 12));
     const payer = noticesForViewer(items, "אופיר סנה");
     expect(payer.map((i) => i.id)).toContain("transfer:night-a:0:paid");
+    /* המקבל לא מקבל שום פריט העברה (כלל 7) — רק עדן רואה את שני הצדדים */
     const receiver = noticesForViewer(items, "קובי סעדה");
-    expect(receiver.map((i) => i.id)).toContain("transfer:night-a:0:received");
+    expect(receiver.filter((i) => i.kind === "transfer")).toEqual([]);
   });
 
   it("ערב א' שנסגר יוצא מהמגירה; ערב ב' נשאר", () => {

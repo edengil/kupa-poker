@@ -79,6 +79,9 @@ function richData() {
           { name: "אורן גיל", buyin: 300 },
         ],
         savingsPot: 93, savingsPotActual: 70,
+        /* מאושר לצפייה (כלל 3) — בלי האישור ה־payments מוסר כולו מההקרנה
+           והבדיקות על potPaid/plan לא היו נוגעות בכלום. */
+        settlementApprovedAt: "2026-11-08T00:00:00.000Z",
         coupleFills: [{ from: "עדן גיל", to: "אורן גיל", amount: 285 }],
         manualSettlement: {
           shortfall: { "אורן גיל": 13 },
@@ -109,6 +112,7 @@ function richData() {
         /* ערב עם potPaid אבל plan שרת בלי שום העברת קופה —
            מקרה־הקצה שהכלל האחיד נועד לסגור בשני הצדדים. */
         id: "plain-night", iso: "2026-11-01", endedAt: 1500,
+        settlementApprovedAt: "2026-11-08T00:00:00.000Z",
         entries: [{ name: "דן ינקלויץ", amount: 40 }],
         payments: {
           plan: JSON.stringify([
@@ -215,7 +219,9 @@ describe("wave7 7.3 — הקרנת צופה SQL↔JS", () => {
       ["coupleFills", "savingsPot", "savingsPotActual"].sort()
     );
     expect([...VIEWER_MANUAL_SETTLEMENT_STRIP_KEYS].sort()).toEqual(
-      ["frozenActual", "frozenAuto", "frozenReal"].sort()
+      /* frozenPot נוסף בגל Pot Boost (25.11) — סכום הקופה שעליו נבנתה
+         התוכנית הוא נתון קופה, מנהל בלבד, כמו שאר סימוני ההקפאה. */
+      ["frozenActual", "frozenAuto", "frozenReal", "frozenPot"].sort()
     );
     expect([...VIEWER_DATA_STRIP_KEYS].sort()).toEqual(
       ["savingsPot", "savingsWithdrawals"].sort()
@@ -292,6 +298,7 @@ describe("wave7 7.3 — הקרנת צופה SQL↔JS", () => {
        עדיין להסיר את potPaid, ושאר שדות ה־payments נשמרים זהים. */
     const sess = {
       id: "nullplan-night", iso: "2026-11-02", endedAt: 1300,
+      settlementApprovedAt: "2026-11-08T00:00:00.000Z",
       entries: [{ name: "דן ינקלויץ", amount: 40 }],
       payments: {
         plan: null,

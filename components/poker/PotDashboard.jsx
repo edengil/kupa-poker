@@ -5,7 +5,7 @@ import { C } from "@/lib/poker/colors";
 import { r2 } from "@/lib/poker/helpers";
 import { fmtGap } from "@/lib/poker/format";
 import { potOverview } from "@/lib/paymentTracking";
-import { withActual } from "@/lib/poker/potEdits";
+import { withActual, withRecordedPot, potEditBlockReason } from "@/lib/poker/potEdits";
 import { flushStore } from "@/lib/store";
 
 /**
@@ -16,7 +16,7 @@ import { flushStore } from "@/lib/store";
  * היתרה הראשית היא ה"בפועל". פער הערב (חוסר/עודף במאזן) מוצג כשורה
  * נפרדת ולעולם לא מתקזז מול הקופה.
  */
-export function PotDashboard({ db, commit, isAdmin }) {
+export function PotDashboard({ db, commit, isAdmin, readOnly = false }) {
   const [editingId, setEditingId] = useState(null);
   const [potValue, setPotValue] = useState("");
   const [editingActualId, setEditingActualId] = useState(null);
@@ -26,19 +26,24 @@ export function PotDashboard({ db, commit, isAdmin }) {
   if (!isAdmin) return null;
 
   const savePot = async (sessionId) => {
+    /* B4: במצב צפייה־בלבד העריכה נחסמת בקול — לא נעלמת בשקט (23.11). */
+    const blocked = potEditBlockReason({ readOnly });
+    if (blocked) {
+      alert(blocked);
+      return;
+    }
     const v = Number(potValue);
     if (!Number.isFinite(v) || v < 0) {
       alert("סכום לא תקין");
       return;
     }
     if (!commit) return;
-    /* גל 7 (7.5): היתרה המצטברת נגזרת מ־potOverview — העריכה נוגעת
-       רק בשדה של הערב, והיתרה מתעדכנת מאליה מהנגזרת. (לפני הגל,
-       B5 תחזק כאן את db.savingsPot ידנית בהפרש; המונה הופסק.) */
+    /* Pot Boost (25.11): עריכת "רשום" עוברת רק דרך withRecordedPot —
+       לפני הקפאה זה מעצב את החלוקה מחדש, אחרי הקפאה נוגע רק בפנקס. */
     commit({
       ...db,
       sessions: db.sessions.map((s) =>
-        s.id === sessionId ? { ...s, savingsPot: v > 0 ? r2(v) : undefined } : s
+        s.id === sessionId ? withRecordedPot(s, v) : s
       ),
     });
     /* בודקים את תוצאת השטיפה (גל 4, 4.6 — בדפוס signOut של OwnerApp):
@@ -63,6 +68,11 @@ export function PotDashboard({ db, commit, isAdmin }) {
      סכומי שחקנים בדיוק. מחיקת הבפועל משחררת את ההקפאה: מפה אוטומטית
      נמחקת כולה, וחלוקה אמיתית נשארת עם המפה הקפואה (אותם סכומים). */
   const savePotActual = async (sessionId) => {
+    const blocked = potEditBlockReason({ readOnly });
+    if (blocked) {
+      alert(blocked);
+      return;
+    }
     const v = Number(actualValue);
     if (!Number.isFinite(v) || v < 0) {
       alert("סכום לא תקין");

@@ -52,17 +52,19 @@ describe("זיכוי העודף לעדן (19.11) — מסלול אוטומטי",
     ]);
     const { got, gave } = sums(resolved.transfers);
     expect(got["דן ינקלויץ"]).toBe(250); // זוכה מקבל מלא
-    expect(got[POT_SINK_NAME]).toBe(93); // קופה מלאה, כיור נפרד
+    /* §8: רגל הקופה = floor5(93) = 90 (בפנקס נרשמים 93); שבר הקופה 3
+       מצטרף לעודף של עדן. */
+    expect(got[POT_SINK_NAME]).toBe(90);
     expect(gave["אבי כהן"]).toBe(300); // חייב משלם מלא — 250 לדן + 50 לעדן
     expect(got[RESIDUAL_SINK_NAME]).toBeUndefined();
-    // צפוי עדן: −100 גולמי + 57 זיכוי = −43; הגולמי נשמר ב־raw
+    // צפוי עדן: −100 גולמי + 60 זיכוי (57 עודף + 3 שבר־קופה) = −40
     const eden = resolved.expected.find((e) => e.name === "עדן גיל");
-    expect(eden.net).toBe(-43);
+    expect(eden.net).toBe(-40);
     expect(eden.raw).toBe(-100);
     // התוכנית הקנונית והטקסט לקבוצה לא חושפים את שורת העודף
     expect(plan.transfers.some((t) => t.residual)).toBe(false);
-    expect(plan.potTransfer).toMatchObject({ from: "עדן גיל", to: POT_SINK_NAME, amount: 93 });
-    const text = settlementTextForSession(session);
+    expect(plan.potTransfer).toMatchObject({ from: "עדן גיל", to: POT_SINK_NAME, amount: 90 });
+    const text = settlementTextForSession(session, { manager: true });
     // תנועותיו היחידות של עדן בערב הזה הן הקופה (יוצאת) והעודף (נכנס) —
     // שתיהן מסוננות מהטקסט לקבוצה, אז שמו לא מופיע בו כלל
     expect(text).not.toContain("עדן גיל");
@@ -100,12 +102,14 @@ describe("זיכוי העודף לעדן (19.11) — מסלול אוטומטי",
       ],
     };
     const resolved = resolveSettlement(session);
+    /* §8: רגל הקופה 90 במקום 93 — עדן משלם 245 + 90 = 335; דן עדיין
+       סופג את קיצוץ החמישיות 5 (250 ← 245). */
     expect(resolved.transfers).toEqual([
       { from: "עדן גיל", to: "דן ינקלויץ", amount: 245 },
-      { from: "עדן גיל", to: POT_SINK_NAME, amount: 93, pot: true },
+      { from: "עדן גיל", to: POT_SINK_NAME, amount: 90, pot: true },
     ]);
     const eden = resolved.expected.find((e) => e.name === "עדן גיל");
-    expect(eden.net).toBe(-338); // משלם 245 + 93
+    expect(eden.net).toBe(-335); // משלם 245 + 90
     expect(eden.raw).toBe(-343); // הגולמי לא זז
     expect(paymentPlan(session).problems).toEqual([]);
   });
@@ -175,11 +179,10 @@ describe("זיכוי העודף לעדן (19.11) — מסלול שמור וסי�
     const withManual = saveManualPayments(NIGHT_1010, REAL);
     const before = paymentPlan(withManual);
     const resolved = resolveSettlement(withManual);
-    // עודף 75 מזוכה: שורת אורן→עדן 1, שארית עדן (74) נספגת, צפוי −205
-    expect(resolved.transfers.filter((t) => t.residual)).toEqual([
-      expect.objectContaining({ from: "אורן גיל", to: "עדן גיל", amount: 1, residual: true }),
-    ]);
-    expect(resolved.expected.find((e) => e.name === "עדן גיל").net).toBe(-205);
+    // עודף 75 מזוכה לעדן; שארית ה־1₪ של אורן נספגת בעיגול המנוע
+    // (חייבת־מועדפת למטה) — אין שורת residual, צפוי עדן −206
+    expect(resolved.transfers.filter((t) => t.residual)).toEqual([]);
+    expect(resolved.expected.find((e) => e.name === "עדן גיל").net).toBe(-206);
     // התוכנית הקנונית לא כוללת שורות עודף — לכן אינדקסי הסימון יציבים
     expect(before.transfers.some((t) => t.residual)).toBe(false);
     expect(before.problems).toEqual([]);

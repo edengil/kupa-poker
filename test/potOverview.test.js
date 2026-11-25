@@ -48,7 +48,7 @@ describe("דשבורד קופה", () => {
     expect(e.actual).toBe(76.25); // ברירת מחדל: בפועל = רשום
     expect(e.gap).toBe(-75); // פער הערב — שורה נפרדת, לא חלק מהקופה
     expect(e.edenGross).toBe(-280);
-    expect(e.edenPaid).toBe(276); // עיגול לחמישיות (19.11): הקופה בתוכנית 76, עדן מממן אותה — סך בין־אנשים 200 (תקרה), שבר 4 נספג בקיצוץ הזוכים (דן −5)
+    expect(e.edenPaid).toBe(275); // §8: רגל הקופה בתוכנית = floor5(76.25) = 75 (השבר 1.25 לעדן כעודף נסתר) — סך בין־אנשים 200, עדן מממן את הרגל
     expect(e.edenWon).toBe(0);
     expect(o.totalRecorded).toBe(76.25);
     expect(o.totalActual).toBe(76.25);

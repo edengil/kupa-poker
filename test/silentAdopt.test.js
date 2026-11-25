@@ -58,6 +58,10 @@ vi.mock("../components/poker/chrome", () => ({
 }));
 vi.mock("../components/poker/Banner", () => ({ Banner: () => null }));
 vi.mock("../components/poker/RecordsAlert.jsx", () => ({ RecordsAlert: () => null }));
+/* גל Pot Boost (איחוד טאבים): RecordsTab מתארח בתוך טאב הטבלה
+   ו־SummariesTab בתוך טאב הערבים — ממוקים כאן כמו שאר כרטיסי הטאב. */
+vi.mock("../components/poker/RecordsTab.jsx", () => ({ RecordsTab: () => null }));
+vi.mock("../components/poker/SummariesTab.jsx", () => ({ SummariesTab: () => null }));
 vi.mock("../components/poker/SavingsPotCard.jsx", () => ({ SavingsPotCard: () => null }));
 vi.mock("../components/poker/PersonalHighlightsCard", () => ({ PersonalHighlightsCard: () => null }));
 vi.mock("../components/poker/PersonalStatsCard", () => ({ PersonalStatsCard: () => null }));

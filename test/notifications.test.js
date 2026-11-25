@@ -30,16 +30,18 @@ describe("in-app notices", () => {
     ]),
   ], { roster: ["אופיר סנה", "קובי סעדה"] });
 
-  it("tells the payer and the receiver to act while the transfer is open", () => {
+  it("tells only the payer to act while the transfer is open (כלל 7)", () => {
+    /* הכרעת עדן 25.11 (§7.2): שחקן מקבל התראה רק על העברה שהוא עצמו
+       צריך לבצע, ובלי הסכום. המקבל לא מקבל התראת שחקן בכלל; הצדדים
+       המלאים (כולל «התקבל») קיימים רק כפריטי־מנהל לעדן. */
     const items = collectNotices(open, new Date(2026, 8, 25, 12));
     const payer = noticesForViewer(items, "אופיר סנה");
     const receiver = noticesForViewer(items, "קובי סעדה");
     expect(payer.map((item) => item.action)).toEqual(["paid"]);
     expect(payer[0].actorRole).toBe("מעביר");
     expect(payer[0].actionLabel).toBe("שולם");
-    expect(receiver.map((item) => item.action)).toEqual(["received"]);
-    expect(receiver[0].actorRole).toBe("מקבל");
-    expect(receiver[0].actionLabel).toBe("התקבל");
+    expect(payer[0].body).not.toMatch(/30/);
+    expect(receiver.filter((item) => item.kind === "transfer")).toEqual([]);
     expect(noticesForViewer(items, "שגיא גיל")).toEqual([]);
   });
 
@@ -61,7 +63,10 @@ describe("in-app notices", () => {
     const items = collectNotices(couple, new Date(2026, 7, 3, 12));
     const eden = noticesForViewer(items, "עדן גיל");
     expect(eden.some((item) => item.action === "paid" && item.actorName === "אורן גיל")).toBe(true);
-    expect(eden.some((item) => item.action === "received")).toBe(false);
+    /* צד ה־received שעדן רואה הוא פריט־המנהל בלבד (adminOnly, ממוען
+       אליו בשם) — לא התראת שחקן של המקבל. */
+    const receivedSeen = eden.filter((item) => item.action === "received");
+    expect(receivedSeen.every((item) => item.adminOnly)).toBe(true);
   });
 
   it("shows an admin every open transfer and who should act", () => {

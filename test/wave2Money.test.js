@@ -153,9 +153,10 @@ describe("ממצא 3 — כשל בתשלום ידני הוא דגל מפורש, 
     expect(res.manualPayments).toEqual([]);
     expect(res.droppedManualPayments).toHaveLength(1);
     expect(res.transfers.some((t) => t.manual)).toBe(false);
-    // המפה הידנית (W2 −10) נשארת מוחלת גם בלי הידניים: W2 מקבל 69
-    // (בלעדיה היה מקבל 75 כמו בחיתוך האוטומטי הנקי)
-    expect(receivedByName(res.transfers).W2).toBe(69);
+    // המפה הידנית (W2 −10) נשארת מוחלת גם בלי הידניים. במנוע המאוחד
+    // של גל Pot Boost (המסלול השמור עובר באותו מנוע חמישיות כמו
+    // האוטומטי) W2 מקבל 70 — לא 69 של החשבון הישן הלא־מעוגל.
+    expect(receivedByName(res.transfers).W2).toBe(70);
   });
 
   it("מסלול בלי־קופה: המפה הדו־צדדית נשארת והשגיאה מדווחת", () => {

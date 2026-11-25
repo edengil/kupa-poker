@@ -55,8 +55,17 @@ describe("publicShare", () => {
     // בלי frozenActual ה־manualSettlement של הצופה זהה לזה של המנהל
     const { frozenActual, ...expectedMs } = frozen.manualSettlement;
     expect(viewerSession.manualSettlement).toEqual(expectedMs);
-    // וסכומי השחקנים שהצופה מחשב זהים לאלה של המנהל
-    expect(paymentPlan(viewerSession).transfers).toEqual(paymentPlan(frozen).transfers);
+    /* גל Pot Boost: הערב לא אושר לצפייה (כלל 3) — לצופה אין payments
+       בכלל. עם אישור צפייה, סכומי השחקנים שהצופה רואה זהים לאלה של
+       המנהל (אותה תוכנית שמורה, רק בלי שורת הקופה). */
+    expect(viewerSession.payments).toBeUndefined();
+    const approved = { ...frozen, settlementApprovedAt: "2026-11-08T00:00:00.000Z" };
+    const approvedViewer = snapshotForViewer({
+      id: "g1", config: { shareHistory: true }, data: { sessions: [approved] },
+    }).data.sessions[0];
+    expect(paymentPlan(approvedViewer).transfers).toEqual(
+      paymentPlan(approved).transfers.filter((t) => !t.pot)
+    );
   });
 
   it("גל 1: גם הלייב מוקרן — שדות קופה ו־coupleFills יוצאים, שחקנים ו־cps נשארים", () => {

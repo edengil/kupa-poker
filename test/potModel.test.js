@@ -62,7 +62,7 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     expect(nightGap(NIGHT_2410)).toBe(-35); // הפער אינו הקופה
   });
 
-  it("אוטומטי: חוסר 58 + שבר קופה 2 נחתכים בחמישיות מהזוכים; הקופה מלאה; עדן משלם 528 מהם 93 לקופה", () => {
+  it("אוטומטי: חוסר 58 + שבר קופה 2 נחתכים בחמישיות מהזוכים; רגל הקופה 90 (§8); עדן משלם 525", () => {
     const plan = paymentPlan(NIGHT_2410);
     expect(plan.problems).toEqual([]);
     // החשבונאות המלאה (כולל כיורים) היא של ה־resolver; paymentPlan מחזיק רק העברות שחקנים
@@ -78,18 +78,20 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     expect(got["אורן גיל"]).toBe(305);
     expect(got["דור לירז"]).toBe(105);
     expect(got["דן ינקלויץ"]).toBe(95);
-    expect(got[POT_SINK_NAME]).toBe(93); // הקופה לעולם לא נחתכת
-    expect(gave["עדן גיל"]).toBe(528); // 435 בין־אנשים + 93 לקופה (הגולמי 530)
+    /* §8.9: רגל הקופה בתוכנית = floor5(93) = 90; ההפרש 3 הוא עודף שיורי
+       נסתר לעדן (בפנקס עדיין נרשמים 93 מלאים — potRecordedFor למעלה). */
+    expect(got[POT_SINK_NAME]).toBe(90);
+    expect(gave["עדן גיל"]).toBe(525); // 435 בין־אנשים + 90 לקופה (הגולמי 530)
     expect(gave["קובי סעדה"]).toBe(400);
     expect(gave["נתנאל כהן"]).toBe(150);
-    // חובת ההפקדה של עדן: שורת קופה אחת של 93 ממנו
+    // חובת ההפקדה של עדן: שורת קופה אחת של 90 ממנו
     const potFromEden = allTransfers.filter((t) => t.to === POT_SINK_NAME);
     expect(potFromEden).toHaveLength(1);
     expect(potFromEden[0].from).toBe("עדן גיל");
-    expect(potFromEden[0].amount).toBe(93);
+    expect(potFromEden[0].amount).toBe(90);
   });
 
-  it("החלוקה הידנית של עדן לערב זה (35/13/10) נשמרת במדויק דרך manualSettlement", () => {
+  it("החלוקה הידנית של עדן לערב זה (35/13/10) נצרכת כמות שהיא; היתרות מתעגלות במנוע", () => {
     const basis = settlementBasis(playersFromSession(NIGHT_2410), 2);
     const session = {
       ...NIGHT_2410,
@@ -107,18 +109,22 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     const allTransfers = resolveSettlement(session).transfers;
     const { got, gave } = sums(allTransfers);
     expect(got["אופיר סנה"]).toBe(480);
-    expect(got["אורן גיל"]).toBe(307);
+    /* המפה השמורה (35/13/10) נצרכת כמות שהיא — עיגול §8 חל על ערכים
+       חדשים בשמירה, לא על נתון היסטורי שמור. אורן: 320 גולמי − 13 מהמפה
+       = 307, ובמנוע החמישיות זוכה עדן/אורן מתעגלת למעלה → 310. */
+    expect(got["אורן גיל"]).toBe(310);
     expect(got["דור לירז"]).toBe(100);
     expect(got["דן ינקלויץ"]).toBe(100);
     // R3: עם savingsPotActual=70 — ההעברה לקופה בתוכנית היא הבפועל, לא הרשום
     expect(got[POT_SINK_NAME]).toBe(70);
     // הכרעת 19.11: ה־23 (הפרש רשום־בפועל) הם שארית של עדן עצמו — נספגים
-    // כזיכוי על שמו, לא שורת העברה. בהעברות הוא משלם 507 = 437 + 70,
-    // והצפוי שלו הוא −507 (הגולמי −530 נשמר ב־raw/בסטטיסטיקה).
-    expect(gave["עדן גיל"]).toBe(507);
+    // כזיכוי על שמו, לא שורת העברה. במנוע החמישיות עדן גם מממן את
+    // עיגול־המעלה של אורן (307→310): הוא משלם 510 = 440 + 70 לקופה,
+    // והצפוי שלו −510 (הגולמי −530 נשמר ב־raw/בסטטיסטיקה).
+    expect(gave["עדן גיל"]).toBe(510);
     expect(
       resolveSettlement(session).expected.find((e) => e.name === "עדן גיל").net
-    ).toBe(-507);
+    ).toBe(-510);
     expect(gave["קובי סעדה"]).toBe(400);
     expect(gave["נתנאל כהן"]).toBe(150);
     const edenToPot = allTransfers
@@ -126,7 +132,7 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
       .reduce((s, t) => s + t.amount, 0);
     expect(edenToPot).toBe(70);
     // הטקסט הציבורי לקבוצה לא חושף את הקופה
-    const text = settlementTextForSession(session);
+    const text = settlementTextForSession(session, { manager: true });
     expect(text).not.toContain("קופת חיסכון");
     expect(text).not.toContain("93");
   });
@@ -147,16 +153,17 @@ describe("מודל הקופה (25.10) — ערב 24.10", () => {
     const resolved = resolveSettlement(session);
     const { got, gave } = sums(resolved.transfers);
     expect(got["דן ינקלויץ"]).toBe(250);
-    expect(got[POT_SINK_NAME]).toBe(93);
-    // 150 עודף − 93 קופה = 57 עודף. עדן הוא החייב היחיד, אז כל ה־57 הם
-    // שאריתו שלו — נספגת: אין שורת כיור ואין שורת residual, והוא משלם
-    // 343 בלבד בהעברות (250 לדן + 93 לקופה). הצפוי שלו −343; הגולמי
-    // −400 נשמר בשדה raw.
+    /* §8.9: רגל הקופה = floor5(93) = 90; שבר הקופה 3 מצטרף לעודף של עדן. */
+    expect(got[POT_SINK_NAME]).toBe(90);
+    // 150 עודף − 93 קופה = 57 עודף, ועוד 3 שבר־קופה — 60 שארית של עדן,
+    // נספגת: אין שורת כיור ואין שורת residual, והוא משלם 340 בלבד
+    // בהעברות (250 לדן + 90 לקופה). הצפוי שלו −340; הגולמי −400 נשמר
+    // בשדה raw.
     expect(got[RESIDUAL_SINK_NAME]).toBeUndefined();
     expect(resolved.transfers.filter((t) => t.residual)).toEqual([]);
-    expect(gave["עדן גיל"]).toBe(343);
+    expect(gave["עדן גיל"]).toBe(340);
     const edenExpected = resolved.expected.find((e) => e.name === "עדן גיל");
-    expect(edenExpected.net).toBe(-343);
+    expect(edenExpected.net).toBe(-340);
     expect(edenExpected.raw).toBe(-400);
     expect(resolved.expected.some((e) => e.name === RESIDUAL_SINK_NAME)).toBe(false);
   });

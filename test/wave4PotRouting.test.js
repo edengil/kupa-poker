@@ -196,19 +196,19 @@ describe("4.1 — פאז תצורות זוגיות (תצורת הרפרו נכל
 });
 
 describe("4.1 — פיקסצ'ר־הזהב 24.10 לא זז", () => {
-  it("התוכנית המחושבת של 24.10 זהה בייטית לתוכנית הסופית הסגורה", () => {
+  it("התוכנית המוצגת של 24.10 היא התוכנית הסופית הסגורה עצמה (הקפאה — לא מחושבת מחדש)", () => {
+    /* גל Pot Boost (B1/§8.6): לפיקסצ'ר יש סימוני תשלום, ולכן הערב מוקפא —
+       paymentPlan מגיש את התוכנית השמורה ב־payments.plan מילה במילה
+       (כולל דגלי manual ושורת הקופה 60 שנשמרה אז), ולא חישוב חדש.
+       זו בדיוק התוכנית הסופית הסגורה של הערב. */
     const plan = paymentPlan(NIGHT_24_10);
     expect(plan.problems).toEqual([]);
-    expect(plan.transfers).toEqual([
-      { from: "עדן גיל", to: "אורן גיל", amount: 307, pair: true },
-      { from: "נתנאל כהן", to: "אופיר סנה", amount: 150, pair: true },
-      { from: "קובי סעדה", to: "אופיר סנה", amount: 330 },
-      { from: "עדן גיל", to: "דן ינקלויץ", amount: 30 },
-      { from: "עדן גיל", to: "דור לירז", amount: 100 },
-      { from: "קובי סעדה", to: "דן ינקלויץ", amount: 70 },
-    ]);
+    expect(plan.frozen).toBe(true);
+    expect(plan.transfers).toEqual(
+      JSON.parse(NIGHT_24_10.payments.plan).filter((t) => !t.pot)
+    );
     expect(plan.potTransfer).toEqual(
-      expect.objectContaining({ from: "עדן גיל", to: "קופת חיסכון", amount: 70, pot: true })
+      expect.objectContaining({ from: "עדן גיל", to: "קופת חיסכון", amount: 60, pot: true })
     );
   });
 });

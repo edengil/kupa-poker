@@ -124,39 +124,32 @@ describe("המונה כולל את הקופה (החלטה 3)", () => {
 });
 
 describe("עריכת בפועל מהכרטיס (withActual) — סימונים והקופה", () => {
-  it("הגדלה 65→80: שורת הקופה 80, potPaid שורד, וה־15 הנוספים יורדים מהמרוויחים", () => {
+  /* גל Pot Boost: הערב מסומן במלואו (כולל potPaid) ולכן מוקפא — עריכת
+     ה«בפועל» אחרי ההקפאה לא מזינה את חישוב ההעברות בכלל. היא נראית רק
+     בשורת הקופה של המנהל וביתרת הפנקס; תוכנית השחקנים היא השמורה. */
+  it("הגדלה 65→80 אחרי הקפאה: שורת הקופה למנהל 80, potPaid שורד, תוכנית השחקנים לא זזה", () => {
     const marked = markPotPaid(markAllPlayers(night1711), true, "עדן גיל");
     const edited = withActual(marked, 80);
+    expect(edited.savingsPotActual).toBe(80);
     const plan = paymentPlan(edited);
     expect(plan.potTransfer.amount).toBe(80);
     expect(plan.potPaid).toBe(true);
     const receivedBy = {};
     for (const t of plan.transfers) receivedBy[t.to] = (receivedBy[t.to] || 0) + t.amount;
-    // תחת הרשום: אופיר 245, דור 40 (סה"כ 285; בחמישיות מאז 19.11).
-    // ההגדלה היא חוסר מימון נוסף של 15 שמתחלק בין המרוויחים —
-    // סה"כ השחקנים 270.
-    expect(receivedBy["אופיר סנה"] + receivedBy["דור לירז"]).toBe(270);
+    // התוכנית השמורה כמות שהיא: אופיר 245 + דור 40 = 285 — שום קיצוץ חדש
+    expect(receivedBy["אופיר סנה"] + receivedBy["דור לירז"]).toBe(285);
     expect(adminSessionConfirmations(edited).potRow.amount).toBe(80);
     expect(adminSessionConfirmations(edited).potRow.closed).toBe(true);
   });
 
-  it("הקטנה 65→50: potPaid שורד, וסימון של העברה שלא השתנתה נודד לפי זהות", () => {
+  it("הקטנה 65→50 אחרי הקפאה: potPaid שורד וכל הסימונים נשארים על התוכנית השמורה", () => {
     const marked = markPotPaid(markAllPlayers(night1711), true, "עדן גיל");
     const edited = withActual(marked, 50);
     const plan = paymentPlan(edited);
     expect(plan.potTransfer.amount).toBe(50);
     expect(plan.potPaid).toBe(true);
-    // ההעברה קובי סעדה ← דור לירז 40 לא השתנתה — הסימון שלה שרד ועבר
-    // לאינדקס החדש שלה; העברות שהזדהותן השתנתה איבדו סימון (נדידה לפי
-    // זהות בלבד, כמו בכל המערכת). (תחת עיגול החמישיות של 19.11 התוכנית
-    // האוטומטית של הערב היא אופיר 245 / דור 40 — ההקפאה שומרת אותן.)
-    const survivorIdx = plan.transfers.findIndex(
-      (t) => t.from === "קובי סעדה" && t.to === "דור לירז" && t.amount === 40
-    );
-    expect(survivorIdx).toBeGreaterThan(-1);
-    expect(plan.paid[survivorIdx]).toBe(true);
-    expect(Object.values(plan.paid).filter(Boolean)).toHaveLength(1);
-    // סך כל השחקנים נשמר תחת ההקפאה — רק שורת הקופה זזה
+    expect(plan.transfers).toEqual(paymentPlan(marked).transfers);
+    expect(plan.paid).toEqual(marked.payments.paid);
     const total = plan.transfers.reduce((sum, t) => sum + t.amount, 0);
     expect(total).toBe(285);
   });
@@ -178,8 +171,10 @@ describe("נעילת העברה מסומנת (החלטה 4)", () => {
 
   it("גם סימון «התקבל» נועל, וגם כשהשינוי עקיף (דרך תשלום ידני אחר)", () => {
     const marked = markReceipt(night1711, 1, true, "אופיר סנה");
+    /* הסכומים כפולות־5 ותקינים במנוע §8 (41 הישן היה מתעגל ל־45 ועובר
+       את זכאותו המעוגלת של דור, 40 — העורך דוחה אותו עוד לפני הנעילה). */
     const blocked = markedTransfersBlockingSave(marked, [
-      { from: "קובי סעדה", to: "דור לירז", amount: 41, id: "x3" },
+      { from: "קובי סעדה", to: "דור לירז", amount: 40, id: "x3" },
       { from: "קובי סעדה", to: "אופיר סנה", amount: 60, id: "x4" },
     ]);
     expect(blocked).toEqual([
@@ -226,7 +221,7 @@ describe("פרטיות קופה — הקרנת צופה וסיכום לקבוצ�
   });
 
   it("סיכום החלוקה לקבוצה נשאר בלי שורת קופה ובלי סכומיה", () => {
-    const text = settlementTextForSession(night1711);
+    const text = settlementTextForSession(night1711, { manager: true });
     expect(text).not.toContain(POT_SINK_NAME);
     expect(text.length).toBeGreaterThan(0);
   });

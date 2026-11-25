@@ -14,9 +14,11 @@ test.describe("ניווט ומסכים", () => {
     await expect(page.getByPlaceholder("חיפוש שחקן…")).toBeVisible({ timeout: 20_000 });
   });
 
-  test("טאב שיאים נטען", async ({ page }) => {
-    await page.getByTestId("tab-records").click();
-    await expect(page.getByText(/שיא|רווח|טיפ|ג׳יטונים|גיבור/)).toBeVisible({
+  test("שיאים נטענים בתוך טאב הטבלה", async ({ page }) => {
+    /* גל Pot Boost (S5, הכרעת עדן §8.7): טאב השיאים בוטל — השיאים
+       מתרנדרים בתוך טאב הטבלה, והמזהה הישן records ממופה אליו. */
+    await page.getByTestId("tab-table").click();
+    await expect(page.getByRole("heading", { name: "♠ שיאים" })).toBeVisible({
       timeout: 20_000,
     });
   });

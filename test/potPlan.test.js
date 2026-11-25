@@ -37,10 +37,12 @@ describe("R3 — סכום הקופה בתוכנית", () => {
     expect(plan.problems).toEqual([]);
   });
 
-  it("עם savingsPotActual — ההעברה לקופה היא הבפועל, והפנקס לא משתנה", () => {
+  it("עם savingsPotActual — ההעברה לקופה היא הבפועל מעוגל למטה לחמישיות (§8), והפנקס לא משתנה", () => {
     const session = { ...POT_NIGHT, savingsPotActual: 18 };
     const plan = paymentPlan(session);
-    expect(plan.potTransfer?.amount).toBe(18);
+    /* §8.9: רגל הקופה = floor5(18) = 15; ההפרש 3 הוא עודף שיורי נסתר
+       לעדן. הפנקס עדיין רושם את המלא (18 בפועל / 25 רשום). */
+    expect(plan.potTransfer?.amount).toBe(15);
     expect(plan.problems).toEqual([]);
     const overview = potOverview({ sessions: [session], savingsWithdrawals: [] });
     expect(overview.totalRecorded).toBe(25);
@@ -68,9 +70,9 @@ describe("הקפאת מפה בעריכת בפועל (ערב בלי חלוקה ש
       },
     };
     // מנהל על הערב הקפוא: אותם סכומי שחקנים כמו בחלוקה האוטומטית של הרשום,
-    // ורק ההעברה לקופה היא הבפועל (18)
+    // ורק ההעברה לקופה היא הבפועל מעוגל למטה לחמישיות (§8): floor5(18) = 15
     expect(paymentPlan(frozen).transfers).toEqual(recordedAuto.transfers);
-    expect(paymentPlan(frozen).potTransfer?.amount).toBe(18);
+    expect(paymentPlan(frozen).potTransfer?.amount).toBe(15);
     // וצופה (בלי שדות קופה, רשום מחושב מ־5%) מקבל אותם סכומים ואותו fingerprint
     const viewer = { ...frozen, savingsPot: undefined, savingsPotActual: undefined };
     expect(paymentPlan(viewer).transfers).toEqual(recordedAuto.transfers);

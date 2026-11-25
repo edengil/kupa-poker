@@ -169,9 +169,14 @@ function App({
   }, []);
   // initialTab מאפשר לרענון מבחוץ (remount אחרי פינג מהבוט) לא לזרוק
   // את המשתמש בחזרה לטבלה
-  const [tab, setTabState] = useState(initialTab);
+  /* מיפוי טאבים ישנים לטאב־האם (צמצום 25.11): records→table (שיאים כמקטע
+     בטבלה), summaries→sessions (סיכומים כמקטע בערבים), stats→players
+     (צפיות כמקטע בשחקנים). קישורים/מצבים ישנים ממשיכים לעבוד. */
+  const TAB_HOST = { records: "table", summaries: "sessions", stats: "players" };
+  const [tab, setTabState] = useState(TAB_HOST[initialTab] || initialTab);
   // מעבר טאב מדווח החוצה — ככה יומן הצפיות יודע במה כל צופה הסתכל
   const setTab = (id) => {
+    id = TAB_HOST[id] || id;
     // startTransition — נדרש כדי שמעבר המסך (ViewTransition) יתנגן
     startTransition(() => setTabState(id));
     track("tab_viewed", { tab: id });
@@ -537,35 +542,41 @@ function App({
               <SavingsPotCard db={db} commit={commit} isAdmin={isAdmin} />
             </>
           ) : tab === "sessions" ? (
-            <SessionsTab db={db} commit={commit} isAdmin={isAdmin} viewerName={viewerName} />
+            <>
+              <SessionsTab db={db} commit={commit} isAdmin={isAdmin} viewerName={viewerName} readOnly={readOnly} />
+              {/* "סיכומים" קופל לתוך "ערבים" (צמצום טאבים 25.11) */}
+              <SummariesTab db={db} />
+            </>
           ) : tab === "pot" && isAdmin && !readOnly ? (
-            <PotDashboard db={db} commit={commit} isAdmin={isAdmin} />
+            <PotDashboard db={db} commit={commit} isAdmin={isAdmin} readOnly={readOnly} />
           ) : tab === "table" ? (
-            <TableTab
-              db={db}
-              commit={commit}
-              years={years}
-              readOnly={readOnly}
-              scope={scope}
-              setScope={setScope}
-              y={y}
-              setY={setPeriodY}
-              mo={mo}
-              setMo={setPeriodMo}
-              viewerName={viewerName}
-              isAdmin={isAdmin}
-              onMarkPayment={onMarkPayment}
-              onVotePlayer={onVotePlayer}
-              focusSessionId={focusSessionId}
-            />
-          ) : tab === "stats" && statsPanel ? (
-            statsPanel
-          ) : tab === "records" ? (
-            <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} allowPick={!readOnly} />
-          ) : tab === "summaries" ? (
-            <SummariesTab db={db} />
+            <>
+              <TableTab
+                db={db}
+                commit={commit}
+                years={years}
+                readOnly={readOnly}
+                scope={scope}
+                setScope={setScope}
+                y={y}
+                setY={setPeriodY}
+                mo={mo}
+                setMo={setPeriodMo}
+                viewerName={viewerName}
+                isAdmin={isAdmin}
+                onMarkPayment={onMarkPayment}
+                onVotePlayer={onVotePlayer}
+                focusSessionId={focusSessionId}
+              />
+              {/* "שיאים" קופל לתוך "טבלה" (צמצום טאבים 25.11) */}
+              <RecordsTab db={db} viewerName={viewerName} showMine={showPersonal} allowPick={!readOnly} />
+            </>
           ) : (
-            <PlayersTab db={db} onPlayer={setProfile} />
+            <>
+              <PlayersTab db={db} onPlayer={setProfile} />
+              {/* "צפיות" קופל לתוך "שחקנים" (צמצום טאבים 25.11) */}
+              {statsPanel}
+            </>
           )}
           </ViewTransition>
         </Suspense>

@@ -19,7 +19,9 @@ test.describe("גל 7 · גרף השוואה וכרטיס סיכום", () => {
       await dialog.accept();
     });
     await resetPreview(page);
-    await page.getByTestId("tab-records").click();
+    /* גל Pot Boost (S5, הכרעת עדן §8.7): טאב השיאים בוטל — גרף ההשוואה
+       חי בתוך טאב הטבלה. */
+    await page.getByTestId("tab-table").click();
   });
 
   test("בחירת שחקנים מציירת את כל העקומות עם מקרא, עד ארבעה", async ({ page }) => {

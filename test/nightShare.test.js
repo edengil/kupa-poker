@@ -62,7 +62,9 @@ describe("settlementTextForSession", () => {
       ],
       endedAt: Date.parse("2026-08-20T22:00:00+03:00"),
     };
-    const text = settlementTextForSession(session);
+    /* {manager:true} — שער כלל 3: בלי אישור צפייה אין טקסט חלוקה;
+       הבדיקות כאן בודקות את יצירת הטקסט עצמה (תצוגת מנהל). */
+    const text = settlementTextForSession(session, { manager: true });
     expect(text.startsWith(BOT_MARK)).toBe(true);
     expect(text).toContain("חלוקה");
     expect(text).toMatch(/קובי מעביר 100 לשגיא/);
@@ -76,7 +78,7 @@ describe("settlementTextForSession", () => {
       ],
       endedAt: Date.parse("2026-08-20T22:00:00+03:00"),
     };
-    const text = settlementTextForSession(session);
+    const text = settlementTextForSession(session, { manager: true });
     expect(text).toMatch(/ב מעביר 100 לא/);
   });
 
@@ -397,7 +399,7 @@ describe("nightSummaryText", () => {
     expect(text).toContain("אופיר");
     expect(text).not.toContain("15");
     expect(text).toMatch(/קובי/);
-    const split = settlementTextForSession(session);
+    const split = settlementTextForSession(session, { manager: true });
     expect(split).toContain("חלוקה");
     expect(split).toMatch(/מעביר/);
   });

@@ -6,6 +6,7 @@ import { SendSettlementLink } from "./SendSettlementLink";
 import { C } from "@/lib/poker/colors";
 import { festiveCardSoft, festiveGlow, sectionEyebrow } from "@/lib/poker/festive";
 import { settlementTextForSession, potActualFor } from "@/lib/nightShare";
+import { isSettlementApproved, isAmountsApproved } from "@/lib/settlementApproval";
 import { paymentPlan, markTransfer, markReceipt, markPotPaid } from "@/lib/paymentTracking";
 import { r2 } from "@/lib/poker/helpers";
 import { settlementVersionLabel } from "@/lib/savedSettlement";
@@ -191,10 +192,10 @@ export function LastSettlementCard({
       ? (db?.sessions || []).find((s) => s.id === sessionId) || null
       : latestSession(db?.sessions);
     if (!session) return null;
-    const text = settlementTextForSession(session);
+    const text = settlementTextForSession(session, { manager: isAdmin });
     const isLatest = latestSession(db?.sessions)?.id === session.id;
     return { session, isLatest, text: text || "", ...paymentPlan(session) };
-  }, [db?.sessions, sessionId]);
+  }, [db?.sessions, sessionId, isAdmin]);
 
   /* הצבעת שחקן הערב — הקולות על הערב עצמו; צופה מצביע דרך RPC, מנהל דרך commit */
   const potnSession = card?.session || null;
@@ -206,6 +207,12 @@ export function LastSettlementCard({
   const [voting, setVoting] = useState(false);
 
   if (!card) return null;
+
+  /* שער כלל 3 (25.11.2026): צופה לא רואה את כרטיס החלוקה של ערב שהמנהל
+     עוד לא אישר לצפייה. המנהל רואה תמיד. */
+  if (!isAdmin && !isSettlementApproved(card.session)) return null;
+  /* אישור סכומים נפרד: בלעדיו צופה רואה מי־מעביר־למי בלי סכומים. */
+  const amountsVisible = isAdmin || isAmountsApproved(card.session);
 
   const { session, isLatest, text, transfers, potTransfer, potPaid, problems } = card;
   const dateLabel = `${session.d}.${session.mo}.${session.y}`;
@@ -391,8 +398,8 @@ export function LastSettlementCard({
             </>
           )}
         </span>
-        <b>{transfer.amount}₪</b>
-        {playerPhone(db, transfer.to) && (isAdmin || isSelf(transfer)) && (
+        {amountsVisible ? <b>{transfer.amount}₪</b> : <b>₪•••</b>}
+        {amountsVisible && playerPhone(db, transfer.to) && (isAdmin || isSelf(transfer)) && (
           <button
             type="button"
             aria-label={`העתק מספר וסכום: ${transfer.to}, ${transfer.amount} שקלים`}

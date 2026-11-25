@@ -19,14 +19,15 @@ import {
   potConfirmationStatusText,
 } from "@/lib/nightConfirmations";
 import { markTransfer, markReceipt, markPotPaid } from "@/lib/paymentTracking";
-import { withActual } from "@/lib/poker/potEdits";
+import { withActual, withRecordedPot, potEditBlockReason } from "@/lib/poker/potEdits";
+import { withSettlementApproval } from "@/lib/settlementApproval";
 import { flushStore } from "@/lib/store";
 import { allTransfersPaid } from "@/lib/settlementClosed";
 import { announceSettlementClosed } from "@/lib/announceSettlementClosed";
 import { notifyPaymentConfirmed } from "@/lib/poker/notifyTransfersClient";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
+export function SessionsTab({ db, commit, isAdmin, viewerName = null, readOnly = false }) {
   const [share, setShare] = useState(null);
   const [settlementId, setSettlementId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -59,11 +60,24 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
     setPendingDelete(null);
   };
 
+  /* אישורי כלל 3: קביעה/ביטול של אישור הצפייה או אישור הסכומים לערב. */
+  const toggleApproval = (s, field) => {
+    if (!isAdmin || !commit) return;
+    commit({
+      ...db,
+      sessions: db.sessions.map((x) =>
+        x.id === s.id ? withSettlementApproval(x, field, !x[field]) : x
+      ),
+    });
+    void flushStore();
+  };
+
   const openShare = (s) => {
     setShare({
       session: s,
       text: withSettlementLink(nightSummaryText(s, A), resolveBrowserInviteUrl(null, s.id)),
-      settlement: settlementTextForSession(s) || undefined,
+      /* כלל 3: טקסט החלוקה לוואטסאפ רק אחרי אישור צפייה של המנהל. */
+      settlement: s.settlementApprovedAt ? settlementTextForSession(s, { manager: true }) || undefined : undefined,
     });
   };
 
@@ -141,6 +155,12 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
      והעורך נשאר פתוח. */
   const savePotAmount = async () => {
     if (!latestSession || !potEdit) return;
+    /* B4: עריכת קופה במצב צפייה־בלבד נחסמת עם הודעה מפורשת (23.11). */
+    const blocked = potEditBlockReason({ readOnly });
+    if (blocked) {
+      alert(blocked);
+      return;
+    }
     const v = Number(potEditValue);
     if (!Number.isFinite(v) || v < 0) {
       alert("סכום לא תקין");
@@ -150,9 +170,10 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
       ...db,
       sessions: db.sessions.map((s) => {
         if (s.id !== latestSession.id) return s;
+        /* Pot Boost: "רשום" רק דרך withRecordedPot (הקפאה־מודע). */
         return potEdit === "actual"
           ? withActual(s, v)
-          : { ...s, savingsPot: v > 0 ? r2(v) : undefined };
+          : withRecordedPot(s, v);
       }),
     });
     if ((await flushStore().catch(() => false)) === false) {
@@ -213,6 +234,50 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null }) {
                 {s.d}.{s.mo}.{s.y}
               </b>
               <div style={{ display: "flex", gap: 6 }}>
+                {/* שער כלל 3 (25.11.2026): אישורי המנהל לערב הזה — צפייה
+                    בחלוקה, ובנפרד הצגת סכומים. מנהל בלבד. */}
+                {isAdmin && commit && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleApproval(s, "settlementApprovedAt")}
+                      data-testid={`session-approve-view-${s.id}`}
+                      aria-pressed={!!s.settlementApprovedAt}
+                      style={{
+                        background: s.settlementApprovedAt ? C.win : C.feltDeep,
+                        color: s.settlementApprovedAt ? C.feltDeep : C.brass,
+                        border: `1px solid ${C.line}`,
+                        borderRadius: 8,
+                        padding: "6px 8px",
+                        fontSize: 12,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {s.settlementApprovedAt ? "✓ צפייה אושרה" : "אשר צפייה בחלוקה"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleApproval(s, "settlementAmountsApprovedAt")}
+                      data-testid={`session-approve-amounts-${s.id}`}
+                      aria-pressed={!!s.settlementAmountsApprovedAt}
+                      disabled={!s.settlementApprovedAt}
+                      style={{
+                        background: s.settlementAmountsApprovedAt ? C.win : C.feltDeep,
+                        color: s.settlementAmountsApprovedAt ? C.feltDeep : C.brass,
+                        border: `1px solid ${C.line}`,
+                        borderRadius: 8,
+                        padding: "6px 8px",
+                        fontSize: 12,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                        opacity: s.settlementApprovedAt ? 1 : 0.5,
+                      }}
+                    >
+                      {s.settlementAmountsApprovedAt ? "✓ סכומים גלויים" : "אשר הצגת סכומים"}
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={() => setSettlementId(s.id)}

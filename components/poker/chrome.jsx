@@ -115,15 +115,16 @@ export const TABBAR_H = 90;
 
 export function TabBar({ tab, setTab, n, readOnly = false, hasStats = false, isAdmin = false }) {
   const WRITE_TABS = ["live", "input", "sessions"];
+  /* צמצום טאבים (25.11.2026, חופש תכנון מעדן): "שיאים" קופל לתוך "טבלה",
+     "סיכומים" לתוך "ערבים", ו"צפיות" לתוך "שחקנים" — כל הפונקציות נשארות
+     נגישות כמקטעים בתוך טאב־האם. תוצאה: מנהל 6 טאבים, צופה 3.
+     מזהי הטאבים הישנים (records/summaries/stats) ממופים לטאב־האם ב־PokerApp. */
   const items = [
     ["table", "טבלה", BarChart3],
     ["players", "שחקנים", Users],
-    ["records", "שיאים", Trophy],
-    ["summaries", "סיכומים", Images],
     ["live", "לייב", PlayCircle],
     ["input", "הזנה", ClipboardPaste],
     ["sessions", "ערבים", CalendarDays],
-    ...(hasStats ? [["stats", "צפיות", Eye]] : []),
     // דשבורד קופת חיסכון — אדמין בלבד (דורש commit, לכן לא ב-readOnly)
     ...(!readOnly && isAdmin ? [["pot", "קופה", Coins]] : []),
   ].filter(([id]) => !readOnly || !WRITE_TABS.includes(id));

@@ -13,6 +13,9 @@ const SLUG = "test-link";
 const SESSION_ID = NIGHT_24_10.id;
 const storedSession = {
   ...NIGHT_24_10,
+  /* מאושר לצפייה (כלל 3, גל Pot Boost) — בלי האישור ההקרנה מסירה את
+     ה־payments כולו ואין לצופה תוכנית לסמן מולה. */
+  settlementApprovedAt: "2026-11-08T00:00:00.000Z",
   payments: { ...NIGHT_24_10.payments, potPaid: true, futureKey: "keep-me" },
 };
 
@@ -86,7 +89,9 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
       // נתיב הלקוח האמיתי: הקרנת צופה → יעד RPC
       const snap = { id: "g", data: { sessions: [storedSession] }, config: { shareHistory: true } };
       const viewerSession = snapshotForViewer(snap).data.sessions[0];
-      const target = rpcMarkTarget(viewerSession, 1); // נתנאל→אופיר בתוכנית הנוכחית
+      /* גל Pot Boost: ערב מסומן מוקפא — התוכנית המוצגת היא השמורה עצמה,
+         ונתנאל→אופיר יושב בה באינדקס 0 (גם בהקרנה וגם בגולמי). */
+      const target = rpcMarkTarget(viewerSession, 0); // נתנאל→אופיר בתוכנית השמורה
       expect(target).not.toBeNull();
       expect(target.fingerprint).not.toContain("קופת חיסכון");
 
@@ -102,8 +107,8 @@ describe("mark_group_payment — projection acceptance + key preservation", () =
       expect(sess.payments.confirmations).toEqual(
         expect.arrayContaining([expect.objectContaining({ index: 0, action: "paid", by: "נתנאל כהן" })])
       );
-      // ובצד המנהל הסימון נראה על ההעברה בתוכנית הנוכחית (אינדקס 1)
-      expect(paymentPlan(sess).paid[1]).toBe(true);
+      // ובצד המנהל הסימון נראה על אותה העברה בתוכנית השמורה (אינדקס 0)
+      expect(paymentPlan(sess).paid[0]).toBe(true);
     } finally {
       await db.exec("reset role");
     }

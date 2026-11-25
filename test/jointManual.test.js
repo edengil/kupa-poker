@@ -51,16 +51,16 @@ describe("העברות אמיתיות 10.10 — תשלום זוגי ידני", (
     expect(pending).toHaveLength(1);
     expect(pending[0].to).toBe("אופיר סנה");
     expect(pending[0].amount).toBe(5);
-    // הכרעת 19.11: העודף (75₪) מזוכה לעדן על שמו — 74 ממנו הם שאריתו של
-    // עדן עצמו (נספגת, בלי שורה), ורק 1₪ הוא שארית של אורן, כשורה אליו.
-    // סך הזיכוי נראה בצפוי של עדן: −280 + 75 = −205. שורות העודף הן
-    // פנימיות ל־resolver ואינן חלק מתוכנית התשלומים הקנונית.
+    // הכרעת 19.11 + מנוע החמישיות: העודף (75₪) מזוכה לעדן על שמו.
+    // שארית ה־1₪ של אורן (חייבה 120, שילמה 119 בפיצולים) לא יוצאת עוד
+    // כשורת residual של 1₪ — במנוע היא נספגת בעיגול: חובת חייבת־מועדפת
+    // מתעגלת למטה (119), וזיכוי העודף של עדן קטן בהתאם. צפוי עדן:
+    // −280 + 74 = −206. שורות העודף הן פנימיות ל־resolver ואינן חלק
+    // מתוכנית התשלומים הקנונית.
     const resolved = resolveSettlement(withManual);
     const residual = resolved.transfers.filter((t) => t.residual);
-    expect(residual).toEqual([
-      expect.objectContaining({ from: "אורן גיל", to: "עדן גיל", amount: 1, residual: true }),
-    ]);
-    expect(resolved.expected.find((e) => e.name === "עדן גיל").net).toBe(-205);
+    expect(residual).toEqual([]);
+    expect(resolved.expected.find((e) => e.name === "עדן גיל").net).toBe(-206);
   });
 
   it("הוולידטור לא מתריע על החלוקה המלאה (ידני + יתרה)", () => {

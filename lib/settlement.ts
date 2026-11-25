@@ -44,10 +44,17 @@ export interface SettleOpts {
   splitUnit5?: boolean;
 }
 
-/* מי שמקבל רק פייבוקס או מזומן, ולא ביט */
+/* מי שמקבל רק פייבוקס או מזומן, ולא ביט (כלל 11, הכרעת עדן 25.11.2026:
+   עדן ואורן מקבלים בפייבוקס או במזומן בלבד — לעולם לא ביט, ולכן גם לא
+   נוצר להם קישור תשלום ביט בשום משטח) */
 export const CASH_ONLY: string[] = ["עדן", "אורן", "עדן גיל", "אורן גיל"];
 
-/* מי שלא אוהב להעביר בפייבוקס — יש להתאים אותו קודם למקבלי ביט */
+/* מי שלא משלם במזומן לעולם (כלל 11, הכרעת עדן 25.11.2026 — נתנאל כהן).
+   הסמנטיקה המדויקת: הערוץ הלא־ביט בקוד הוא "פייבוקס או מזומן" משולב,
+   ונתנאל משלם בו תמיד בצד הפייבוקס. לכן הניתוב מתאים אותו קודם למקבלי
+   ביט (תשלום בביט), ורק כשלא נשאר מקבל ביט הוא משלם למקבל "פייבוקס או
+   מזומן" — בפייבוקס. (הניסוח הישן "לא אוהב להעביר בפייבוקס" היה הפוך:
+   המגבלה היא על מזומן, לא על פייבוקס.) */
 export const AVOID_CASH_PAY: string[] = ["נתנאל", "נתנאל כהן"];
 
 /* זוגות שמכסים אחד את השני ואחר כך יכולים לשלם יחד.
@@ -132,6 +139,85 @@ export function distribute5(total: number, weights: number[], caps: number[]): n
     if (!progressed) break;
   }
   return out;
+}
+
+/* ============================================================================
+   מנוע העיגול לחמישיות האחד (כלל ברזל 1; הכרעות עדן 19.11 + 25.11.2026) —
+   משותף לכל מסלולי החלוקה: האוטומטי (settleWithPot ב־nightShare), השמור/
+   הידני (savedSettlementWithPot), והעורך. פעם ההיגיון חי רק בתוך
+   settleWithPot ב־nightShare והמסלול השמור לא עיגל כלל — שורש באג 22.11.
+   ========================================================================== */
+
+/**
+ * עיגול נטו שלם אחד לחמישיות: זוכה רגיל — למטה (122←120); זוכה מועדף
+ * (עדן/אורן) — למעלה (13←15); חייב רגיל — החוב למעלה (137←140, ההפרש
+ * לעודף); חייב מועדף — החוב למטה (13←10). אפס נשאר אפס; הסימן לא מתהפך.
+ */
+export function roundNetTo5(net: number, priv: boolean): number {
+  if (net > 0) return priv ? ceil5(net) : floor5(net);
+  if (net < 0) return priv ? -floor5(-net) : -ceil5(-net);
+  return 0;
+}
+
+/**
+ * קיצוץ חוסר־מימון בחמישיות (הקצאה משותפת P1): החלוקה היחסית נשארת, אבל
+ * כל קיצוץ הוא כפולה של 5.
+ * 1. מועדפים (עדן/אורן) נחתכים רק מול החוסר האמיתי trueGap: חלק יחסי
+ *    מדויק, מעוגל למטה לחמישייה. משבר־הקופה ומשאריות העיגול הם פטורים.
+ * 2. היתרה לזוכים הרגילים ביחידות־5 (distribute5), בקבוצות ההעדפה של
+ *    settle: לא־מועדפים קודם, מועדפים (preferSet) אחרונים.
+ * 3. פינת נפילה מתועדת (הכרעת 19.11, לא הורחבה): אם הרגילים מיצו את
+ *    תביעותיהם ועדיין חסר קיצוץ — המועדפים סופגים אחרונים, ביחידות־5.
+ * @returns {Map<string, number>} שם זוכה → סכום הקיצוץ
+ */
+export function shortfallCuts5(
+  winners: { name: string; claim: number; priv: boolean }[],
+  totalCut: number,
+  preferSet: Set<string>,
+  trueGap: number
+): Map<string, number> {
+  const cuts = new Map(winners.map((w) => [w.name, 0]));
+  if (totalCut <= 0 || !winners.length) return cuts;
+  const totalClaims = winners.reduce((s, w) => s + w.claim, 0);
+  if (totalClaims <= 0) return cuts;
+
+  let privSum = 0;
+  for (const w of winners) {
+    if (!w.priv) continue;
+    const share = trueGap > 0 ? (trueGap * w.claim) / totalClaims : 0;
+    const c = Math.min(w.claim, Math.max(0, floor5(share)));
+    cuts.set(w.name, c);
+    privSum += c;
+  }
+
+  let remaining = totalCut - privSum;
+  const nonPref = winners.filter((w) => !w.priv && !preferSet.has(canonName(w.name)));
+  const pref = winners.filter((w) => !w.priv && preferSet.has(canonName(w.name)));
+  const groups: (typeof winners)[] = [];
+  if (nonPref.length) groups.push(nonPref);
+  if (pref.length) groups.push(pref);
+  for (const group of groups) {
+    if (remaining <= 0) break;
+    const gClaims = group.reduce((s, w) => s + w.claim, 0);
+    if (gClaims <= 0) continue;
+    const take = Math.min(remaining, gClaims);
+    const dist = distribute5(take, group.map((w) => w.claim), group.map((w) => w.claim));
+    group.forEach((w, i) => cuts.set(w.name, dist[i]));
+    remaining -= dist.reduce((s, v) => s + v, 0);
+  }
+
+  if (remaining > 0) {
+    const privs = winners.filter((w) => w.priv);
+    const room = privs.map((w) => w.claim - (cuts.get(w.name) || 0));
+    const extra = distribute5(remaining, room, room);
+    privs.forEach((w, i) => cuts.set(w.name, (cuts.get(w.name) || 0) + extra[i]));
+  }
+  return cuts;
+}
+
+/** עיגול ערך ידני לא־כפול־5 למעלה לכפולת־5 הבאה (הכרעת עדן 25.11, §8). */
+export function ceilTo5(v: number): number {
+  return ceil5(Math.round(+v || 0));
 }
 
 function roundPreservingSum(values: number[]): number[] {
