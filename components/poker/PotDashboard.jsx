@@ -16,7 +16,7 @@ import { flushStore } from "@/lib/store";
  * היתרה הראשית היא ה"בפועל". פער הערב (חוסר/עודף במאזן) מוצג כשורה
  * נפרדת ולעולם לא מתקזז מול הקופה.
  */
-export function PotDashboard({ db, commit, isAdmin, readOnly = false }) {
+export function PotDashboard({ db, commit, isAdmin, readOnly = false, onPotEdit = null }) {
   const [editingId, setEditingId] = useState(null);
   const [potValue, setPotValue] = useState("");
   const [editingActualId, setEditingActualId] = useState(null);
@@ -39,19 +39,28 @@ export function PotDashboard({ db, commit, isAdmin, readOnly = false }) {
     }
     if (!commit) return;
     /* Pot Boost (25.11): עריכת "רשום" עוברת רק דרך withRecordedPot —
-       לפני הקפאה זה מעצב את החלוקה מחדש, אחרי הקפאה נוגע רק בפנקס. */
-    commit({
-      ...db,
-      sessions: db.sessions.map((s) =>
-        s.id === sessionId ? withRecordedPot(s, v) : s
-      ),
-    });
-    /* בודקים את תוצאת השטיפה (גל 4, 4.6 — בדפוס signOut של OwnerApp):
-       שמירה שלא הגיעה לענן לא סוגרת את העורך כאילו הכול תקין. הערך
-       נשמר מקומית ויישטף בכתיבה הבאה, אבל המנהל חייב לדעת. */
-    if ((await flushStore().catch(() => false)) === false) {
-      alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
-      return;
+       לפני הקפאה זה מעצב את החלוקה מחדש, אחרי הקפאה נוגע רק בפנקס.
+       סבב תיקון (B6): כשה־onPotEdit מחווט (PokerApp) העריכה רצה דרך
+       applyPotEditCas על המצב הטרי; בלי חיווט — commit מקומי + שטיפה. */
+    if (typeof onPotEdit === "function") {
+      if (!(await onPotEdit(sessionId, (s) => withRecordedPot(s, v)))) {
+        alert("הערך לא נשמר (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
+    } else {
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) =>
+          s.id === sessionId ? withRecordedPot(s, v) : s
+        ),
+      });
+      /* בודקים את תוצאת השטיפה (גל 4, 4.6 — בדפוס signOut של OwnerApp):
+         שמירה שלא הגיעה לענן לא סוגרת את העורך כאילו הכול תקין. הערך
+         נשמר מקומית ויישטף בכתיבה הבאה, אבל המנהל חייב לדעת. */
+      if ((await flushStore().catch(() => false)) === false) {
+        alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
     }
     setEditingId(null);
     setPotValue("");
@@ -65,8 +74,10 @@ export function PotDashboard({ db, commit, isAdmin, readOnly = false }) {
      כמפה ידנית (frozenActual) — לערב בלי חלוקה שמורה כחלוקה חדשה
      אוטומטית (frozenAuto), ולערב עם חלוקה ידנית כמפה מחליפה בתוך אותה
      חלוקה (frozenReal, ממצא ביקורת 8) — כך מנהל וצופה מקבלים אותם
-     סכומי שחקנים בדיוק. מחיקת הבפועל משחררת את ההקפאה: מפה אוטומטית
-     נמחקת כולה, וחלוקה אמיתית נשארת עם המפה הקפואה (אותם סכומים). */
+     סכומי שחקנים בדיוק. מחיקת/ניקוי ה"בפועל" לעולם לא משחררת הקפאה
+     (C6): היא מעדכנת רק את ערך השדה בפנקס, וההקפאה (frozenActual/
+     frozenPot והמפה הקפואה) נשארת במלואה עד פעולת "פתח חלוקה לעריכה
+     מחדש" המפורשת בעורך. */
   const savePotActual = async (sessionId) => {
     const blocked = potEditBlockReason({ readOnly });
     if (blocked) {
@@ -79,14 +90,22 @@ export function PotDashboard({ db, commit, isAdmin, readOnly = false }) {
       return;
     }
     if (!commit) return;
-    commit({
-      ...db,
-      sessions: db.sessions.map((s) => (s.id === sessionId ? withActual(s, v) : s)),
-    });
-    // כמו savePot (4.6): כשל שטיפה = העורך נשאר פתוח עם הודעה
-    if ((await flushStore().catch(() => false)) === false) {
-      alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
-      return;
+    /* B6 (סבב תיקון): גם עריכת "בפועל" רצה דרך CAS כשהוא מחווט. */
+    if (typeof onPotEdit === "function") {
+      if (!(await onPotEdit(sessionId, (s) => withActual(s, v)))) {
+        alert("הערך לא נשמר (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
+    } else {
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) => (s.id === sessionId ? withActual(s, v) : s)),
+      });
+      // כמו savePot (4.6): כשל שטיפה = העורך נשאר פתוח עם הודעה
+      if ((await flushStore().catch(() => false)) === false) {
+        alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
     }
     setEditingActualId(null);
     setActualValue("");

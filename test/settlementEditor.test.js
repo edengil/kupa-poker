@@ -131,7 +131,7 @@ describe("ניתוב הקופה דרך עדן — העברת זוג מוגנת",
 });
 
 describe("ערב 24.10 (manualSettlement שמור) — זוגות נסגרים קודם במסלול הידני", () => {
-  it("עדן→אורן 310 במלואה וראשונה (מפה שמורה כמות שהיא; זוכה־מועדפת מתעגלת למעלה במנוע); נתנאל→אופיר 150 כזוג; עדן 440 לזוכים + 70 לקופה (בפועל — R3)", () => {
+  it("עדן→אורן 305 במלואה וראשונה (מפה שמורה עם עיגול §8.5: 13←15, ההפרש לעדן); נתנאל→אופיר 150 כזוג; עדן 435 לזוכים + 70 לקופה (בפועל — R3)", () => {
     const session = night2410WithManualMap();
     const plan = paymentPlan(session);
     expect(plan.problems).toEqual([]);
@@ -139,7 +139,7 @@ describe("ערב 24.10 (manualSettlement שמור) — זוגות נסגרים �
     // עדן→אורן: העברה אחת, מלאה, זוגית — ואין שום העברה אחרת לאורן
     const toOren = t.filter((x) => x.to === "אורן גיל");
     expect(toOren).toEqual([
-      expect.objectContaining({ from: "עדן גיל", to: "אורן גיל", amount: 310, pair: true }),
+      expect.objectContaining({ from: "עדן גיל", to: "אורן גיל", amount: 305, pair: true }),
     ]);
     expect(t.findIndex((x) => x.from === "עדן גיל")).toBe(t.indexOf(toOren[0]));
     // נתנאל↔אופיר: כל ה־150 של נתנאל נסגרים מול אופיר כהעברת זוג יחידה
@@ -151,20 +151,20 @@ describe("ערב 24.10 (manualSettlement שמור) — זוגות נסגרים �
     // הקנונית — היא חוזרת כ־potTransfer, ובפועל (70) כי savingsPotActual נערך
     const { got, gave } = sums(t);
     expect(got["אופיר סנה"]).toBe(480);
-    expect(got["אורן גיל"]).toBe(310);
+    expect(got["אורן גיל"]).toBe(305);
     expect(got["דור לירז"]).toBe(100);
     expect(got["דן ינקלויץ"]).toBe(100);
     expect(got[POT_SINK_NAME]).toBeUndefined();
     expect(plan.potTransfer).toEqual(
       expect.objectContaining({ from: "עדן גיל", to: POT_SINK_NAME, amount: 70, pot: true })
     );
-    expect(gave["עדן גיל"]).toBe(440);
+    expect(gave["עדן גיל"]).toBe(435);
     // הפרש הרשום־בפועל (23) הוא שארית של עדן עצמו — בהכרעת 19.11 הוא
-    // נספג כזיכוי על שמו: אין שורות residual. במנוע החמישיות עדן גם
-    // מממן את עיגול־המעלה של אורן (307→310): צפויו −510.
+    // נספג כזיכוי על שמו: אין שורות residual. עם עיגול §8.5 של מפת
+    // החוסר (13←15) צפוי עדן הוא −505.
     const resolvedE = resolveSettlement(session);
     expect(resolvedE.transfers.filter((x) => x.residual)).toEqual([]);
-    expect(resolvedE.expected.find((e) => e.name === "עדן גיל").net).toBe(-510);
+    expect(resolvedE.expected.find((e) => e.name === "עדן גיל").net).toBe(-505);
   });
 
   it("עקביות צופה (R1+R3+R4): בלי שדות הקופה מתקבלת אותה תוכנית שחקנים ואותו fingerprint", () => {

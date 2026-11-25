@@ -8,6 +8,7 @@ import { festiveCardSoft, festiveGlow, sectionEyebrow } from "@/lib/poker/festiv
 import { settlementTextForSession, potActualFor } from "@/lib/nightShare";
 import { isSettlementApproved, isAmountsApproved } from "@/lib/settlementApproval";
 import { paymentPlan, markTransfer, markReceipt, markPotPaid } from "@/lib/paymentTracking";
+import { withRecordedPot, potEditBlockReason } from "@/lib/poker/potEdits";
 import { r2 } from "@/lib/poker/helpers";
 import { settlementVersionLabel } from "@/lib/savedSettlement";
 import { confirmationStatusText, sessionConfirmations, settlementLinkSummary } from "@/lib/nightConfirmations";
@@ -155,6 +156,7 @@ export function LastSettlementCard({
   sessionId = null,
   onMarkPayment = null,
   onVotePlayer = null,
+  onPotEdit = null,
   collapsible = false,
   defaultOpen = true,
 }) {
@@ -164,7 +166,13 @@ export function LastSettlementCard({
   const [editingPot, setEditingPot] = useState(false);
   const [potValue, setPotValue] = useState("");
 
-  const savePot = () => {
+  const savePot = async () => {
+    /* B4: במצב צפייה־בלבד העריכה נחסמת בקול — לא נעלמת בשקט (23.11). */
+    const blocked = potEditBlockReason({ readOnly });
+    if (blocked) {
+      alert(blocked);
+      return;
+    }
     const v = Number(potValue);
     if (!Number.isFinite(v) || v < 0) {
       alert("סכום לא תקין");
@@ -172,14 +180,26 @@ export function LastSettlementCard({
     }
     const sid = sessionId || session?.id;
     if (!sid || !commit) return;
-    /* גל 7 (7.5): כמו בדשבורד הקופה — היתרה המצטברת נגזרת
-       מ־potOverview, והעריכה נוגעת רק בשדה של הערב. */
-    commit({
-      ...db,
-      sessions: db.sessions.map((s) =>
-        s.id === sid ? { ...s, savingsPot: v > 0 ? r2(v) : undefined } : s
-      ),
-    });
+    /* סבב תיקון (בודק 2): עריכת "רשום" מהכרטיס עוברת באותו מסלול משותף
+       כמו שני המסכים האחרים — withRecordedPot (הקפאה־מודע, זורע
+       frozenPot) ודרך onPotEdit‏/CAS (B6) כשהוא מחווט. כתיבה ישירה של
+       savingsPot הייתה עוקפת את ההקפאה ומזיזה תוכנית של ערב סגור. */
+    if (typeof onPotEdit === "function") {
+      const ok = await onPotEdit(sid, (s) => withRecordedPot(s, v));
+      if (!ok) {
+        alert("הערך לא נשמר (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
+    } else {
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) => (s.id === sid ? withRecordedPot(s, v) : s)),
+      });
+      if ((await flushStore().catch(() => false)) === false) {
+        alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
+    }
     setEditingPot(false);
     setPotValue("");
   };

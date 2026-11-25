@@ -171,8 +171,13 @@ function App({
   // את המשתמש בחזרה לטבלה
   /* מיפוי טאבים ישנים לטאב־האם (צמצום 25.11): records→table (שיאים כמקטע
      בטבלה), summaries→sessions (סיכומים כמקטע בערבים), stats→players
-     (צפיות כמקטע בשחקנים). קישורים/מצבים ישנים ממשיכים לעבוד. */
-  const TAB_HOST = { records: "table", summaries: "sessions", stats: "players" };
+     (צפיות כמקטע בשחקנים). קישורים/מצבים ישנים ממשיכים לעבוד.
+     סבב תיקון (§8.7): אצל צופה (readOnly) "ערבים" הוא מסך כתיבה ומסונן
+     מהסרגל, ולכן summaries אינו ממופה אצלו — הוא טאב עצמאי שמרנדר את
+     SummariesTab, כדי שהסיכומים יישארו נגישים לו (צופה = 3 טאבים). */
+  const TAB_HOST = readOnly
+    ? { records: "table", stats: "players" }
+    : { records: "table", summaries: "sessions", stats: "players" };
   const [tab, setTabState] = useState(TAB_HOST[initialTab] || initialTab);
   // מעבר טאב מדווח החוצה — ככה יומן הצפיות יודע במה כל צופה הסתכל
   const setTab = (id) => {
@@ -260,6 +265,55 @@ function App({
     },
     [readOnly]
   ); // כתיבה רק בפעולת משתמש
+
+  /* עריכת קופה דרך CAS (B6, סבב תיקון): כל שלושת מסכי עריכת הקופה
+     (PotDashboard, SessionsTab, LastSettlementCard) עוברים כאן. כשיש
+     הקשר קבוצה — applyPotEditCas מריץ את editFn בתוך בניית־המחדש של
+     updateGroupCas, על ה־session הטרי מהשרת, כך שבדיקת ההקפאה/הסימון
+     שב־withRecordedPot/withActual רצה על מצב טרי ולא על צילום מקומי
+     מיושן, וסימון RPC טרי של צופה לא נדרס. התוצאה שה־CAS כתב מאומצת
+     למצב המקומי בדיוק כמו אימוץ מרוחק (החלפת אותו session בלבד),
+     ואחריה שטיפת החנות הרגילה (שבעצמה כתיבת CAS עם מיזוג סימונים).
+     בלי הקשר קבוצה (תצוגות מקדימות/בדיקות) — נפילה ל־commit המקומי,
+     ששטיפתו היא ממילא casWriteGroup עם מיזוג מול הטרי.
+     מחזיר true רק כשהעריכה נחתה (CAS או שטיפה) — כשל מחזיר false
+     והמסך משאיר את העורך פתוח עם הודעה, לא סוגר בשקט. */
+  const commitPotEdit = useCallback(
+    async (sessionId, editFn) => {
+      if (readOnly || !db) return false;
+      if (groupId) {
+        try {
+          const { applyPotEditCas } = await import("@/lib/poker/potEdits");
+          const { getSupabase } = await import("@/lib/supabaseClient");
+          let captured = null;
+          const res = await applyPotEditCas(getSupabase(), groupId, sessionId, (fresh) => {
+            const edited = editFn(fresh);
+            if (edited && edited !== fresh) captured = edited;
+            return edited;
+          });
+          if (res && !res.ok) return false; // conflict מתמשך — לא נופלים לכתיבה עיוורת
+          if (captured) {
+            commit({
+              ...db,
+              sessions: db.sessions.map((s) => (s.id === sessionId ? captured : s)),
+            });
+            return (await flushStore().catch(() => false)) !== false;
+          }
+          if (res?.skipped) return true; // אין שינוי — שום דבר לא צריך לנחות
+          /* ה־session לא נמצא בשורת השרת — נופלים למסלול המקומי,
+             שהמיזוג בשטיפה יחלץ אותו לשרת כמו כל ערב מקומי חדש. */
+        } catch {
+          return false;
+        }
+      }
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) => (s.id === sessionId ? editFn(s) : s)),
+      });
+      return (await flushStore().catch(() => false)) !== false;
+    },
+    [readOnly, db, groupId, commit]
+  );
 
   const years = useMemo(() => {
     if (!db) return [];
@@ -494,6 +548,7 @@ function App({
             readOnly={readOnly}
             onMarkPayment={onMarkPayment}
             onVotePlayer={onVotePlayer}
+            onPotEdit={commitPotEdit}
           />
         )}
         <Header noticeCount={unseenCount} onOpenNotices={openNotices} />
@@ -541,14 +596,18 @@ function App({
               />
               <SavingsPotCard db={db} commit={commit} isAdmin={isAdmin} />
             </>
+          ) : tab === "summaries" ? (
+            /* טאב הסיכומים העצמאי של הצופה (סבב תיקון, §8.7): אצל המנהל
+               summaries ממופה ל־sessions ולכן הענף הזה לא נגיש לו. */
+            <SummariesTab db={db} />
           ) : tab === "sessions" ? (
             <>
-              <SessionsTab db={db} commit={commit} isAdmin={isAdmin} viewerName={viewerName} readOnly={readOnly} />
+              <SessionsTab db={db} commit={commit} isAdmin={isAdmin} viewerName={viewerName} readOnly={readOnly} onPotEdit={commitPotEdit} />
               {/* "סיכומים" קופל לתוך "ערבים" (צמצום טאבים 25.11) */}
               <SummariesTab db={db} />
             </>
           ) : tab === "pot" && isAdmin && !readOnly ? (
-            <PotDashboard db={db} commit={commit} isAdmin={isAdmin} readOnly={readOnly} />
+            <PotDashboard db={db} commit={commit} isAdmin={isAdmin} readOnly={readOnly} onPotEdit={commitPotEdit} />
           ) : tab === "table" ? (
             <>
               <TableTab
@@ -566,6 +625,7 @@ function App({
                 isAdmin={isAdmin}
                 onMarkPayment={onMarkPayment}
                 onVotePlayer={onVotePlayer}
+                onPotEdit={commitPotEdit}
                 focusSessionId={focusSessionId}
               />
               {/* "שיאים" קופל לתוך "טבלה" (צמצום טאבים 25.11) */}

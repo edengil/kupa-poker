@@ -432,6 +432,7 @@ export default function OwnerApp({ hosts } = {}) {
       </div>
       <AppErrorBoundary>
       <PokerApp
+        groupId={group.id}
         viewerAuth={viewerAuth}
         onTabChange={(t) => {
           if (t === "live") checkLive();

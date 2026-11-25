@@ -27,7 +27,7 @@ import { announceSettlementClosed } from "@/lib/announceSettlementClosed";
 import { notifyPaymentConfirmed } from "@/lib/poker/notifyTransfersClient";
 
 /* טאב ערבים שמורים — חולץ מ-PokerApp.jsx כ-JSX נקי. */
-export function SessionsTab({ db, commit, isAdmin, viewerName = null, readOnly = false }) {
+export function SessionsTab({ db, commit, isAdmin, viewerName = null, readOnly = false, onPotEdit = null }) {
   const [share, setShare] = useState(null);
   const [settlementId, setSettlementId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -166,19 +166,25 @@ export function SessionsTab({ db, commit, isAdmin, viewerName = null, readOnly =
       alert("סכום לא תקין");
       return;
     }
-    commit({
-      ...db,
-      sessions: db.sessions.map((s) => {
-        if (s.id !== latestSession.id) return s;
-        /* Pot Boost: "רשום" רק דרך withRecordedPot (הקפאה־מודע). */
-        return potEdit === "actual"
-          ? withActual(s, v)
-          : withRecordedPot(s, v);
-      }),
-    });
-    if ((await flushStore().catch(() => false)) === false) {
-      alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
-      return;
+    /* Pot Boost: "רשום" רק דרך withRecordedPot, "בפועל" דרך withActual
+       (שניהם הקפאה־מודעים). B6 (סבב תיקון): כשה־onPotEdit מחווט
+       (PokerApp) העריכה רצה דרך applyPotEditCas על המצב הטרי מהשרת;
+       בלי חיווט — commit מקומי + שטיפה כמקודם. */
+    const editFn = (s) => (potEdit === "actual" ? withActual(s, v) : withRecordedPot(s, v));
+    if (typeof onPotEdit === "function") {
+      if (!(await onPotEdit(latestSession.id, editFn))) {
+        alert("הערך לא נשמר (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
+    } else {
+      commit({
+        ...db,
+        sessions: db.sessions.map((s) => (s.id === latestSession.id ? editFn(s) : s)),
+      });
+      if ((await flushStore().catch(() => false)) === false) {
+        alert("הערך נשמר במכשיר אבל לא הגיע לענן (בעיית רשת או התנגשות). העורך נשאר פתוח — נסה שוב בעוד רגע.");
+        return;
+      }
     }
     setPotEdit(null);
     setPotEditValue("");

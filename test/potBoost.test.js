@@ -9,6 +9,8 @@
      טקסט הוואטסאפ רק למנהל/מאושר.
    • התראות: שחקן בלי סכום ורק על העברותיו; עדן מקבל הכול.
    • עורך: שמירה לא מסמנת ביצוע. */
+import React from "react";
+import { renderToString } from "react-dom/server";
 import { describe, it, expect } from "vitest";
 import {
   paymentPlan,
@@ -19,9 +21,12 @@ import {
 import { resolveSettlement, settlementTextForSession } from "../lib/nightShare.js";
 import { snapshotForViewer } from "../lib/publicShare.js";
 import { collectNotices, noticesForViewer } from "../lib/notifications.js";
-import { potEditBlockReason, withRecordedPot } from "../lib/poker/potEdits.js";
+import { potEditBlockReason, withRecordedPot, applyPotEditCas } from "../lib/poker/potEdits.js";
 import { withActual } from "../lib/poker/potEdits.js";
+import { TabBar } from "../components/poker/chrome.jsx";
+import { SummariesTab } from "../components/poker/SummariesTab.jsx";
 import { NIGHT_22_11 } from "./fixtures/night-2026-11-22.js";
+import { NIGHT_24_10 } from "./fixtures/night-2026-10-24.js";
 
 const is5 = (n) => Number.isInteger(n) && n % 5 === 0;
 function expectAllFive(transfers) {
@@ -186,6 +191,119 @@ describe("הקפאה (B1/B6/C6)", () => {
     expect(potEditBlockReason({ readOnly: true })).toMatch(/צפייה/);
     expect(potEditBlockReason({ readOnly: false })).toBeNull();
     expect(potEditBlockReason({})).toBeNull();
+  });
+});
+
+describe("מפת חוסר ידנית — עיגול §8.5 בקריאה (סבב תיקון, ממצא בודק 1)", () => {
+  /* ערב 24.10 האמיתי, payments מוסרים כדי לאלץ חישוב (הערב כפי שהוא
+     שמור מוגש מהתוכנית השמורה — ראו הבדיקה האחרונה). המפה האמיתית של
+     הערב היא {אורן:13, דור:10, אופיר:35} — ה־13 אינו כפולת־5. */
+  const withMap = (patch) => {
+    const s = JSON.parse(JSON.stringify(NIGHT_24_10));
+    delete s.payments;
+    s.manualSettlement = {
+      ...s.manualSettlement,
+      shortfall: { "אורן גיל": 13, "דור לירז": 10, "אופיר סנה": 35, ...patch },
+    };
+    return s;
+  };
+  const key = (r) => JSON.stringify({ t: r.transfers, e: r.expected });
+
+  it("מפה {אורן:13} ≡ מפה {אורן:15} בהעברות+צפוי, ושונה מ־{אורן:10}; ההפרש 2 מזוכה לעדן", () => {
+    const r13 = resolveSettlement(withMap({ "אורן גיל": 13 }));
+    const r15 = resolveSettlement(withMap({ "אורן גיל": 15 }));
+    const r10 = resolveSettlement(withMap({ "אורן גיל": 10 }));
+    expect(key(r13)).toBe(key(r15));
+    expect(key(r13)).not.toBe(key(r10));
+    /* המספרים שהבודק הוכיח: אורן 305 (לא 310), עדן −505 (לא −510) */
+    expect(r13.expected.find((x) => x.name === "אורן גיל").net).toBe(305);
+    expect(r13.expected.find((x) => x.name === "עדן גיל").net).toBe(-505);
+    expect(r13.saved.hiddenResidualCredit).toBe(2);
+    expect(r15.saved.hiddenResidualCredit).toBe(0);
+    expect(r13.saved.shortfall["אורן גיל"]).toBe(15);
+  });
+
+  it("ערך של זוכה רגיל: {דור:13} מתעגל ל־15 וההפרש מזוכה לעדן", () => {
+    const base = { "אורן גיל": 15, "דור לירז": 10, "אופיר סנה": 35 };
+    const r13 = resolveSettlement(withMap({ ...base, "דור לירז": 13 }));
+    const r15 = resolveSettlement(withMap({ ...base, "דור לירז": 15 }));
+    const r10 = resolveSettlement(withMap({ ...base, "דור לירז": 10 }));
+    expect(key(r13)).toBe(key(r15));
+    expect(key(r13)).not.toBe(key(r10));
+    expect(r13.saved.hiddenResidualCredit).toBe(2);
+    /* שימור נטו: סך הצפוי זהה בין 13 ל־15, והזיכוי יושב אצל עדן */
+    const sum = (r) => r.expected.reduce((s, x) => s + x.net, 0);
+    expect(sum(r13)).toBe(sum(r15));
+  });
+
+  it("הערב כפי שהוא שמור (עם סימונים) עדיין מוגש מהתוכנית השמורה כמות שהיא", () => {
+    const stored = JSON.parse(JSON.stringify(NIGHT_24_10));
+    const plan = paymentPlan(stored);
+    expect(plan.frozen).toBe(true);
+    expect(plan.fingerprint).toBe(stored.payments.plan);
+  });
+});
+
+describe("עריכת קופה דרך CAS — applyPotEditCas מחווט (סבב תיקון, B6)", () => {
+  it("הבדיקה רצה בתוך ה־rebuild על מצב טרי עם סימון: העריכה הופכת לעריכת־פנקס עם frozenPot", async () => {
+    const markedSession = {
+      id: "s1",
+      iso: "2026-11-17",
+      savingsPot: 65,
+      payments: { plan: "[]", paid: { 0: true }, received: {}, confirmations: [] },
+      entries: [],
+    };
+    let row = { id: "g1", data: { sessions: [markedSession] }, updated_at: "t1" };
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ single: async () => ({ data: row, error: null }) }),
+        }),
+      }),
+      rpc: async (_name, args) => {
+        row = { ...row, data: args.p_patch.data, updated_at: "t2" };
+        return { data: "t2", error: null };
+      },
+    };
+    const res = await applyPotEditCas(supabase, "g1", "s1", (s) => withRecordedPot(s, 120));
+    expect(res.ok).toBe(true);
+    const written = row.data.sessions[0];
+    expect(written.savingsPot).toBe(120);
+    /* הסימון הטרי נראה בתוך ה־rebuild — נזרעה הקפאה על 65, לא על 120 */
+    expect(written.manualSettlement.frozenPot).toBe(65);
+    expect(written.payments.paid).toEqual({ 0: true });
+  });
+});
+
+describe("טאבי צופה — סיכומים נגישים, בדיוק 3 טאבים (סבב תיקון, §8.7)", () => {
+  const bar = (props) =>
+    renderToString(
+      React.createElement(TabBar, { tab: "table", setTab: () => {}, n: 3, ...props })
+    );
+
+  it("צופה (readOnly): טבלה, שחקנים, סיכומים — בלי ערבים/לייב/הזנה/קופה", () => {
+    const html = bar({ readOnly: true });
+    expect(html).toContain('data-testid="tab-table"');
+    expect(html).toContain('data-testid="tab-players"');
+    expect(html).toContain('data-testid="tab-summaries"');
+    expect(html).not.toContain('data-testid="tab-sessions"');
+    expect(html).not.toContain('data-testid="tab-live"');
+    expect(html).not.toContain('data-testid="tab-input"');
+    expect(html).not.toContain('data-testid="tab-pot"');
+  });
+
+  it("מנהל: 6 טאבים, בלי טאב סיכומים עצמאי (מקופל בערבים)", () => {
+    const html = bar({ readOnly: false, isAdmin: true });
+    for (const id of ["table", "players", "live", "input", "sessions", "pot"]) {
+      expect(html).toContain(`data-testid="tab-${id}"`);
+    }
+    expect(html).not.toContain('data-testid="tab-summaries"');
+  });
+
+  it("SummariesTab מרונדר לצופה ומציג את כותרת הסיכומים", () => {
+    const db = { roster: [], aliases: {}, yearly: [], sessions: [] };
+    const html = renderToString(React.createElement(SummariesTab, { db }));
+    expect(html).toContain("סיכומים");
   });
 });
 
