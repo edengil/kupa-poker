@@ -90,10 +90,45 @@ export function applyCommands(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: 
   return decoratePendingReminder(applyCommandsCore(live, cmds, msgId, cps, { ...opts, now }), now);
 }
 
+/* הקשר ההחלה המפורש של applyCommandsCore (גל B, מנה 6.0 — הכנה לפיצול
+   ליבת הבוט, בלי שום מעבר קוד): כל מה שה־closures הפנימיים של הליבה
+   סוגרים עליו מרוכז כאן, כדי שמנות ההמשך יוכלו לקבל את ה־ctx כפרמטר
+   ולהוציא ענפים החוצה בצורה מכנית. השדות הם אותם ערכים/הפניות בדיוק
+   שהקוד השתמש בהם עד היום: state/record/acks/problems הם אותם אובייקטים
+   (מוטציות דרך ה־ctx ודרך המקומיים הן אותה מוטציה), ו־retarget/prevRecord
+   מתמלאים פעם אחת בלבד — בבלוק הביטול+ההחלה־מחדש — לפני כל שימוש, ולא
+   מוקצים שוב אחר כך. פנימי למודול: לא מיוצא. */
+interface WaApplyCtx {
+  state: WaLiveState;
+  record: UndoEntry[];
+  acks: string[];
+  problems: string[];
+  aliases: ReturnType<typeof aliasesOf>;
+  cps: number;
+  now: number;
+  retarget: Map<string, string>;
+  prevRecord: UndoEntry[] | null;
+}
+
 function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: string | null, cps: number = CPS, opts: WaApplyOpts = {}) {
   const now = opts.now ?? Date.now();
   const aliases = aliasesOf(opts);
   const state = blank(live);
+
+  /* מנה 6.0: איסוף ההקשר המפורש. retarget/prevRecord מתחילים ריקים כאן
+     ומתמלאים בבלוק הביטול+ההחלה־מחדש שלמטה — בדיוק כפי שהמקומיים שלהם
+     התמלאו שם עד היום; כל שאר השדות סופיים כבר מעכשיו. */
+  const ctx: WaApplyCtx = {
+    state,
+    record: [],
+    acks: [],
+    problems: [],
+    aliases,
+    cps,
+    now,
+    retarget: new Map<string, string>(),
+    prevRecord: null,
+  };
 
   /* שער מסירה מאוחרת (ממצא 21): הלייב ריק לגמרי אבל חותמת ההודעה קודמת
      לסוף הערב השמור האחרון — זו לא פתיחת ערב חדש אלא ניסיון־מסירה זקן
@@ -128,7 +163,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   }
 
   const report = () =>
-    buildReport({ players: state.players, entriesCount: state.entriesCount as string, startedAt: state.startedAt, cps });
+    buildReport({ players: ctx.state.players, entriesCount: ctx.state.entriesCount as string, startedAt: ctx.state.startedAt, cps: ctx.cps });
 
   // פקודות מידע — לא נוגעות בנתונים ולכן יוצאות כאן
   if (cmds.length === 1 && READ_ONLY.has(cmds[0].kind)) {
@@ -190,52 +225,50 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
      פקודת קנייה נוחתת על השחקן שהביטול נגע בו, בשמו הנוכחי, ולא פותרת
      את השם הגולמי מההודעה מחדש (זהות החותמת: מזהה הודעה + אינדקס פקודה,
      יציבה בין ההחלה למסירה החוזרת של אותה הודעה). */
-  let retarget = new Map<string, string>();
   /* הרשומה הקודמת של ההודעה נשמרת גם אחרי הביטול: ההחלה־מחדש צריכה
      לדעת מה ההודעה עשתה קודם — בפרט אם היא יצרה בקשת־ממתין שכבר אושרה
      (השער לפני החתמת הקנייה למטה). */
-  let prevRecord: UndoEntry[] | null = null;
   if (msgId && state.applied[msgId]) {
-    prevRecord = state.applied[msgId] as UndoEntry[];
-    retarget = undo(state, prevRecord);
+    ctx.prevRecord = state.applied[msgId] as UndoEntry[];
+    ctx.retarget = undo(state, ctx.prevRecord);
     delete state.applied[msgId];
   }
 
-  const record: UndoEntry[] = [];
-  const acks = [];
-  const problems = [];
+  const record = ctx.record;
+  const acks = ctx.acks;
+  const problems = ctx.problems;
 
   /* שורת הומור לכניסה שלישית ומעלה של אותו שחקן באותו ערב. נקראת רק
      אחרי שהחותמת הוחלה — buyinEvents כבר כולל את הכניסה הנוכחית. */
   const pushRebuyJoke = (name: string, player: { buyinEvents?: unknown[] }) => {
-    const joke = formatRebuyJoke(name, (player.buyinEvents || []).length, isFemaleName, now);
-    if (joke) acks.push(joke);
+    const joke = formatRebuyJoke(name, (player.buyinEvents || []).length, isFemaleName, ctx.now);
+    if (joke) ctx.acks.push(joke);
   };
 
   /* סך קופת השולחן (סכום הכניסות) — אותה הגדרה כמו בתמונת המצב. */
-  const totalTablePot = () => r2(state.players.reduce((t, p) => t + (+p.buyin || 0), 0));
+  const totalTablePot = () => r2(ctx.state.players.reduce((t, p) => t + (+p.buyin || 0), 0));
 
   /* ציון חציית סף קופה (כפולת 500): לפני < סף ≤ אחרי. כל סף מוכרז פעם
      אחת בערב — נרשם במצב, כך שביטול+החלה־מחדש של אותה הודעה לא מכריז
      שוב. כשכמה ספים נחצים בכניסה אחת — מוכרז הגבוה שבהם. */
   const pushPotMilestone = (before: number, after: number) => {
     if (!(after > before)) return;
-    const announced = state.potMilestonesAnnounced || [];
+    const announced = ctx.state.potMilestonesAnnounced || [];
     const crossed: number[] = [];
     for (let t = 500; t <= after; t += 500) {
       if (before < t && !announced.includes(t)) crossed.push(t);
     }
     if (!crossed.length) return;
-    state.potMilestonesAnnounced = [...announced, ...crossed];
-    acks.push(formatPotMilestoneLine(crossed[crossed.length - 1], now));
+    ctx.state.potMilestonesAnnounced = [...announced, ...crossed];
+    ctx.acks.push(formatPotMilestoneLine(crossed[crossed.length - 1], ctx.now));
   };
 
   /* נבואת פתיחה — פעם אחת בערב, בכניסה הראשונה כשהשולחן היה ריק.
      הדגל במצב שורד ביטול+החלה־מחדש של הודעת הפתיחה. */
   const pushOpeningProphecy = (wasEmptyTable: boolean) => {
-    if (!wasEmptyTable || state.openingProphecyDone) return;
-    state.openingProphecyDone = true;
-    acks.push(formatOpeningProphecy(now));
+    if (!wasEmptyTable || ctx.state.openingProphecyDone) return;
+    ctx.state.openingProphecyDone = true;
+    ctx.acks.push(formatOpeningProphecy(ctx.now));
   };
 
 
@@ -350,7 +383,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
          בשולחן; אם הוסר מאז ההמתנה — הפעולה אובדת עם הודעה, לא מומצאת
          על שחקן אחר. */
       if (isOpPending(item)) {
-        const rtOpName = sid ? retarget.get(sid) : undefined;
+        const rtOpName = sid ? ctx.retarget.get(sid) : undefined;
         const opIdx = rtOpName
           ? state.players.findIndex((p) => p.name === rtOpName)
           : state.players.findIndex((p) => p.name === item.name);
@@ -421,7 +454,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       }
       /* החלה־מחדש של אישור: נוחתים על השחקן שהביטול נגע בו בשמו הנוכחי,
          אם הוא עדיין בשולחן — לא על פתרון שם הממתין מחדש. */
-      const rtApproveName = sid ? retarget.get(sid) : undefined;
+      const rtApproveName = sid ? ctx.retarget.get(sid) : undefined;
       const rtApproveIdx = rtApproveName
         ? state.players.findIndex((p) => p.name === rtApproveName)
         : -1;
@@ -546,7 +579,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     /* החלה־מחדש של פקודת קנייה: אם הביטול נגע בשחקן בשביל החותמת של
        הפקודה הזו, מאתרים אותו בשמו הנוכחי ישירות — בלי findInState,
        שפתרון הכינוי/הרחבת־השם שלו עלולים להחזיר שם ישן או אדם אחר. */
-    const rtName = cmd.kind === "add" && sid ? retarget.get(sid) : undefined;
+    const rtName = cmd.kind === "add" && sid ? ctx.retarget.get(sid) : undefined;
     const rtIdx = rtName ? state.players.findIndex((p) => p.name === rtName) : -1;
     const found =
       rtIdx !== -1 ? { index: rtIdx, resolved: rtName as string } : findInState(state, cmd.name, aliases);
@@ -740,9 +773,9 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
        על אותה בקשה בדיוק. הבקשה כבר מומשה, אז לא נוגעים בכסף; רשומת
        הבקשה המקורית נרשמת מחדש כמו שהיא, כדי שמסירה נוספת של אותה
        הודעה תתנהג שוב בדיוק כך. */
-    if (cmd.kind === "add" && prevRecord && found.index !== -1) {
+    if (cmd.kind === "add" && ctx.prevRecord && found.index !== -1) {
       const seatedPlayer = state.players[found.index];
-      const prevPending = prevRecord.find(
+      const prevPending = ctx.prevRecord.find(
         (e) =>
           e.t === "pending" &&
           (e.name === seatedPlayer.name || resolveAlias(e.name || "", aliases) === seatedPlayer.name),
