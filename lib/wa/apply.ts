@@ -2,7 +2,6 @@
 
 import { buildReport, CPS, settleLine } from "../report.js";
 import { nextTipCompliment, formatTipCompliment, tipBagKey, tipLastKey } from "../tipCompliments.js";
-import { formatRebuyJoke, formatPotMilestoneLine, formatOpeningProphecy } from "../tipSummaryCopy.js";
 import { isFemaleName, byGender } from "../gender.js";
 import { BOT_MARK } from "../botMark.js";
 import { buildTipsTable } from "../tipsTable.js";
@@ -28,6 +27,7 @@ import {
 } from "./state";
 import { allClosedNote, closingStatus, finalSummary, snapshot } from "./summary";
 import { helpText, ownerAskText } from "./help.js";
+import { pushOpeningProphecy, pushPotMilestone, pushRebuyJoke, totalTablePot } from "./applyHumor";
 
 export { helpText } from "./help.js";
 
@@ -98,7 +98,7 @@ export function applyCommands(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: 
    (מוטציות דרך ה־ctx ודרך המקומיים הן אותה מוטציה), ו־retarget/prevRecord
    מתמלאים פעם אחת בלבד — בבלוק הביטול+ההחלה־מחדש — לפני כל שימוש, ולא
    מוקצים שוב אחר כך. פנימי למודול: לא מיוצא. */
-interface WaApplyCtx {
+export interface WaApplyCtx {
   state: WaLiveState;
   record: UndoEntry[];
   acks: string[];
@@ -237,40 +237,6 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   const record = ctx.record;
   const acks = ctx.acks;
   const problems = ctx.problems;
-
-  /* שורת הומור לכניסה שלישית ומעלה של אותו שחקן באותו ערב. נקראת רק
-     אחרי שהחותמת הוחלה — buyinEvents כבר כולל את הכניסה הנוכחית. */
-  const pushRebuyJoke = (name: string, player: { buyinEvents?: unknown[] }) => {
-    const joke = formatRebuyJoke(name, (player.buyinEvents || []).length, isFemaleName, ctx.now);
-    if (joke) ctx.acks.push(joke);
-  };
-
-  /* סך קופת השולחן (סכום הכניסות) — אותה הגדרה כמו בתמונת המצב. */
-  const totalTablePot = () => r2(ctx.state.players.reduce((t, p) => t + (+p.buyin || 0), 0));
-
-  /* ציון חציית סף קופה (כפולת 500): לפני < סף ≤ אחרי. כל סף מוכרז פעם
-     אחת בערב — נרשם במצב, כך שביטול+החלה־מחדש של אותה הודעה לא מכריז
-     שוב. כשכמה ספים נחצים בכניסה אחת — מוכרז הגבוה שבהם. */
-  const pushPotMilestone = (before: number, after: number) => {
-    if (!(after > before)) return;
-    const announced = ctx.state.potMilestonesAnnounced || [];
-    const crossed: number[] = [];
-    for (let t = 500; t <= after; t += 500) {
-      if (before < t && !announced.includes(t)) crossed.push(t);
-    }
-    if (!crossed.length) return;
-    ctx.state.potMilestonesAnnounced = [...announced, ...crossed];
-    ctx.acks.push(formatPotMilestoneLine(crossed[crossed.length - 1], ctx.now));
-  };
-
-  /* נבואת פתיחה — פעם אחת בערב, בכניסה הראשונה כשהשולחן היה ריק.
-     הדגל במצב שורד ביטול+החלה־מחדש של הודעת הפתיחה. */
-  const pushOpeningProphecy = (wasEmptyTable: boolean) => {
-    if (!wasEmptyTable || ctx.state.openingProphecyDone) return;
-    ctx.state.openingProphecyDone = true;
-    ctx.acks.push(formatOpeningProphecy(ctx.now));
-  };
-
 
   for (let ci = 0; ci < cmds.length; ci++) {
     let cmd = cmds[ci];
@@ -748,7 +714,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         continue;
       }
       const fresh = { name, buyin: 0, cashout: "", buyinEvents: [] };
-      const potBefore = totalTablePot();
+      const potBefore = totalTablePot(ctx);
       const wasEmptyTable = state.players.length === 0 && !state.startedAt;
       const seated = stampBuyin(state, fresh, cmd.amount, now, sid);
       state.players.push(seated);
@@ -761,9 +727,9 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
         ev: stampedEventOf(fresh, seated),
       });
       acks.push(`${name} ${byGender(name, "נכנס", "נכנסה")} ב-${cmd.amount}₪`);
-      pushRebuyJoke(name, seated);
-      pushOpeningProphecy(wasEmptyTable);
-      pushPotMilestone(potBefore, totalTablePot());
+      pushRebuyJoke(ctx, name, seated);
+      pushOpeningProphecy(ctx, wasEmptyTable);
+      pushPotMilestone(ctx, potBefore, totalTablePot(ctx));
       continue;
     }
 
@@ -789,7 +755,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     }
 
     const p = state.players[found.index];
-    const potBefore = totalTablePot();
+    const potBefore = totalTablePot(ctx);
     const next = stampBuyin(state, p, cmd.amount, now, sid);
     const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
     state.players[found.index] = next;
@@ -797,8 +763,8 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${next.buyin}₪`);
     /* רק כשהחותמת באמת הוסיפה אירוע כניסה — הפחתה לא סופרת כניסה */
     if (stampedEventOf(p, next)) {
-      pushRebuyJoke(p.name, next);
-      pushPotMilestone(potBefore, totalTablePot());
+      pushRebuyJoke(ctx, p.name, next);
+      pushPotMilestone(ctx, potBefore, totalTablePot(ctx));
     }
   }
 
