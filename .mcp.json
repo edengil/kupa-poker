@@ -1,0 +1,1 @@
+{"mcpServers":{"next-devtools":{"args":["-y","next-devtools-mcp@latest"],"command":"npx"},"supabase":{"type":"http","url":"https://mcp.supabase.com/mcp?read_only=true"}}}
