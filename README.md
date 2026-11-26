@@ -92,10 +92,14 @@ components/
 lib/
   store.js              שכבת האחסון — כאן מתחלף localStorage ב-Supabase
   realtime.js           ערוץ ה-ping וקריאה מחדש
-  supabaseClient.js     לקוח דפדפן
-  supabaseServer.js     לקוח שרת + לקוח אנונימי
+  supabaseClient.ts     לקוח דפדפן
+  supabaseServer.ts     לקוח שרת + לקוח אנונימי
+  supabaseAdmin.ts      לקוח שרת עם מפתח סודי (webhook וכרונים)
+  database.types.ts     טיפוסי המסד — נוצרים מהסכמה החיה, לא עורכים ידנית
 supabase/schema.sql     טבלה, RLS, ופונקציית הקריאה הציבורית
 ```
+
+**טיפוסי המסד:** `lib/database.types.ts` נוצר מהסכמה החיה של פרויקט ה־Supabase (דרך ה־Management API או ה־CLI) — לעולם לא עורכים אותו ידנית, ורגנרציה נעשית רק מהסכמה החיה. הפרויקט משותף עם אפליקציית כספים נוספת, ולכן הקובץ כולל גם את טבלאות `t_*` ו־`of_secrets` — זה צפוי בכל רגנרציה ולא מנקים אותן. שלושת לקוחות ה־Supabase ב־`lib/` מחווטים עם `createClient<Database>` (ושקיליו ב־SSR); לקוחות אד־הוק בתוך ראוטי API בודדים עדיין לא מטופסים.
 
 ---
 

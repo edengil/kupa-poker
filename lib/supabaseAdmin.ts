@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 
 /* ============================================================================
    לקוח צד-שרת עם מפתח סודי.
@@ -11,7 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 export function getAdminSupabase() {
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!key) throw new Error("SUPABASE_SECRET_KEY חסר");
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, key, {
+  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL, key, {
     auth: { persistSession: false },
     // Next.js patches global fetch with a Data Cache that otherwise serves stale
     // PostgREST GETs across serverless invocations. The WhatsApp webhook and the
@@ -22,7 +23,7 @@ export function getAdminSupabase() {
 }
 
 /** ניסיון לעדכן צופים מיידית. הסקר בצד הצופה מכסה גם אם זה נכשל. */
-export async function pingViewers(slug) {
+export async function pingViewers(slug: string) {
   try {
     await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/realtime/v1/api/broadcast`, {
       method: "POST",

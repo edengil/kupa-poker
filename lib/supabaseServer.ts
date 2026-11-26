@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import type { Database } from "./database.types";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -8,7 +9,7 @@ const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 /** לקוח לצד שרת שקורא את הסשן מהעוגיות. */
 export async function getServerSupabase() {
   const store = await cookies();
-  return createServerClient(URL, KEY, {
+  return createServerClient<Database>(URL, KEY, {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (list) => {
@@ -24,5 +25,5 @@ export async function getServerSupabase() {
 
 /** לקוח אנונימי, בלי סשן. משמש רק לקריאה הציבורית לפי slug. */
 export function getAnonSupabase() {
-  return createClient(URL, KEY, { auth: { persistSession: false } });
+  return createClient<Database>(URL, KEY, { auth: { persistSession: false } });
 }
