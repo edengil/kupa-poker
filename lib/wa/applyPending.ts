@@ -9,10 +9,9 @@
    צורות הרשומות (pending/pendingOp/approve/approveOp עם כל שדות
    ה־revert) הן חוזה קפוא מול undo.ts — אפס שינוי בכל ליטרל רשומה.
    מעגליות: הקשר הטיפוסי ל־apply.ts הוא import type בלבד (WaApplyCtx/
-   WaCmd). קבועי KOBI/KOBI_TIP_OPENER חיים ב־apply.ts ומשותפים גם
-   לענף הטיפ שנשאר בליבה — לכן הם מיוצאים משם ומיובאים לכאן כערך;
-   השימוש בהם הוא בזמן־קריאה בלבד (לא ברמת המודול), כך שסדר־כניסה
-   של applyPending ראשון אינו נוגע בהם לפני אתחול apply.ts.
+   WaCmd). קבועי KOBI/KOBI_TIP_OPENER חיים מ־גל B מנה 6.10
+   ב־lib/tipCompliments.js (הבעלים העלווה של תחום הטיפ) ומיובאים
+   לכאן משם כערך, יחד עם שאר יבואי הטיפ מהמודול.
    היבואנים הם הבעלים הישירים, לא דרך barrel ה־state:
    pickPending/findInState/stampBuyin/stampedEventOf מ־./buyinStamp,
    ‏isOpPending/applyOpTip/applyOpCashout/opTipId מ־./opPending,
@@ -21,12 +20,11 @@
    ו־resolveAlias מ־./parse.js. */
 
 import { settleLine } from "../report.js";
-import { formatTipCompliment, nextTipCompliment } from "../tipCompliments.js";
+import { formatTipCompliment, KOBI, KOBI_TIP_OPENER, nextTipCompliment } from "../tipCompliments.js";
 import { byGender, isFemaleName } from "../gender.js";
 import { findInState, pickPending, stampBuyin, stampedEventOf } from "./buyinStamp";
 import { applyOpCashout, applyOpTip, isOpPending, opTipId } from "./opPending";
 import { resolveAlias } from "./parse.js";
-import { KOBI, KOBI_TIP_OPENER } from "./apply";
 import type { WaApplyCtx, WaCmd } from "./apply";
 
 export function applyPendingDecision(ctx: WaApplyCtx, cmd: WaCmd, sid: string | undefined): void {

@@ -1,8 +1,6 @@
 /* החלת פקודות על ערב חי. לא שולח לוואטסאפ — רק מצב ותשובה אחת. */
 
-import { buildReport, CPS, settleLine } from "../report.js";
-import { nextTipCompliment, formatTipCompliment, tipBagKey, tipLastKey } from "../tipCompliments.js";
-import { isFemaleName, byGender } from "../gender.js";
+import { buildReport, CPS } from "../report.js";
 import { BOT_MARK } from "../botMark.js";
 import { aliasesOf, findPlayer, READ_ONLY, resolveAlias } from "./parse.js";
 import { decoratePendingReminder } from "./reminders.js";
@@ -12,7 +10,6 @@ import {
   MAX_APPLIED_RECORDS,
   openPlayers,
   pickPending,
-  r2,
   renameEverywhere,
   undo,
 } from "./state";
@@ -22,6 +19,7 @@ import { applyInfo, NOT_INFO } from "./applyInfo";
 import { applyPendingDecision } from "./applyPending";
 import { applyClosingCmd, applySettle } from "./applyClosing";
 import { applyAdd, applyRemove, applyReopen } from "./applyEntries";
+import { applyMoneyCmd, applyTipNoName } from "./applyMoney";
 
 export { helpText } from "./help.js";
 
@@ -55,12 +53,6 @@ export interface WaApplyOpts {
    המאוחרת (גל 5, פריט 5.5): רק בליעת פקודה כזו מקבלת שורת בריאות
    גלויה לבעלים; כל בליעה מקבלת משואת diag. */
 export const WA_MONEY_KINDS = new Set(["add", "tip", "tipNoName", "cashout", "answer"]);
-
-/* קובי מקבל פתיח משלו לפני משפט המחמאה על כל טיפ. הקבועים מיוצאים:
-   הם משותפים לענף הטיפ כאן ולענף אישור־ממתין־הטיפ ב־applyPending
-   (גל B, מנה 6.7), שמייבא אותם מכאן. */
-export const KOBI = "קובי סעדה";
-export const KOBI_TIP_OPENER = "יא חאלייה";
 
 /* ============================================================================
    אין יותר תקרה ואין תור אישור לפקודות כסף בבוט (החלטת עדן 9.11,
@@ -210,10 +202,10 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     const sid = msgId ? `${msgId}:${ci}` : undefined;
     if (READ_ONLY.has(cmd.kind)) continue;
 
-    if (cmd.kind === "tipNoName") {
-      problems.push(`טיפ ${cmd.chips} — של מי? תכתוב למשל «אופיר טיפ ${cmd.chips}»`);
-      continue;
-    }
+    /* טיפ בלי שם (גל B, מנה 6.10): הענף נשאר במיקום הדיספאץ' המוקדם
+       הזה במכוון — הוא כותב problems בלבד, לפני found; גופו ב־
+       applyTipNoName שב־applyMoney. */
+    if (cmd.kind === "tipNoName") { applyTipNoName(ctx, cmd); continue; }
 
     if (cmd.kind === "settleCancel") {
       if (state.closing) {
@@ -306,94 +298,10 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
 
     if (cmd.kind === "reopen") { applyReopen(ctx, cmd, found); continue; }
 
-    /* טיפ מג'יטונים של השחקן (לא מהקופה) — רישום בלבד (עדן, 11.11):
-       tipsGiven מצטבר לסטטיסטיקה והאירוע נכנס ליומן, אבל ה־cashout לא
-       משתנה בשום מצב, גם אם השחקן כבר סגור עם יציאה מספרית. הטיפים
-       עוברים בין השחקנים ונשארים בשולחן — היציאה הנספרת היא האמת, וג'יטוני
-       הטיפ מוחזרים לספירה בבדיקת איזון הג'יטונים בשמירה (nightBalance). */
-    if (cmd.kind === "tip") {
-      if (found.index === -1) {
-        problems.push(`${cmd.name} לא בשולחן`);
-        continue;
-      }
-      const p = state.players[found.index];
-      const amount = Math.max(0, +cmd.chips || 0);
-      if (!amount) {
-        problems.push(`טיפ של 0 לא נספר`);
-        continue;
-      }
-      const tipId = `${msgId || "tip"}_${record.length}_${Date.now()}`;
-      const female = isFemaleName(p.name);
-      /* צילום־לפני של השקית שממנה באמת שולפים (גל 4, פריט 4.2): השקית
-         חיה במפתח המגדרי (BagM/BagF), עם נפילת־מורשת לזכר כמו בתוך
-         nextTipCompliment. הצילום הישן העתיק את שדה המורשת — והביטול
-         "שחזר" שדה שאף אחד לא שולף ממנו, בעוד השליפה בפועל נשארה
-         צרכנית. bagV:2 מסמן רשומה עם צילום מגדרי מדויק. */
-      const bk = tipBagKey(female);
-      const lk = tipLastKey(female);
-      const bagState = state as unknown as Record<string, unknown>;
-      let bagBefore = Array.isArray(bagState[bk]) ? [...(bagState[bk] as number[])] : [];
-      if (!bagBefore.length && !female && Array.isArray(state.tipComplimentBag)) {
-        bagBefore = [...state.tipComplimentBag];
-      }
-      const lastBefore =
-        (bagState[lk] as number | null | undefined) ??
-        (!female ? state.tipComplimentLast : null) ??
-        null;
-      const { template, bag, last, bagKey, lastKey } = nextTipCompliment(state, { female }) as unknown as {
-        template: string;
-        bag: number[];
-        last: number;
-        bagKey: string;
-        lastKey: string;
-      };
-      (state as unknown as Record<string, unknown>)[bagKey] = bag;
-      (state as unknown as Record<string, unknown>)[lastKey] = last;
-      // תאימות לאחור לשדות הישנים
-      if (!female) {
-        state.tipComplimentBag = bag;
-        state.tipComplimentLast = last;
-      }
-      const tipsGiven = r2((+p.tipsGiven || 0) + amount);
-      const next = { ...p, tipsGiven };
-      /* רישום בלבד: ה־cashout לא משתנה, ולכן גם אין cashDelta ברשומה.
-         ביטול של רשומת מורשת (עם cashDelta / cashoutBefore מהמשטר הישן)
-         עדיין משחזר את היציאה בדיוק כמו קודם — ראו את ענף ה־"tip" ב־undo. */
-      state.players[found.index] = next;
-      state.tips = [...(state.tips || []), { id: tipId, name: p.name, amount, at: Date.now() }];
-      record.push({
-        t: "tip",
-        name: p.name,
-        amount,
-        tipId,
-        bagBefore,
-        lastBefore,
-        female,
-        bagV: 2,
-      });
-      // BOT_MARK מתווסף אוטומטית על כל ack
-      if (resolveAlias(p.name, aliases) === KOBI) acks.push(KOBI_TIP_OPENER);
-      acks.push(formatTipCompliment(template, p.name, amount));
-      continue;
-    }
-
-    if (cmd.kind === "cashout") {
-      if (found.index === -1) {
-        problems.push(`${cmd.name} לא בשולחן`);
-        continue;
-      }
-      const p = state.players[found.index];
-      // סגירה חוזרת = עדכון. דורסים את הערך הקודם ואומרים את זה במפורש
-      const wasClosed = p.cashout !== "" && p.cashout != null;
-      record.push({ t: "out", name: p.name, before: p.cashout ?? "" });
-      const closed = { ...p, cashout: String(cmd.chips) };
-      state.players[found.index] = closed;
-      if (state.pending === p.name) state.pending = null;
-      acks.push(
-        `${wasClosed ? "עודכן: " : ""}${p.name} ${byGender(p.name, "יצא", "יצאה")} עם ${cmd.chips} ג\'יטונים · ${settleLine(closed, cps)}`
-      );
-      continue;
-    }
+    /* טיפ + יציאה (גל B, מנה 6.10): הגופים ב־applyMoneyCmd שב־
+       applyMoney, באותו מיקום לולאה בדיוק — אחרי remove/reopen וקפדנית
+       לפני נפילת־הזנב applyAdd, שפקודת כסף לא נופלת אליה לעולם. */
+    if (cmd.kind === "tip" || cmd.kind === "cashout") { applyMoneyCmd(ctx, cmd, found); continue; }
 
     applyAdd(ctx, cmd, sid, found, rtName);
   }
