@@ -367,7 +367,19 @@ export default function OwnerApp({ hosts } = {}) {
     try {
       localStorage.removeItem("poker:cache:group");
     } catch {}
-    await supabase.auth.signOut();
+    /* גיבוי התנתקות (פריט 4 / fixall א4): ב־supabase-js 2.119.2 ה־signOut
+       הגלובלי מחזיר { error } בכשל שרת/אופליין לפני ניקוי הסשן המקומי —
+       והמשתמש נשאר מחובר מקומית. לכן מפרקים את התוצאה: על error (או על
+       זריקה) נופלים ל־signOut({ scope: "local" }), שמנקה את הסשן המקומי
+       של המכשיר הזה ראשון. נתיב ההצלחה זהה להתנהגות הקודמת. */
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {}
+    }
   }, [supabase]);
 
   if (phase === "loading") return <EGSplash />;
