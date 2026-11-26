@@ -25,7 +25,8 @@ const sorted = (arr) => [...arr].sort();
 const keysOf = (obj) => sorted(Object.keys(obj));
 
 /* השדות ש־blank() מנרמל תמיד (רשימת השדות המפורשת בגוף blank ב־
-   lib/wa/state.ts) — נוכחים בפלט גם מלייב ריק, עם ברירות־המחדל. */
+   lib/wa/liveState.ts — עבר לשם מ־state.ts במנה 6.4) — נוכחים בפלט
+   גם מלייב ריק, עם ברירות־המחדל. */
 const BLANK_NORMALIZED_ALWAYS = [
   "entriesCount",
   "addAmt",
@@ -134,7 +135,7 @@ const FIXTURE_ONLY_VS_TYPE = [
 const TYPE_ONLY_VS_FIXTURE = [...KNOWN_DIVERGENCE_HUMOR];
 
 function waLiveStateFields() {
-  const src = readFileSync(new URL("../lib/wa/state.ts", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../lib/wa/liveState.ts", import.meta.url), "utf8");
   const start = src.indexOf("interface WaLiveState {");
   const block = src.slice(start, src.indexOf("\n}", start));
   return sorted([...block.matchAll(/^\s{2}([A-Za-z_][A-Za-z0-9_]*)\??:/gm)].map((m) => m[1]));

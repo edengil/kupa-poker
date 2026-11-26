@@ -261,7 +261,10 @@ describe("wave4 finding 14 — one 5% constant, one pot formula", () => {
     /* מנה 6.1 (גל B): חותמת הקנייה (stampBuyin, הצרכן של potForBuyin)
        עברה מ־state.ts ל־lib/wa/buyinStamp.ts — בדיקת ההכלה עוקבת אחריה,
        באותו דפוס של 5.1. בדיקת איסור־הקבועים נשארת על כל החמישה. */
-    for (const p of ["lib/wa/state.ts", "lib/wa/buyinStamp.ts", "lib/nightShare.js", "lib/potReaders.js", "components/poker/LiveTab.jsx", "components/poker/live/LiveBuyinControls.jsx"]) {
+    /* מנה 6.4 (גל B): מצב הלייב (blank) עבר מ־state.ts ל־
+       lib/wa/liveState.ts — liveState.ts נוסף לרשימת איסור־הקבועים
+       באותו דפוס (הבדיקה חלה על כל מודולי המשפחה, גם על ה־barrel). */
+    for (const p of ["lib/wa/state.ts", "lib/wa/liveState.ts", "lib/wa/buyinStamp.ts", "lib/nightShare.js", "lib/potReaders.js", "components/poker/LiveTab.jsx", "components/poker/live/LiveBuyinControls.jsx"]) {
       const src = readSrc(p);
       expect(src, p).not.toMatch(/\*\s*0\.05|0\.95\s*\*/);
     }

@@ -7,10 +7,11 @@
    revertAppliedOpCashout) ישירות מהבעלים ב־lib/wa/opPending.ts —
    לעולם לא דרך state.ts. את r2 מייבאים מהבעלים ב־lib/poker/helpers.js
    (דפוס 6.1/6.2 — אין תלות בקבוע TDZ של state).
-   מעגליות: undo.ts → state.ts הוא קצה זמן־ריצה אחד בלבד —
-   renameEverywhere (הכרזת פונקציה, נקראת רק בזמן קריאה בתוך undo);
-   שאר הקשר ל־state הוא טיפוסים ב־import type בלבד. הקצה החוזר
-   state.ts → undo.ts הוא re-export של הכרזות פונקציה בלבד, בלי
+   מעגליות: undo.ts → liveState.ts הוא קצה זמן־ריצה אחד בלבד —
+   renameEverywhere (הכרזת פונקציה, נקראת רק בזמן קריאה בתוך undo;
+   עברה ל־liveState במנה 6.4); שאר הקשר ל־liveState הוא טיפוסים
+   ב־import type בלבד. הקצה החוזר state.ts → undo.ts הוא re-export
+   של הכרזות פונקציה בלבד, בלי
    הפעלה ברמת־המודול. */
 
 import { ALIASES, findPlayer } from "./parse.js";
@@ -23,8 +24,8 @@ import {
   unstampEvent,
 } from "./buyinStamp";
 import { revertAppliedOpCashout, revertAppliedOpTip } from "./opPending";
-import { renameEverywhere } from "./state";
-import type { UndoEntry, WaLiveState, WaPendingApproval, WaPlayer } from "./state";
+import { renameEverywhere } from "./liveState";
+import type { UndoEntry, WaLiveState, WaPendingApproval, WaPlayer } from "./liveState";
 
 /** מבטל את מה שהודעה קודמת עם אותו מזהה כבר עשתה.
  * מחזיר מפת נחיתה להחלה־מחדש: מזהה חותמת → השם הנוכחי של השחקן שהביטול

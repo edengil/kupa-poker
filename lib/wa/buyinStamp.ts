@@ -1,16 +1,16 @@
 /* חותמות קנייה וחיפוש שחקנים במצב הלייב — חולץ מ־lib/wa/state.ts
    (גל B, מנה 6.1). state.ts מייצא הלאה את כל השמות הציבוריים מכאן,
    כך שאף יבואן לא השתנה.
-   מעגליות: expandSeatedName קורא ל־renameEverywhere שנשאר ב־state.ts
-   (יעבור רק במנה 6.4), ו־state.ts מייבא מכאן את פנימי הביטול. כל
+   מעגליות: expandSeatedName קורא ל־renameEverywhere שעבר במנה 6.4
+   ל־lib/wa/liveState.ts, ו־liveState אינו מייבא מכאן — אין מעגל.
    הקשירות החוצות הן הכרזות פונקציה הנקראות בזמן קריאה בלבד — אין
    הפעלה ברמת־המודול ואין תלות בקבועים (r2 מיובא מהבעלים שלו
    ב־lib/poker/helpers.js, כמו potForBuyin). */
 
 import { ALIASES, findPlayer, resolveAlias } from "./parse.js";
 import { potForBuyin, r2 } from "../poker/helpers.js";
-import { renameEverywhere } from "./state";
-import type { UndoEntry, WaBuyinEvent, WaLiveState, WaPlayer } from "./state";
+import { renameEverywhere } from "./liveState";
+import type { UndoEntry, WaBuyinEvent, WaLiveState, WaPlayer } from "./liveState";
 
 type AliasTable = typeof ALIASES;
 

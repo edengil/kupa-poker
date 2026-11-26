@@ -2,12 +2,13 @@
    (גל B, מנה 6.2). state.ts מייצא הלאה את השמות הציבוריים מכאן, כך שאף
    יבואן לא השתנה; revertAppliedOpTip/revertAppliedOpCashout מיובאים
    ב־state.ts לשימוש undo() בלבד ואינם מיוצאים הלאה ממנו.
-   מעגליות: אין מעגל זמן־ריצה — המודול מייבא מ־state.ts טיפוסים בלבד
-   (import type, נמחק בקומפילציה), ואת r2 מהבעלים שלו
-   ב־lib/poker/helpers.js (אותה הגדרה שהייתה ב־state). */
+   מעגליות: אין מעגל זמן־ריצה — המודול מייבא מ־liveState.ts טיפוסים
+   בלבד (import type, נמחק בקומפילציה; עברו לשם מ־state.ts במנה 6.4),
+   ואת r2 מהבעלים שלו ב־lib/poker/helpers.js (אותה הגדרה שהייתה
+   ב־state). */
 
 import { r2 } from "../poker/helpers.js";
-import type { UndoEntry, WaLiveState, WaPendingApproval } from "./state";
+import type { UndoEntry, WaLiveState, WaPendingApproval } from "./liveState";
 
 /* ------------- החלה/ביטול של פעולות־ממתין היסטוריות (גל 4ב) -------------
    טיפ ויציאה חריגים נותבו פעם לתור אישור מעל תקרת השפיות; המנגנון הוסר
