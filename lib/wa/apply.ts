@@ -97,7 +97,8 @@ export function applyCommands(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: 
    שהקוד השתמש בהם עד היום: state/record/acks/problems הם אותם אובייקטים
    (מוטציות דרך ה־ctx ודרך המקומיים הן אותה מוטציה), ו־retarget/prevRecord
    מתמלאים פעם אחת בלבד — בבלוק הביטול+ההחלה־מחדש — לפני כל שימוש, ולא
-   מוקצים שוב אחר כך. פנימי למודול: לא מיוצא. */
+   מוקצים שוב אחר כך. הממשק מיוצא (גל B, מנה 6.5) — נצרך ב־import type
+   בלבד על־ידי מודולי ההמשך, בלי קצה זמן־ריצה חזרה לכאן. */
 export interface WaApplyCtx {
   state: WaLiveState;
   record: UndoEntry[];
@@ -108,6 +109,10 @@ export interface WaApplyCtx {
   now: number;
   retarget: Map<string, string>;
   prevRecord: UndoEntry[] | null;
+  live: Partial<WaLiveState>;
+  cmds: WaCmd[];
+  msgId: string | null;
+  opts: WaApplyOpts;
 }
 
 function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: string | null, cps: number = CPS, opts: WaApplyOpts = {}) {
@@ -128,6 +133,10 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     now,
     retarget: new Map<string, string>(),
     prevRecord: null,
+    live,
+    cmds,
+    msgId,
+    opts,
   };
 
   /* שער מסירה מאוחרת (ממצא 21): הלייב ריק לגמרי אבל חותמת ההודעה קודמת
