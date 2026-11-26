@@ -50,6 +50,15 @@ export function makeLiveFull() {
     bitIdleRemindedAt: LIVE_T0 + 2000,
     pendingRemindAttemptAt: LIVE_T0 + 3000,
     bitIdleRemindAttemptAt: LIVE_T0 + 3500,
+    /* חותמות רגל ה־DM של התזכורות (גל 5, פריט 5.6) — הושלמו במנת
+       6.4-PREP: הפיקסצ'ר טען לשאת את כל שדות blank() אבל הארבע האלה
+       חסרו בו (ביקורת 6.0, §12). ערכים לא־null כמו ארבע חותמות הוותיקות
+       שלמעלה: blank() מוחק חותמות null מהפלט, אז null היה הופך את
+       התוספת ל־no-op אצל כל צרכן קיים ולא היה נתפס שום אובדן עתידי. */
+    pendingDmRemindedAt: LIVE_T0 + 1500,
+    bitIdleDmRemindedAt: LIVE_T0 + 2500,
+    pendingDmRemindAttemptAt: LIVE_T0 + 3200,
+    bitIdleDmRemindAttemptAt: LIVE_T0 + 3700,
     tips: [{ id: "t1", name: "קובי סעדה", amount: 10, at: LIVE_T0 }],
     tipComplimentBag: [1, 2],
     tipComplimentLast: 1,
