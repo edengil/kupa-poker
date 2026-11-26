@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 
 /* ============================================================================
    גל 2, פריט 2.2 — בלוק כותרות האבטחה ב־next.config:
-   CSP במצב Report-Only בלבד (אכיפה רק אחרי עשן חי של כל המסכים —
-   כלל התוכנית), X-Frame-Options, nosniff, ו־Referrer-Policy שלא
-   דולף את ה־slug. הבדיקה נועלת גם את ההחלטה: אין כותרת CSP אוכפת.
+   CSP עלתה כ־Report-Only, ועברה לאכיפה בגל השבועי 26.11.2026
+   (פריט 3) אחרי עשן חי של כל המסכים. X-Frame-Options, nosniff,
+   ו־Referrer-Policy שלא דולף את ה־slug. הבדיקה נועלת את מצב
+   האכיפה: כותרת Content-Security-Policy קיימת, ואין Report-Only.
    ============================================================================ */
 
 import nextConfig from "../next.config.mjs";
@@ -25,10 +26,10 @@ describe("security headers block (wave 2.2)", () => {
     expect(m.get("Referrer-Policy")).toBe("same-origin");
   });
 
-  it("ships CSP as report-only (not enforcing) per the plan rule", async () => {
+  it("ships CSP as enforcing (report-only was lifted after the live smoke)", async () => {
     const m = await headerMap();
-    expect(m.has("Content-Security-Policy")).toBe(false);
-    const csp = m.get("Content-Security-Policy-Report-Only");
+    expect(m.has("Content-Security-Policy-Report-Only")).toBe(false);
+    const csp = m.get("Content-Security-Policy");
     expect(typeof csp).toBe("string");
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
@@ -39,7 +40,7 @@ describe("security headers block (wave 2.2)", () => {
 
   it("CSP allows the resources the app actually loads", async () => {
     const m = await headerMap();
-    const csp = m.get("Content-Security-Policy-Report-Only");
+    const csp = m.get("Content-Security-Policy");
     // חיבורי Supabase (REST + realtime) ואנליטיקס
     expect(csp).toContain("https://*.supabase.co");
     expect(csp).toContain("wss://*.supabase.co");
