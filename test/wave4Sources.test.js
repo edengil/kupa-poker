@@ -255,10 +255,15 @@ describe("wave4 finding 14 — one 5% constant, one pot formula", () => {
   });
 
   it("no hardcoded 0.05/0.95 left in the pot paths (source lock)", () => {
-    for (const p of ["lib/wa/state.ts", "lib/nightShare.js", "components/poker/LiveTab.jsx", "components/poker/live/LiveBuyinControls.jsx"]) {
+    /* מנה 5.1 (גל B): נוסחת הקופה עברה מ־nightShare ל־lib/potReaders.js —
+       נעילת־המקור עוקבת אחרי הקוד: בדיקת ההכלה חלה על המודול החדש,
+       ובדיקת איסור־הקבועים חלה על כל החמישה. */
+    for (const p of ["lib/wa/state.ts", "lib/nightShare.js", "lib/potReaders.js", "components/poker/LiveTab.jsx", "components/poker/live/LiveBuyinControls.jsx"]) {
       const src = readSrc(p);
       expect(src, p).not.toMatch(/\*\s*0\.05|0\.95\s*\*/);
-      expect(src, p).toContain("potForBuyin");
+    }
+    for (const p of ["lib/wa/state.ts", "lib/potReaders.js", "components/poker/LiveTab.jsx", "components/poker/live/LiveBuyinControls.jsx"]) {
+      expect(readSrc(p), p).toContain("potForBuyin");
     }
   });
 });
