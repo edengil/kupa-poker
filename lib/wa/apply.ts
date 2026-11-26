@@ -7,15 +7,11 @@ import { BOT_MARK } from "../botMark.js";
 import { aliasesOf, findPlayer, READ_ONLY, resolveAlias } from "./parse.js";
 import { decoratePendingReminder } from "./reminders.js";
 import {
-  applyOpCashout,
-  applyOpTip,
   blank,
   findInState,
   isKnownName,
-  isOpPending,
   MAX_APPLIED_RECORDS,
   openPlayers,
-  opTipId,
   pickPending,
   playerPotSum,
   r2,
@@ -28,6 +24,7 @@ import { allClosedNote, closingStatus, finalSummary } from "./summary";
 import { ownerAskText } from "./help.js";
 import { pushOpeningProphecy, pushPotMilestone, pushRebuyJoke, totalTablePot } from "./applyHumor";
 import { applyInfo, NOT_INFO } from "./applyInfo";
+import { applyPendingDecision } from "./applyPending";
 
 export { helpText } from "./help.js";
 
@@ -62,9 +59,11 @@ export interface WaApplyOpts {
    גלויה לבעלים; כל בליעה מקבלת משואת diag. */
 export const WA_MONEY_KINDS = new Set(["add", "tip", "tipNoName", "cashout", "answer"]);
 
-/* קובי מקבל פתיח משלו לפני משפט המחמאה על כל טיפ */
-const KOBI = "קובי סעדה";
-const KOBI_TIP_OPENER = "יא חאלייה";
+/* קובי מקבל פתיח משלו לפני משפט המחמאה על כל טיפ. הקבועים מיוצאים:
+   הם משותפים לענף הטיפ כאן ולענף אישור־ממתין־הטיפ ב־applyPending
+   (גל B, מנה 6.7), שמייבא אותם מכאן. */
+export const KOBI = "קובי סעדה";
+export const KOBI_TIP_OPENER = "יא חאלייה";
 
 /* ============================================================================
    אין יותר תקרה ואין תור אישור לפקודות כסף בבוט (החלטת עדן 9.11,
@@ -282,170 +281,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
     }
 
     if (cmd.kind === "approve" || cmd.kind === "reject") {
-      const pending = state.pendingApprovals || [];
-      const idx = pickPending(pending, cmd.name, aliases);
-      if (idx === -2) {
-        problems.push(`כמה ממתינים — כתוב אשר + שם (${pending.map((p) => p.name).join(", ")})`);
-        continue;
-      }
-      if (idx < 0) {
-        if (!pending.length) continue; // "כן" בקבוצה בלי המתנה — מתעלמים
-        problems.push(cmd.name ? `${cmd.name} לא ממתין לאישור` : "אין שחקן שממתין לאישור");
-        continue;
-      }
-      const item = pending[idx];
-      state.pendingApprovals = pending.filter((_, i) => i !== idx);
-      if (cmd.kind === "reject") {
-        if (isOpPending(item)) {
-          /* דחיית פעולת־ממתין היסטורית (גל 4ב, מנגנון שהוסר 9.11):
-             פריטים כאלה יכולים להתקיים רק בלייב שנוצר לפני ההסרה —
-             ממשיכים לטפל בהם עד שהתור מתרוקן: הממתין נצרך ושום דבר
-             לא הוחל — הטיפ/היציאה פשוט לא קורים. */
-          record.push({
-            t: "pendingOp",
-            op: item.op,
-            name: item.name,
-            amount: item.amount,
-            at: item.at,
-            pendingBefore: item,
-          });
-          acks.push(
-            item.op === "tip"
-              ? `הטיפ של ${item.name} (${item.amount} ג'יטונים) נדחה — לא נרשם`
-              : `היציאה של ${item.name} (${item.amount} ג'יטונים) נדחתה — ${byGender(item.name, "נשאר", "נשארה")} בשולחן`
-          );
-          continue;
-        }
-        record.push({ t: "pending", name: item.name, amount: item.amount, at: item.at });
-        acks.push(
-          `${item.name} ${byGender(item.name, "נדחה", "נדחתה")} — ${byGender(item.name, "לא נכנס", "לא נכנסה")} לשולחן`
-        );
-        continue;
-      }
-      /* אישור פעולת־ממתין היסטורית (גל 4ב — טיפ/יציאה ממתינים): ממתינים
-         כאלה לא נוצרים יותר (המנגנון הוסר 9.11), אבל פריט קיים בלייב
-         ממשיך להיות ניתן לאישור עד שהתור מתרוקן: ההחלה היא אותה לוגיקה
-         של הפקודה הרגילה, על צילום־הלפני שנשמר בממתין. השחקן חייב להיות
-         בשולחן; אם הוסר מאז ההמתנה — הפעולה אובדת עם הודעה, לא מומצאת
-         על שחקן אחר. */
-      if (isOpPending(item)) {
-        const rtOpName = sid ? ctx.retarget.get(sid) : undefined;
-        const opIdx = rtOpName
-          ? state.players.findIndex((p) => p.name === rtOpName)
-          : state.players.findIndex((p) => p.name === item.name);
-        if (opIdx === -1) {
-          record.push({
-            t: "pendingOp",
-            op: item.op,
-            name: item.name,
-            amount: item.amount,
-            at: item.at,
-            pendingBefore: item,
-          });
-          problems.push(`${item.name} כבר לא בשולחן — הפעולה הממתינה בוטלה`);
-          continue;
-        }
-        const opPlayer = state.players[opIdx];
-        if (item.op === "tip") {
-          const female = item.tipFemale ?? isFemaleName(opPlayer.name);
-          const { template, bag, last, bagKey, lastKey } = nextTipCompliment(state, {
-            female,
-          }) as unknown as {
-            template: string;
-            bag: number[];
-            last: number;
-            bagKey: string;
-            lastKey: string;
-          };
-          const tipId = opTipId(item);
-          applyOpTip(state, opIdx, item, tipId, {
-            bag,
-            last,
-            bagKey,
-            lastKey,
-            female,
-          });
-          record.push({
-            t: "approveOp",
-            op: "tip",
-            name: opPlayer.name,
-            pending: item,
-            tipRevert: {
-              tipsGiven: +opPlayer.tipsGiven || 0,
-              cashout: opPlayer.cashout,
-              tipId,
-            },
-          });
-          if (resolveAlias(opPlayer.name, aliases) === KOBI) acks.push(KOBI_TIP_OPENER);
-          acks.push(
-            `אושר: ${formatTipCompliment(template, opPlayer.name, item.amount)}`
-          );
-          continue;
-        }
-        const wasPending = state.pending === opPlayer.name;
-        applyOpCashout(state, opIdx, item);
-        const closedPlayer = state.players[opIdx];
-        record.push({
-          t: "approveOp",
-          op: "cashout",
-          name: opPlayer.name,
-          pending: item,
-          cashoutRevert: opPlayer.cashout ?? "",
-          wasPending,
-        });
-        acks.push(
-          `אושר: ${opPlayer.name} ${byGender(opPlayer.name, "יצא", "יצאה")} עם ${item.amount} ג'יטונים · ${settleLine(closedPlayer, cps)}`
-        );
-        continue;
-      }
-      /* החלה־מחדש של אישור: נוחתים על השחקן שהביטול נגע בו בשמו הנוכחי,
-         אם הוא עדיין בשולחן — לא על פתרון שם הממתין מחדש. */
-      const rtApproveName = sid ? ctx.retarget.get(sid) : undefined;
-      const rtApproveIdx = rtApproveName
-        ? state.players.findIndex((p) => p.name === rtApproveName)
-        : -1;
-      const already =
-        rtApproveIdx !== -1
-          ? { index: rtApproveIdx, resolved: rtApproveName as string }
-          : findInState(state, item.name, aliases);
-      // הקנייה עוברת דרך החותמת המרכזית — אירוע אחד, pot ו־savingsPot כמו באפליקציה
-      if (already.index !== -1) {
-        const p = state.players[already.index];
-        const next = stampBuyin(state, p, item.amount, now, sid);
-        state.players[already.index] = next;
-        record.push({
-          t: "approve",
-          name: p.name,
-          pending: item,
-          created: false,
-          ev: stampedEventOf(p, next),
-        });
-        if (!state.approvedNames.includes(p.name)) state.approvedNames.push(p.name);
-        acks.push(`${p.name} ${byGender(p.name, "אושר", "אושרה")} · +${item.amount}₪ · סה״כ ${next.buyin}₪`);
-        continue;
-      }
-      const fresh = {
-        /* שחקן שהביטול הסיר לגמרי (החותמה הייתה כל מה שהיה לו) נוצר מחדש
-           בשמו הנוכחי מהביטול, לא בשם הגולמי של הממתין. */
-        name: rtApproveName ?? resolveAlias(item.name, aliases),
-        buyin: 0,
-        cashout: "",
-        buyinEvents: [],
-      };
-      const seated = stampBuyin(state, fresh, item.amount, now, sid);
-      state.players.push(seated);
-      state.startedAt = state.startedAt || Date.now();
-      if (!state.approvedNames.includes(seated.name)) state.approvedNames.push(seated.name);
-      record.push({
-        t: "approve",
-        name: seated.name,
-        pending: item,
-        created: true,
-        ev: stampedEventOf(fresh, seated),
-      });
-      acks.push(
-        `${seated.name} ${byGender(seated.name, "אושר · נכנס", "אושרה · נכנסה")} ב-${item.amount}₪`
-      );
+      applyPendingDecision(ctx, cmd, sid);
       continue;
     }
 
