@@ -4,7 +4,6 @@ import { buildReport, CPS, settleLine } from "../report.js";
 import { nextTipCompliment, formatTipCompliment, tipBagKey, tipLastKey } from "../tipCompliments.js";
 import { isFemaleName, byGender } from "../gender.js";
 import { BOT_MARK } from "../botMark.js";
-import { buildTipsTable } from "../tipsTable.js";
 import { aliasesOf, findPlayer, READ_ONLY, resolveAlias } from "./parse.js";
 import { decoratePendingReminder } from "./reminders.js";
 import {
@@ -25,9 +24,10 @@ import {
   stampedEventOf,
   undo,
 } from "./state";
-import { allClosedNote, closingStatus, finalSummary, snapshot } from "./summary";
-import { helpText, ownerAskText } from "./help.js";
+import { allClosedNote, closingStatus, finalSummary } from "./summary";
+import { ownerAskText } from "./help.js";
 import { pushOpeningProphecy, pushPotMilestone, pushRebuyJoke, totalTablePot } from "./applyHumor";
+import { applyInfo, NOT_INFO } from "./applyInfo";
 
 export { helpText } from "./help.js";
 
@@ -165,43 +165,14 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
   const report = () =>
     buildReport({ players: ctx.state.players, entriesCount: ctx.state.entriesCount as string, startedAt: ctx.state.startedAt, cps: ctx.cps });
 
-  // פקודות מידע — לא נוגעות בנתונים ולכן יוצאות כאן
+  // פקודות מידע — לא נוגעות בנתונים ולכן יוצאות כאן. ענפי המידע חולצו
+  // ל־applyInfo (גל B, מנה 6.6) באותו סדר הערכה בדיוק; NOT_INFO מחזיר
+  // לכאן רק את נפילת ה־settle (כותבת state.closing — נשארת בליבה).
   if (cmds.length === 1 && READ_ONLY.has(cmds[0].kind)) {
     const cmd = cmds[0];
 
-    if (cmd.kind === "help") return { live, reply: helpText() };
-
-    if (cmd.kind === "link") {
-      const url = cmd.siteUrl && cmd.slug ? `${cmd.siteUrl}/g/${cmd.slug}` : null;
-      return {
-        live,
-        reply: url
-          ? `${BOT_MARK} הטבלה של הקבוצה:\n${url}\n\nצריך להתחבר עם Google בכניסה.`
-          : `${BOT_MARK} הלינק לא מוגדר.`,
-      };
-    }
-
-    /* טבלת טיפים — הערב החי, ואם אין משחק פתוח אז הערב האחרון שנשמר */
-    if (cmd.kind === "tipsSummary") {
-      if (state.players.length) return { live, reply: buildTipsTable(state, { live: true, now, aliases }) };
-      if (opts.lastSession) return { live, reply: buildTipsTable(opts.lastSession, { aliases }) };
-      return { live, reply: `${BOT_MARK} אין משחק פעיל ואין ערב שמור לסכם.` };
-    }
-
-    if (!state.players.length) {
-      const waiting = state.pendingApprovals || [];
-      if (waiting.length) {
-        return {
-          live: state,
-          reply: `${BOT_MARK} אין עדיין שחקנים בשולחן.\nממתינים לאישור: ${waiting.map((p) => p.name).join(", ")} · אשר / דחה / טעות`,
-        };
-      }
-      return { live, reply: `${BOT_MARK} אין משחק פעיל.` };
-    }
-
-    if (cmd.kind === "status") {
-      return { live, reply: `${BOT_MARK} תמונת מצב\n\n${snapshot(state, cps)}\n\n${report()}` };
-    }
+    const info = applyInfo(ctx, live, cmd, opts.lastSession, report);
+    if (info !== NOT_INFO) return info;
 
     // סיכום כשיש עוד פתוחים — נכנסים לסגירה מודרכת: שם ← ג'יטונים ← הבא
     const open = openPlayers(state);
