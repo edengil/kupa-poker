@@ -20,11 +20,12 @@ import {
   stampedEventOf,
   undo,
 } from "./state";
-import { allClosedNote, closingStatus, finalSummary } from "./summary";
+import { allClosedNote, closingStatus } from "./summary";
 import { ownerAskText } from "./help.js";
 import { pushOpeningProphecy, pushPotMilestone, pushRebuyJoke, totalTablePot } from "./applyHumor";
 import { applyInfo, NOT_INFO } from "./applyInfo";
 import { applyPendingDecision } from "./applyPending";
+import { applyClosingCmd, applySettle } from "./applyClosing";
 
 export { helpText } from "./help.js";
 
@@ -175,28 +176,14 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
 
   // פקודות מידע — לא נוגעות בנתונים ולכן יוצאות כאן. ענפי המידע חולצו
   // ל־applyInfo (גל B, מנה 6.6) באותו סדר הערכה בדיוק; NOT_INFO מחזיר
-  // לכאן רק את נפילת ה־settle (כותבת state.closing — נשארת בליבה).
+  // לכאן רק את נפילת ה־settle, שחולצה ל־applySettle (גל B, מנה 6.8).
   if (cmds.length === 1 && READ_ONLY.has(cmds[0].kind)) {
     const cmd = cmds[0];
 
     const info = applyInfo(ctx, live, cmd, opts.lastSession, report);
     if (info !== NOT_INFO) return info;
 
-    // סיכום כשיש עוד פתוחים — נכנסים לסגירה מודרכת: שם ← ג'יטונים ← הבא
-    const open = openPlayers(state);
-    if (open.length) {
-      state.closing = true;
-      state.pending = null;
-      return {
-        live: state,
-        reply: `${BOT_MARK} סוגרים את הערב 🎯\n\n${closingStatus(state, cps)}\n\nממי מתחילים? תכתוב שם ואני אשאל כמה ג'יטונים.\nאפשר גם ישר: "דן יצא 300".`,
-      };
-    }
-    state.closing = false;
-    return {
-      live: state,
-      reply: finalSummary(state, cps, cmds, aliases, now),
-    };
+    return applySettle(ctx);
   }
 
   /* מסירה חוזרת/עריכה: מבטלים את מה שההודעה עשתה ומחילים מחדש. ה־undo
@@ -285,77 +272,21 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       continue;
     }
 
-    /* שם בלבד — חלק מהסגירה המודרכת: מסמן את השחקן הבא ושואל כמה ג'יטונים.
-       מחוץ למצב סגירה זו סתם הודעה בקבוצה ומתעלמים ממנה בשקט. */
-    if (cmd.kind === "nameOnly") {
-      if (!state.closing) continue;
-      const who = findInState(state, cmd.name, aliases);
-      if (who.ambiguous) {
-        return { live: state, reply: `${BOT_MARK} מתכוון ל־${who.ambiguous.join(" או ")}? תדייק.` };
-      }
-      if (who.index === -1) {
-        const open = openPlayers(state);
-        return {
-          live: state,
-          reply: `${BOT_MARK} לא מצאתי את "${cmd.name}" בשולחן.\nנשארו פתוחים: ${open.map((p) => p.name).join(", ")}`,
-        };
-      }
-      const p = state.players[who.index];
-      if (p.cashout !== "" && p.cashout != null) {
-        /* שם של מי שכבר סגור = כנראה תיקון. שואלים שוב במקום לדחות —
-           טעויות בספירת ג'יטונים מתגלות בדיוק בשלב הזה. */
-        state.pending = p.name;
-        return {
-          live: state,
-          reply: `${BOT_MARK} ${p.name} כבר רשום עם ${p.cashout} ג'יטונים — כמה במקום?\n("${p.name} חוזר" מחזיר אותו למשחק)`,
-        };
-      }
-      state.pending = p.name;
-      return { live: state, reply: `${BOT_MARK} כמה ג'יטונים ל${p.name}?` };
-    }
-
-    // תשובה למה שהבוט שאל. בלי שאלה פתוחה מספר בודד הוא סתם הודעה בקבוצה.
-    if (cmd.kind === "answer") {
-      if (!state.pending) continue;
-      cmd = { kind: "cashout", name: state.pending, chips: cmd.chips };
-    }
-
-    if (cmd.kind === "ask") {
-      const who = findInState(state, cmd.name, aliases);
-      if (who.ambiguous) {
-        problems.push(`${cmd.name} → ${who.ambiguous.join(" / ")}`);
-        continue;
-      }
-      if (who.index === -1) {
-        problems.push(`${cmd.name} לא בשולחן`);
-        continue;
-      }
-      state.pending = state.players[who.index].name;
-      return { live: state, reply: `${BOT_MARK} כמה ג'יטונים ל${state.pending}?` };
-    }
-
-    if (cmd.kind === "entries_left") {
-      record.push({ t: "entries", before: state.entriesCount });
-      const pot = state.players.reduce((t, p) => t + (+p.buyin || 0), 0);
-      const next = r2(pot / 50 + cmd.left);
-      state.entriesCount = String(next);
-      acks.push(`המלאי תוקן: ${cmd.left} בחוץ · סה״כ ${next} כניסות`);
-      continue;
-    }
-
-    if (cmd.kind === "entries") {
-      record.push({ t: "entries", before: state.entriesCount });
-      state.entriesCount = String(cmd.count);
-      acks.push(`הוכנו ${cmd.count} כניסות`);
-      continue;
-    }
-
-    if (cmd.kind === "entries_add") {
-      record.push({ t: "entries", before: state.entriesCount });
-      const next = (+state.entriesCount || 0) + cmd.delta;
-      state.entriesCount = String(next);
-      acks.push(`נוספו ${cmd.delta} כניסות · סה״כ ${next}`);
-      continue;
+    /* סגירה מודרכת + מלאי (גל B, מנה 6.8): nameOnly/answer/ask ושלישיית
+       ה־entries חולצו ל־applyClosingCmd באותו מיקום לולאה ובאותו סדר
+       פנימי. ה־rewrite של answer נופל לגוף הגנרי של אותו איטרציה. */
+    if (
+      cmd.kind === "nameOnly" ||
+      cmd.kind === "answer" ||
+      cmd.kind === "ask" ||
+      cmd.kind === "entries_left" ||
+      cmd.kind === "entries" ||
+      cmd.kind === "entries_add"
+    ) {
+      const o = applyClosingCmd(ctx, cmd);
+      if (o.action === "return") return o.result;
+      if (o.action === "rewrite") cmd = o.cmd;
+      else continue;
     }
 
     /* החלה־מחדש של פקודת קנייה: אם הביטול נגע בשחקן בשביל החותמת של

@@ -7,7 +7,8 @@
    ה־pendingApprovals שביניהם חל על כל סוג שנותר. לכן כניסה אחת
    שמחזירה את NOT_INFO ("לא־מידע / המשך") כשהפקודה אינה ענף מידע
    שנסגר כאן — בפועל רק settle עם שולחן לא־ריק — והליבה ממשיכה
-   לנפילת ה־settle שנשארה בה (היא כותבת state.closing; שייכת ל־6.8).
+   לנפילת ה־settle, שחולצה במנה 6.8 ל־applySettle ב־applyClosing.ts
+   (היא כותבת state.closing שם).
    סדר ההערכה נשמר בדיוק: help ← link ← tipsSummary ← שער־הריק
    (ממתינים / אין־משחק) ← status ← NOT_INFO.
    מעגליות: הקשר ל־apply.ts הוא import type בלבד (WaApplyCtx/WaCmd) —
