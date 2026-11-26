@@ -9,23 +9,19 @@ import { decoratePendingReminder } from "./reminders.js";
 import {
   blank,
   findInState,
-  isKnownName,
   MAX_APPLIED_RECORDS,
   openPlayers,
   pickPending,
-  playerPotSum,
   r2,
   renameEverywhere,
-  stampBuyin,
-  stampedEventOf,
   undo,
 } from "./state";
 import { allClosedNote, closingStatus } from "./summary";
 import { ownerAskText } from "./help.js";
-import { pushOpeningProphecy, pushPotMilestone, pushRebuyJoke, totalTablePot } from "./applyHumor";
 import { applyInfo, NOT_INFO } from "./applyInfo";
 import { applyPendingDecision } from "./applyPending";
 import { applyClosingCmd, applySettle } from "./applyClosing";
+import { applyAdd, applyRemove, applyReopen } from "./applyEntries";
 
 export { helpText } from "./help.js";
 
@@ -89,6 +85,11 @@ export function applyCommands(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: 
   const now = opts.now ?? Date.now();
   return decoratePendingReminder(applyCommandsCore(live, cmds, msgId, cps, { ...opts, now }), now);
 }
+
+/* תוצאת חיפוש השחקן המשותפת של הליבה (findInState או נחיתת ה־retarget
+   הישירה) — מיוצאת כטיפוס בשביל applyEntries (גל B, מנה 6.9), שמקבל
+   אותה כפרמטר. זו תוספת המשטח היחידה של המנה. */
+export type FoundInState = ReturnType<typeof findInState>;
 
 /* הקשר ההחלה המפורש של applyCommandsCore (גל B, מנה 6.0 — הכנה לפיצול
    ליבת הבוט, בלי שום מעבר קוד): כל מה שה־closures הפנימיים של הליבה
@@ -301,40 +302,9 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       continue;
     }
 
-    if (cmd.kind === "remove") {
-      if (found.index === -1) {
-        problems.push(`${cmd.name} לא בשולחן`);
-        continue;
-      }
-      const p = state.players[found.index];
-      record.push({ t: "remove", name: p.name, at: found.index, player: p });
-      state.players.splice(found.index, 1);
-      /* הסרה מפרקת גם את ה־pot שהשחקן צבר: savingsPot הוא סכום ה־pot של
-         האירועים החיים, ואירועיו של המוסר כבר לא חיים. בלעדיו הקופה
-         נשארת מנופחת, ומסירה חוזרת של הודעת היצירה מחזירה את השחקן עם
-         קופה כפולה מהאירועים (תצפית גל 2). ביטול ההסרה ב־undo מחזיר
-         את ה־pot יחד עם השחקן. */
-      const potSum = playerPotSum(p);
-      if (potSum) state.savingsPot = r2((Number(state.savingsPot) || 0) - potSum);
-      acks.push(`${p.name} ${byGender(p.name, "הוסר", "הוסרה")} מהשולחן`);
-      continue;
-    }
+    if (cmd.kind === "remove") { applyRemove(ctx, cmd, found); continue; }
 
-    if (cmd.kind === "reopen") {
-      if (found.index === -1) {
-        problems.push(`${cmd.name} לא בשולחן`);
-        continue;
-      }
-      const p = state.players[found.index];
-      if (p.cashout === "" || p.cashout == null) {
-        problems.push(`${p.name} בכלל ${byGender(p.name, "לא סגור", "לא סגורה")}`);
-        continue;
-      }
-      record.push({ t: "out", name: p.name, before: p.cashout });
-      state.players[found.index] = { ...p, cashout: "" };
-      acks.push(`${p.name} ${byGender(p.name, "חזר", "חזרה")} לשולחן — היציאה בוטלה`);
-      continue;
-    }
+    if (cmd.kind === "reopen") { applyReopen(ctx, cmd, found); continue; }
 
     /* טיפ מג'יטונים של השחקן (לא מהקופה) — רישום בלבד (עדן, 11.11):
        tipsGiven מצטבר לסטטיסטיקה והאירוע נכנס ליומן, אבל ה־cashout לא
@@ -425,94 +395,7 @@ function applyCommandsCore(live: Partial<WaLiveState>, cmds: WaCmd[], msgId: str
       continue;
     }
 
-    // הוספה או הפחתה
-    if (found.index === -1) {
-      if (cmd.amount <= 0) {
-        problems.push(`${cmd.name} לא בשולחן`);
-        continue;
-      }
-      /* החלה־מחדש שהביטול הסיר את השחקן לגמרי: יוצרים מחדש בשם הנוכחי
-         מהביטול ועוקפים את הסחת־הממתין — השחקן כבר הושב על ידי ההודעה
-         הזו עצמה, והשם המתוקן שלו לא חייב להיות ברשימת המוכרים. */
-      const name = rtName || found.resolved || resolveAlias(cmd.name, aliases);
-      const extras = [
-        ...(state.players || []).map((p) => p.name),
-        ...(state.approvedNames || []),
-      ];
-      if (!rtName && !isKnownName(name, opts.knownNames, extras, aliases)) {
-        const at = now;
-        const existing = (state.pendingApprovals || []).find((p) => p.name === name);
-        if (existing) {
-          /* צילום־לפני של הפריט: הביטול ישחזר amount/at בדיוק. ההתאמה
-             הישנה (amount מצטבר מול דלתא) מעולם לא פגעה, ולכן כל מסירה
-             חוזרת של הודעת ההגדלה ספרה אותה שוב (ממצא 4). */
-          const pendingBefore = { amount: existing.amount, at: existing.at };
-          const grown = { ...existing, amount: r2(existing.amount + cmd.amount), at };
-          state.pendingApprovals = (state.pendingApprovals || []).map((p) =>
-            p === existing ? grown : p,
-          );
-          record.push({ t: "pending", name, amount: cmd.amount, at, pendingBefore });
-          acks.push(`${name} עדיין ממתין לאישור עדן · ${grown.amount}₪`);
-        } else {
-          state.pendingApprovals = [...(state.pendingApprovals || []), { name, amount: cmd.amount, at }];
-          record.push({ t: "pending", name, amount: cmd.amount, at, pendingBefore: null });
-          acks.push(`שחקן חדש — מחכה לאישור עדן: ${name} · ${cmd.amount}₪`);
-        }
-        continue;
-      }
-      const fresh = { name, buyin: 0, cashout: "", buyinEvents: [] };
-      const potBefore = totalTablePot(ctx);
-      const wasEmptyTable = state.players.length === 0 && !state.startedAt;
-      const seated = stampBuyin(state, fresh, cmd.amount, now, sid);
-      state.players.push(seated);
-      state.startedAt = state.startedAt || Date.now();
-      record.push({
-        t: "add",
-        name,
-        delta: cmd.amount,
-        created: true,
-        ev: stampedEventOf(fresh, seated),
-      });
-      acks.push(`${name} ${byGender(name, "נכנס", "נכנסה")} ב-${cmd.amount}₪`);
-      pushRebuyJoke(ctx, name, seated);
-      pushOpeningProphecy(ctx, wasEmptyTable);
-      pushPotMilestone(ctx, potBefore, totalTablePot(ctx));
-      continue;
-    }
-
-    /* מסירה חוזרת של בקשת־ממתין שכבר אושרה והושיבה את השחקן (תצפית
-       גל 2): הביטול לא מצא ממתין — הוא נצרך באישור — והחלה רגילה הייתה
-       חותמת את סכום הבקשה שוב על השחקן היושב: קנייה כפולה וקופה כפולה
-       על אותה בקשה בדיוק. הבקשה כבר מומשה, אז לא נוגעים בכסף; רשומת
-       הבקשה המקורית נרשמת מחדש כמו שהיא, כדי שמסירה נוספת של אותה
-       הודעה תתנהג שוב בדיוק כך. */
-    if (cmd.kind === "add" && ctx.prevRecord && found.index !== -1) {
-      const seatedPlayer = state.players[found.index];
-      const prevPending = ctx.prevRecord.find(
-        (e) =>
-          e.t === "pending" &&
-          (e.name === seatedPlayer.name || resolveAlias(e.name || "", aliases) === seatedPlayer.name),
-      );
-      const stillPending = (state.pendingApprovals || []).some((pp) => pp.name === seatedPlayer.name);
-      if (prevPending && !stillPending) {
-        record.push(prevPending);
-        acks.push(`${seatedPlayer.name} כבר בשולחן · סה״כ ${seatedPlayer.buyin}₪`);
-        continue;
-      }
-    }
-
-    const p = state.players[found.index];
-    const potBefore = totalTablePot(ctx);
-    const next = stampBuyin(state, p, cmd.amount, now, sid);
-    const delta = r2((+next.buyin || 0) - (+p.buyin || 0));
-    state.players[found.index] = next;
-    record.push({ t: "add", name: p.name, delta, ev: stampedEventOf(p, next) });
-    acks.push(`${p.name} ${cmd.amount > 0 ? "+" : ""}${cmd.amount}₪ · סה״כ ${next.buyin}₪`);
-    /* רק כשהחותמת באמת הוסיפה אירוע כניסה — הפחתה לא סופרת כניסה */
-    if (stampedEventOf(p, next)) {
-      pushRebuyJoke(ctx, p.name, next);
-      pushPotMilestone(ctx, potBefore, totalTablePot(ctx));
-    }
+    applyAdd(ctx, cmd, sid, found, rtName);
   }
 
   if (!acks.length && !problems.length) return { live, reply: null };
