@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabase } from "@/lib/supabaseAdmin";
 import { envValue, hasEnv } from "@/lib/env";
 import { authorizedAdmin } from "@/lib/cronAuth";
+import { resolveEffectiveSlug } from "@/lib/groupSlug";
 import { botHealthView } from "@/lib/wa/health.js";
 import { waQuotaView } from "@/lib/wa/quota.js";
 
@@ -72,10 +73,13 @@ async function whapiWebhooks(token) {
 }
 
 async function groupState() {
-  const slug = envValue("KUPA_GROUP_SLUG");
-  if (!slug) return { found: false, reason: "no KUPA_GROUP_SLUG" };
   try {
     const supabase = getAdminSupabase();
+    /* גל 6, פריט המשך: לא קוראים את KUPA_GROUP_SLUG גולמי — עוברים דרך
+       הפותר כמו כל הצרכנים: ולידציית [a-z0-9-] במקור, ופתרון סיבוב
+       (prevSlugs) גם כאן. slug חסר/לא־תקין = אותה תשובת «לא נמצא». */
+    const slug = await resolveEffectiveSlug(supabase, envValue);
+    if (!slug) return { found: false, reason: "no KUPA_GROUP_SLUG" };
     const { data, error } = await supabase
       .from("groups")
       .select("id, slug, config, data, live, updated_at")

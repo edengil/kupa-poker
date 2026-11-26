@@ -12,7 +12,7 @@
       בפועל עובר דרך אותו resolveEffectiveSlug. */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { effectiveSlugFromRows, resolveEffectiveSlug } from "../lib/groupSlug.js";
+import { effectiveSlugFromRows, isValidSlug, resolveEffectiveSlug } from "../lib/groupSlug.js";
 
 const envOf = (slug) => (name) => (name === "KUPA_GROUP_SLUG" ? slug : "");
 
@@ -88,6 +88,42 @@ describe("resolveEffectiveSlug (מול מסד מזויף)", () => {
     const admin = fakeAdmin([]);
     await expect(resolveEffectiveSlug(admin, envOf(""))).resolves.toBe("");
     expect(admin.calls).toHaveLength(0);
+  });
+
+  /* גל 6, פריט המשך: ולידציית [a-z0-9-] במקור. ה־slug מושחל לא־מוברח
+     למחרוזת פילטר PostgREST — ערך לא־תקין מטופל כמו «אין slug» ולעולם
+     לא מגיע לשאילתה. */
+  it("slug לא־תקין מהסביבה: מחרוזת ריקה, ושום שאילתת פילטר לא יוצאת", async () => {
+    const invalid = [
+      "Kupa",
+      "ku pa",
+      "a_b",
+      'x",config->prevSlugs.cs.["y',
+      "slug.eq.other",
+      "../etc",
+      "קופה",
+    ];
+    for (const bad of invalid) {
+      const admin = fakeAdmin([{ slug: "kupa", config: {} }]);
+      await expect(resolveEffectiveSlug(admin, envOf(bad))).resolves.toBe("");
+      expect(admin.calls).toHaveLength(0);
+    }
+  });
+});
+
+describe("isValidSlug (גל 6, פריט המשך)", () => {
+  it("תווי בסיס־36 ומקפים בלבד", () => {
+    expect(isValidSlug("kupa")).toBe(true);
+    expect(isValidSlug("kupa-2")).toBe(true);
+    expect(isValidSlug("a1b2c3d4e5f6")).toBe(true);
+    expect(isValidSlug("Kupa")).toBe(false);
+    expect(isValidSlug("ku pa")).toBe(false);
+    expect(isValidSlug("a_b")).toBe(false);
+    expect(isValidSlug("a.b")).toBe(false);
+    expect(isValidSlug("")).toBe(false);
+    expect(isValidSlug(null)).toBe(false);
+    expect(isValidSlug(undefined)).toBe(false);
+    expect(isValidSlug(42)).toBe(false);
   });
 });
 

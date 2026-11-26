@@ -288,11 +288,14 @@ export default function OwnerApp({ hosts } = {}) {
       const token = data.session?.access_token;
       const slug = groupRef.current?.slug;
       if (!token || !slug) return;
-      await fetch("/api/notify-start", {
+      const res = await fetch("/api/notify-start", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ slug }),
       });
+      /* גל 6, פריט המשך: כשל שרת (res.ok=false) לא נבלע בשקט — נרשם כמו
+         כשל רשת ב־catch שלמטה. התנהגות ההצלחה לא השתנתה. */
+      if (!res.ok) console.warn("notify-start failed: HTTP", res.status);
     } catch (e) {
       console.warn("notify-start failed:", e.message);
     }
