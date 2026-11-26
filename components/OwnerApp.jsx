@@ -352,7 +352,9 @@ export default function OwnerApp({ hosts } = {}) {
   }, [sendToWhatsAppGroup]);
 
   const signIn = useCallback(async () => {
-    const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    /* יעד החזרה של OAuth = מקור החלון הנוכחי בלבד (לא NEXT_PUBLIC_SITE_URL):
+       בייצור זהה לכתובת הקבועה, ובפריוויו חוזר לפריוויו עצמו. */
+    const site = window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${site}/auth/callback` },

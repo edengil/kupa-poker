@@ -331,7 +331,9 @@ export default function PublicApp({ slug, nightId = null }) {
   }, [live?.startedAt]);
 
   const signIn = async () => {
-    const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    /* יעד החזרה של OAuth = מקור החלון הנוכחי בלבד (לא NEXT_PUBLIC_SITE_URL):
+       בייצור זהה לכתובת הקבועה, ובפריוויו חוזר לפריוויו עצמו. */
+    const site = window.location.origin;
     const next = nightId ? `/g/${slug}/n/${encodeURIComponent(nightId)}` : `/g/${slug}`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
