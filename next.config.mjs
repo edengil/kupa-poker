@@ -32,8 +32,17 @@ const CSP_REPORT_ONLY = [
   "frame-ancestors 'none'",
 ].join("; ");
 
+/* TEMPORARY PREVIEW-ONLY SCAFFOLD (preview/csp-report-check only — will be
+   dropped wholesale before production): the enforcing CSP value plus
+   violation-reporting directives pointing at /api/csp-report, via both the
+   legacy report-uri/report-to directives and the modern Reporting-Endpoints
+   header. The base policy above stays byte-identical. */
+const CSP_REPORT_TO = `{"group":"csp-endpoint","max_age":10886400,"endpoints":[{"url":"/api/csp-report"}]}`;
+const CSP_ENFORCING_WITH_REPORTING = `${CSP_REPORT_ONLY}; report-uri /api/csp-report; report-to ${CSP_REPORT_TO}`;
+
 const SECURITY_HEADERS = [
-  { key: "Content-Security-Policy", value: CSP_REPORT_ONLY },
+  { key: "Content-Security-Policy", value: CSP_ENFORCING_WITH_REPORTING },
+  { key: "Reporting-Endpoints", value: 'csp-endpoint="/api/csp-report"' },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "same-origin" },

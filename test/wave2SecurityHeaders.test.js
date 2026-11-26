@@ -6,6 +6,9 @@ import { describe, it, expect } from "vitest";
    (פריט 3) אחרי עשן חי של כל המסכים. X-Frame-Options, nosniff,
    ו־Referrer-Policy שלא דולף את ה־slug. הבדיקה נועלת את מצב
    האכיפה: כותרת Content-Security-Policy קיימת, ואין Report-Only.
+   PREVIEW VARIANT (preview/csp-report-check בלבד, scaffold זמני):
+   בנוסף ננעלות הוראות הדיווח (report-uri + report-to) וכותרת
+   Reporting-Endpoints — אלה יוסרו לפני עליית קומיט הייצור.
    ============================================================================ */
 
 import nextConfig from "../next.config.mjs";
@@ -36,6 +39,16 @@ describe("security headers block (wave 2.2)", () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("form-action 'self'");
+  });
+
+  it("PREVIEW VARIANT: CSP carries violation-reporting directives + Reporting-Endpoints header", async () => {
+    const m = await headerMap();
+    const csp = m.get("Content-Security-Policy");
+    expect(csp).toContain("report-uri /api/csp-report");
+    expect(csp).toContain(
+      'report-to {"group":"csp-endpoint","max_age":10886400,"endpoints":[{"url":"/api/csp-report"}]}'
+    );
+    expect(m.get("Reporting-Endpoints")).toBe('csp-endpoint="/api/csp-report"');
   });
 
   it("CSP allows the resources the app actually loads", async () => {
